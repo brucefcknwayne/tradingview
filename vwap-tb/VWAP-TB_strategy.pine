@@ -34,7 +34,7 @@ strategy("VWAP 2σ Top/Bottom · Strategie", shorttitle = "VWAP-TB-S", overlay =
 //          Liegt der SL zu weit weg → Trade wird ausgelassen (Stop wird nie enger gezogen,
 //          stattdessen passt sich bei "Risiko in $" die Kontraktzahl an).
 //    TPs = 1R · 2R · 3R (einstellbar), drei Teile. Hybrid: TP3 am VWAP, falls weiter weg.
-//    Nach TP1: SL auf Einstand · nach TP2: SL auf TP1 (beides abschaltbar).
+//    Nach TP1: SL für den Rest auf Break Even – bleibt dort bis TP2/TP3 oder BE-Stop.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ═══════════════════════════ EINGABEN ═══════════════════════════
@@ -272,8 +272,7 @@ float  r3        = input.float(3.0, "TP3 (R)", minval = 0.25, step = 0.25, inlin
 int    p1        = input.int(33, "Anteil TP1 (%)", minval = 10, maxval = 45, inline = "p", group = G_P)
 int    p2        = input.int(33, "Anteil TP2 (%)", minval = 10, maxval = 45, inline = "p", group = G_P, tooltip = "Rest geht an TP3.")
 bool   useBE     = input.bool(true, "Nach TP1: SL auf Einstand", group = G_P)
-int    beTicks   = input.int(1, "Einstand + Ticks", minval = 0, group = G_P)
-bool   useTrail  = input.bool(true, "Nach TP2: SL auf TP1", group = G_P)
+int    beTicks   = input.int(0, "Einstand + Ticks", minval = 0, group = G_P, tooltip = "0 = exakt Einstiegskurs. 1–2 Ticks decken Kommission und Slippage.")
 
 string sizeMode  = input.string("Fix", "Positionsgröße", options = ["Fix", "Risiko in $"], group = G_Z, tooltip = "Risiko in $: Kontrakte = Risiko ÷ (SL-Abstand × Punktwert). Weiter Stop → weniger Kontrakte, nie ein engerer Stop.")
 int    fixQty    = input.int(3, "Kontrakte (Fix)", minval = 3, group = G_Z)
@@ -384,13 +383,13 @@ if barstate.isconfirmed and not na(atr)
     if placed or (posAbs > 0 and not closedNow)
         int   stage = placed ? 0 : posAbs >= tQty ? 0 : posAbs > tQ3 ? 1 : 2
         float be    = math.round_to_mintick(refPx + tDir * beTicks * syminfo.mintick)
-        curSL := stage == 0 ? tSL : stage == 1 ? (useBE ? be : tSL) : (useTrail ? tTP1 : useBE ? be : tSL)
+        curSL := stage == 0 ? tSL : useBE ? be : tSL
         string eid = tDir == 1 ? "Long" : "Short"
         if stage < 1
             strategy.exit("TP1", eid, qty = tQ1, limit = tTP1, stop = curSL, comment_profit = "TP1", comment_loss = "SL")
         if stage < 2
             strategy.exit("TP2", eid, qty = tQ2, limit = tTP2, stop = curSL, comment_profit = "TP2", comment_loss = stage == 1 and useBE ? "BE" : "SL")
-        strategy.exit("TP3", eid, qty = tQ3, limit = tTP3, stop = curSL, comment_profit = "TP3", comment_loss = stage == 2 and useTrail ? "Trail" : stage >= 1 and useBE ? "BE" : "SL")
+        strategy.exit("TP3", eid, qty = tQ3, limit = tTP3, stop = curSL, comment_profit = "TP3", comment_loss = stage >= 1 and useBE ? "BE" : "SL")
 
 bool showLv = posAbs > 0 or (sigShort or sigLong) and not fillDone
 plot(showLv ? curSL : na, "SL",      color.new(#ff5252, 0),  2, plot.style_linebr)
