@@ -105,9 +105,9 @@ f_new(array<box> bxs, array<bool> act, array<bool> hit, int t, float top, float 
     array.push(act, true)
     array.push(hit, false)
     if array.size(bxs) > maxShow
-        box.delete(array.shift(bxs))
         array.shift(act)
         array.shift(hit)
+        box.delete(array.shift(bxs))
 
 // dir = 1 bullisch (bricht nach unten), -1 bärisch (bricht nach oben)
 f_manage(array<box> bxs, array<bool> act, array<bool> hit, int dir, string txt) =>
@@ -128,10 +128,10 @@ f_manage(array<box> bxs, array<bool> act, array<bool> hit, int dir, string txt) 
                         box.set_text_color(bx, color.new(color.gray, 40))
                         array.set(act, i, false)
                     else
-                        box.delete(bx)
                         array.remove(bxs, i)
                         array.remove(act, i)
                         array.remove(hit, i)
+                        box.delete(bx)
                 else if not array.get(hit, i) and (dir == 1 ? low <= top : high >= bot)
                     array.set(hit, i, true)
                     if alertOn
