@@ -1,0 +1,284 @@
+//@version=6
+strategy("Multi-Setup 1:1 (1–10)", shorttitle = "MULTI-10", overlay = true, pyramiding = 0,
+     default_qty_type = strategy.fixed, default_qty_value = 1, slippage = 1,
+     commission_type = strategy.commission.cash_per_contract, commission_value = 2.5,
+     use_bar_magnifier = true, process_orders_on_close = false)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  10 Setups in einer Strategie, alle mit exakt 1:1 RR (SL = TP = ATR × Faktor).
+//  "Setup" wählt, welches davon echt gehandelt wird (Strategietester).
+//
+//   1  RSI(2)-Pullback im Trend        6  Donchian-Ausbruch (20) im Trend
+//   2  VWAP ±2σ Rückkehr ins Band      7  Inside-Bar-Ausbruch im Trend
+//   3  Bollinger (20,2) Rückkehr       8  Engulfing an der EMA 50
+//   4  Opening Range Breakout 9:30     9  Sweep Vortages-Hoch/-Tief
+//   5  EMA 9/21-Kreuzung im Trend     10  Stochastik-Umkehr im Trend
+//
+//  Tabelle unten rechts: ALLE 10 Setups werden parallel virtuell mitgerechnet
+//  (ohne Kosten, Einstieg zur nächsten Eröffnung, SL und TP in derselben Kerze
+//  = Verlust). So siehst du alle Trefferquoten auf einen Blick.
+//  Tabelle oben rechts: echte Ergebnisse des gewählten Setups inkl. Kosten.
+//
+//  Training = vor "Test ab" → hier Einstellungen wählen.
+//  Test     = danach        → nur anschauen, nicht mehr optimieren.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const string G_A = "Auswahl"
+const string G_F = "Filter"
+const string G_X = "Ausstieg"
+const string G_T = "Test-Zeitraum"
+
+int    setup    = input.int(1, "Setup (1–10)", minval = 1, maxval = 10, group = G_A)
+bool   allowL   = input.bool(true, "Longs", inline = "d", group = G_A)
+bool   allowS   = input.bool(true, "Shorts", inline = "d", group = G_A)
+bool   showCmp  = input.bool(true, "Vergleichstabelle aller 10 Setups", group = G_A)
+
+bool   useSess  = input.bool(true, "Nur in der Handelszeit", group = G_F)
+string sess     = input.session("0945-1530", "Handelszeit (New York)", group = G_F)
+int    maxDay   = input.int(3, "Max. Trades pro Tag", minval = 1, group = G_F)
+
+float  slATR    = input.float(1.5, "SL = ATR ×", minval = 0.25, step = 0.25, group = G_X)
+int    atrLen   = input.int(14, "ATR-Länge", minval = 2, group = G_X)
+float  rr       = input.float(1.0, "TP = SL ×", minval = 0.25, step = 0.25, group = G_X, tooltip = "1.0 = 1:1")
+bool   flatEOD  = input.bool(true, "Flat um 15:55 New York", group = G_X)
+
+int    testFrom = input.time(timestamp("2026-03-24"), "Test ab", group = G_T)
+
+// ═══════════════════════════ GEMEINSAME BAUSTEINE ═══════════════════════════
+float atr    = ta.atr(atrLen)
+float ema9   = ta.ema(close, 9)
+float ema21  = ta.ema(close, 21)
+float ema50  = ta.ema(close, 50)
+float ema200 = ta.ema(close, 200)
+bool  upT    = close > ema200 and ema50 > ema200
+bool  dnT    = close < ema200 and ema50 < ema200
+
+bool  inSess = not useSess or not na(time(timeframe.period, sess, "America/New_York"))
+bool  eod    = flatEOD and not na(time(timeframe.period, "1555-1800", "America/New_York"))
+bool  newDay = timeframe.change("D")
+
+// Alle ta.*-Aufrufe hier oben, damit sie auf jeder Kerze laufen
+float rsi2   = ta.rsi(close, 2)
+[vw, vwUp, vwLo] = ta.vwap(hlc3, newDay, 2.0)
+[bbMid, bbUp, bbLo] = ta.bb(close, 20, 2.0)
+float dcHi   = ta.highest(high, 20)[1]
+float dcLo   = ta.lowest(low, 20)[1]
+bool  x9Up   = ta.crossover(ema9, ema21)
+bool  x9Dn   = ta.crossunder(ema9, ema21)
+float stK    = ta.sma(ta.stoch(close, high, low, 14), 3)
+float stD    = ta.sma(stK, 3)
+bool  stUp   = ta.crossover(stK, stD)
+bool  stDn   = ta.crossunder(stK, stD)
+float pdh    = request.security(syminfo.tickerid, "D", high[1], lookahead = barmerge.lookahead_on)
+float pdl    = request.security(syminfo.tickerid, "D", low[1],  lookahead = barmerge.lookahead_on)
+
+// Opening Range 9:30–9:45 New York
+bool  inOR   = not na(time(timeframe.period, "0930-0945", "America/New_York"))
+var float orH = na
+var float orL = na
+if newDay
+    orH := na
+    orL := na
+if inOR
+    orH := na(orH) ? high : math.max(orH, high)
+    orL := na(orL) ? low  : math.min(orL, low)
+bool  orUp   = ta.crossover(close, nz(orH, high * 10))
+bool  orDn   = ta.crossunder(close, nz(orL, 0))
+bool  orOk   = not inOR and not na(orH)
+
+// ═══════════════════════════ DIE 10 SETUPS ═══════════════════════════
+bool insideP = high[1] < high[2] and low[1] > low[2]
+bool bullEng = close > open and close[1] < open[1] and close >= open[1] and open <= close[1]
+bool bearEng = close < open and close[1] > open[1] and close <= open[1] and open >= close[1]
+
+bool l1  = upT and rsi2 < 10
+bool s1  = dnT and rsi2 > 90
+bool l2  = low < vwLo and close > vwLo
+bool s2  = high > vwUp and close < vwUp
+bool l3  = close[1] < bbLo[1] and close > bbLo
+bool s3  = close[1] > bbUp[1] and close < bbUp
+bool l4  = orOk and orUp
+bool s4  = orOk and orDn
+bool l5  = x9Up and close > ema200
+bool s5  = x9Dn and close < ema200
+bool l6  = upT and close > dcHi
+bool s6  = dnT and close < dcLo
+bool l7  = upT and insideP and close > high[1]
+bool s7  = dnT and insideP and close < low[1]
+bool l8  = upT and low <= ema50 and close > ema50 and bullEng
+bool s8  = dnT and high >= ema50 and close < ema50 and bearEng
+bool l9  = low < pdl and close > pdl
+bool s9  = high > pdh and close < pdh
+bool l10 = upT and stUp and stK[1] < 20
+bool s10 = dnT and stDn and stK[1] > 80
+
+array<bool>   sigL  = array.from(l1, l2, l3, l4, l5, l6, l7, l8, l9, l10)
+array<bool>   sigS  = array.from(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10)
+array<string> names = array.from("RSI(2)-Pullback", "VWAP ±2σ Rückkehr", "Bollinger Rückkehr", "Opening Range 9:30", "EMA 9/21 Kreuzung", "Donchian-Ausbruch", "Inside-Bar-Ausbruch", "Engulfing EMA 50", "Sweep Vortag H/T", "Stochastik-Umkehr")
+
+bool canTrade = inSess and not eod and not na(atr)
+
+// ═══════════════════════════ ECHTER HANDEL (gewähltes Setup) ═══════════════════════════
+var int dayCount = 0
+if newDay
+    dayCount := 0
+
+bool longS  = allowL and array.get(sigL, setup - 1)
+bool shortS = allowS and array.get(sigS, setup - 1)
+
+if barstate.isconfirmed
+    if eod and strategy.position_size != 0
+        strategy.close_all(comment = "EOD")
+    if strategy.position_size == 0 and dayCount < maxDay and canTrade
+        // SL/TP in Ticks → gemessen vom echten Einstiegskurs, also exakt 1:1
+        int slTicks = math.max(1, math.round(slATR * atr / syminfo.mintick))
+        int tpTicks = math.max(1, math.round(rr * slATR * atr / syminfo.mintick))
+        if longS
+            strategy.entry("L", strategy.long, comment = "#" + str.tostring(setup))
+            strategy.exit("LX", "L", loss = slTicks, profit = tpTicks, comment_loss = "SL", comment_profit = "TP")
+            dayCount += 1
+        else if shortS
+            strategy.entry("S", strategy.short, comment = "#" + str.tostring(setup))
+            strategy.exit("SX", "S", loss = slTicks, profit = tpTicks, comment_loss = "SL", comment_profit = "TP")
+            dayCount += 1
+
+plot(ema200, "EMA 200", color.new(color.gray, 50), 1)
+bgcolor(time >= testFrom and time[1] < testFrom ? color.new(color.yellow, 60) : na, title = "Beginn Test-Zeitraum")
+
+// ═══════════════════════════ VIRTUELLE TRADES (alle 10 parallel) ═══════════════════════════
+var array<int>   vDir  = array.new<int>(10, 0)
+var array<int>   vPend = array.new<int>(10, 0)
+var array<float> vRisk = array.new<float>(10, na)
+var array<float> vEnt  = array.new<float>(10, na)
+var array<int>   vTime = array.new<int>(10, 0)
+var array<int>   vDay  = array.new<int>(10, 0)
+var array<int>   nA    = array.new<int>(10, 0)
+var array<int>   wA    = array.new<int>(10, 0)
+var array<float> rA    = array.new<float>(10, 0.0)
+var array<int>   nB    = array.new<int>(10, 0)
+var array<int>   wB    = array.new<int>(10, 0)
+var array<float> rB    = array.new<float>(10, 0.0)
+
+if newDay
+    for i = 0 to 9
+        array.set(vDay, i, 0)
+
+if barstate.isconfirmed and showCmp
+    for i = 0 to 9
+        // Einstieg vom letzten Signal zur Eröffnung dieser Kerze
+        int pd = array.get(vPend, i)
+        if pd != 0
+            array.set(vDir, i, pd)
+            array.set(vEnt, i, open)
+            array.set(vTime, i, time)
+            array.set(vPend, i, 0)
+        // Offenen Trade prüfen (SL und TP in derselben Kerze = Verlust)
+        int d = array.get(vDir, i)
+        if d != 0
+            float e    = array.get(vEnt, i)
+            float rk   = array.get(vRisk, i)
+            float sl   = e - d * rk
+            float tp   = e + d * rr * rk
+            bool  hSL  = d == 1 ? low <= sl : high >= sl
+            bool  hTP  = d == 1 ? high >= tp : low <= tp
+            float res  = hSL ? -1.0 : hTP ? rr : eod ? d * (close - e) / rk : na
+            if not na(res)
+                bool test = array.get(vTime, i) >= testFrom
+                if test
+                    array.set(nB, i, array.get(nB, i) + 1)
+                    array.set(wB, i, array.get(wB, i) + (res > 0 ? 1 : 0))
+                    array.set(rB, i, array.get(rB, i) + res)
+                else
+                    array.set(nA, i, array.get(nA, i) + 1)
+                    array.set(wA, i, array.get(wA, i) + (res > 0 ? 1 : 0))
+                    array.set(rA, i, array.get(rA, i) + res)
+                array.set(vDir, i, 0)
+        // Neues Signal → Einstieg zur nächsten Eröffnung
+        bool gl = allowL and array.get(sigL, i)
+        bool gs = allowS and array.get(sigS, i)
+        if array.get(vDir, i) == 0 and canTrade and array.get(vDay, i) < maxDay and (gl or gs)
+            array.set(vPend, i, gl ? 1 : -1)
+            array.set(vRisk, i, slATR * atr)
+            array.set(vDay, i, array.get(vDay, i) + 1)
+
+// ═══════════════════════════ TABELLEN ═══════════════════════════
+color C_BG  = #131722
+color C_FR  = #2a2e39
+color C_TX  = #d1d4dc
+color C_DIM = #8a8f9c
+color C_GR  = #4caf50
+color C_RD  = #ff5252
+
+f_wr(int n, int w) =>
+    n > 0 ? str.tostring(100.0 * w / n, "#.0") + " %" : "–"
+f_wrCol(int n, int w) =>
+    n == 0 ? C_TX : 100.0 * w / n >= 65 ? C_GR : 100.0 * w / n < 53 ? C_RD : C_TX
+
+var table tReal = table.new(position.top_right, 5, 4, bgcolor = C_BG, frame_color = C_FR, frame_width = 1, border_color = C_FR, border_width = 1)
+var table tCmp  = table.new(position.bottom_right, 6, 11, bgcolor = C_BG, frame_color = C_FR, frame_width = 1, border_color = C_FR, border_width = 1)
+
+if barstate.islast
+    // Echte Ergebnisse des gewählten Setups (inkl. Kommission + Slippage)
+    int   n1 = 0
+    int   w1 = 0
+    float g1 = 0.0
+    float l1s = 0.0
+    float p1 = 0.0
+    int   n2 = 0
+    int   w2 = 0
+    float g2 = 0.0
+    float l2s = 0.0
+    float p2 = 0.0
+    if strategy.closedtrades > 0
+        for i = 0 to strategy.closedtrades - 1
+            float p = strategy.closedtrades.profit(i)
+            if strategy.closedtrades.entry_time(i) >= testFrom
+                n2 += 1
+                w2 += p > 0 ? 1 : 0
+                g2 += math.max(p, 0)
+                l2s += math.max(-p, 0)
+                p2 += p
+            else
+                n1 += 1
+                w1 += p > 0 ? 1 : 0
+                g1 += math.max(p, 0)
+                l1s += math.max(-p, 0)
+                p1 += p
+    table.cell(tReal, 0, 0, "#" + str.tostring(setup) + " " + array.get(names, setup - 1), text_color = C_TX, text_size = size.small, text_halign = text.align_left)
+    table.cell(tReal, 1, 0, "Trades",        text_color = C_DIM, text_size = size.small)
+    table.cell(tReal, 2, 0, "Trefferquote",  text_color = C_DIM, text_size = size.small)
+    table.cell(tReal, 3, 0, "Profit-Faktor", text_color = C_DIM, text_size = size.small)
+    table.cell(tReal, 4, 0, "Netto",         text_color = C_DIM, text_size = size.small)
+    array<string> rn = array.from("Training", "Test", "Gesamt")
+    array<int>    rN = array.from(n1, n2, n1 + n2)
+    array<int>    rW = array.from(w1, w2, w1 + w2)
+    array<float>  rG = array.from(g1, g2, g1 + g2)
+    array<float>  rL = array.from(l1s, l2s, l1s + l2s)
+    array<float>  rP = array.from(p1, p2, p1 + p2)
+    for r = 0 to 2
+        int   n  = array.get(rN, r)
+        int   w  = array.get(rW, r)
+        float gl = array.get(rL, r)
+        float pn = array.get(rP, r)
+        table.cell(tReal, 0, r + 1, array.get(rn, r), text_color = C_DIM, text_size = size.small, text_halign = text.align_left)
+        table.cell(tReal, 1, r + 1, str.tostring(n), text_color = C_TX, text_size = size.small)
+        table.cell(tReal, 2, r + 1, f_wr(n, w), text_color = f_wrCol(n, w), text_size = size.small)
+        table.cell(tReal, 3, r + 1, gl > 0 ? str.tostring(array.get(rG, r) / gl, "#.00") : "–", text_color = C_TX, text_size = size.small)
+        table.cell(tReal, 4, r + 1, str.tostring(pn, "#,###") + " $", text_color = pn >= 0 ? C_GR : C_RD, text_size = size.small)
+
+    // Vergleich aller 10 Setups (virtuell, ohne Kosten)
+    if showCmp
+        array<string> hd = array.from("#", "Setup", "Trades Tr/Te", "WR Training", "WR Test", "R Test")
+        for c = 0 to 5
+            table.cell(tCmp, c, 0, array.get(hd, c), text_color = C_DIM, text_size = size.tiny)
+        for i = 0 to 9
+            color bg = i == setup - 1 ? #1e3a5f : C_BG
+            int   nTr = array.get(nA, i)
+            int   nb  = array.get(nB, i)
+            float rb  = array.get(rB, i)
+            table.cell(tCmp, 0, i + 1, str.tostring(i + 1), bgcolor = bg, text_color = C_DIM, text_size = size.tiny)
+            table.cell(tCmp, 1, i + 1, array.get(names, i), bgcolor = bg, text_color = C_TX, text_size = size.tiny, text_halign = text.align_left)
+            table.cell(tCmp, 2, i + 1, str.tostring(nTr) + " / " + str.tostring(nb), bgcolor = bg, text_color = C_TX, text_size = size.tiny)
+            table.cell(tCmp, 3, i + 1, f_wr(nTr, array.get(wA, i)), bgcolor = bg, text_color = f_wrCol(nTr, array.get(wA, i)), text_size = size.tiny)
+            table.cell(tCmp, 4, i + 1, f_wr(nb, array.get(wB, i)), bgcolor = bg, text_color = f_wrCol(nb, array.get(wB, i)), text_size = size.tiny)
+            table.cell(tCmp, 5, i + 1, (rb >= 0 ? "+" : "") + str.tostring(rb, "#.0") + " R", bgcolor = bg, text_color = rb >= 0 ? C_GR : C_RD, text_size = size.tiny)
