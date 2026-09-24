@@ -2,7 +2,7 @@
 strategy("VWAP 2σ Top/Bottom · Strategie", shorttitle = "VWAP-TB-S", overlay = true, pyramiding = 0,
      default_qty_type = strategy.fixed, default_qty_value = 3, slippage = 1,
      commission_type = strategy.commission.cash_per_contract, commission_value = 0.5,
-     use_bar_magnifier = true, process_orders_on_close = false)
+     use_bar_magnifier = true, process_orders_on_close = false, max_labels_count = 500)
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Nur Umkehrungen am ±2σ-VWAP-Band. Ein Regler steuert alles:
@@ -279,6 +279,7 @@ int    fixQty    = input.int(3, "Kontrakte (Fix)", minval = 3, group = G_Z)
 float  riskUSD   = input.float(300, "Risiko pro Trade ($)", minval = 1, group = G_Z)
 int    timeStop  = input.int(0, "Zeit-Stop (Minuten, 0 = aus)", minval = 0, group = G_Z, tooltip = "Schließt den ganzen Trade, wenn TP1 nach X Minuten noch nicht erreicht ist. Umkehrungen, die nicht schnell laufen, sind oft falsch.")
 bool   flatClose = input.bool(true, "Vor der CME-Pause flat (16:55–18:00 NY)", group = G_Z)
+bool   showSkip  = input.bool(true, "Grund zeigen, wenn ein Dreieck nicht gehandelt wird", group = G_Z)
 
 float atrSlow  = ta.atr(math.max(1, math.round(120 * tfK))) * math.sqrt(tfK)
 float posAbs   = math.abs(strategy.position_size)
@@ -378,6 +379,11 @@ if barstate.isconfirmed and not na(atr)
             placed := true
             if alertSig
                 alert(syminfo.ticker + (dir == 1 ? " ▲ LONG " : " ▼ SHORT ") + str.tostring(q) + "x @ " + str.tostring(close, format.mintick) + " · SL " + str.tostring(sl, format.mintick) + " · TP1 " + str.tostring(tTP1, format.mintick) + " · TP2 " + str.tostring(tTP2, format.mintick) + " · TP3 " + str.tostring(tTP3, format.mintick), alert.freq_once_per_bar_close)
+
+    // Dreieck ohne Einstieg → Grund direkt am Chart zeigen
+    if (sigShort or sigLong) and not placed and showSkip
+        string why = strategy.position_size != 0 ? "schon im Trade" : inFlatWin ? "Session-Ende (16:55–18:00 NY)" : lastSkip
+        label.new(bar_index, sigShort ? high + atr : low - atr, "✕ " + why, style = sigShort ? label.style_label_down : label.style_label_up, color = color.new(color.gray, 25), textcolor = color.white, size = size.tiny)
 
     // 4) Exits setzen / nachziehen (jeder Teil hat eigenes Limit + gemeinsamen SL)
     if placed or (posAbs > 0 and not closedNow)
