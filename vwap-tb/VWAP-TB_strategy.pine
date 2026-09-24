@@ -1,0 +1,462 @@
+//@version=6
+strategy("VWAP 2σ Top/Bottom · Strategie", shorttitle = "VWAP-TB-S", overlay = true, pyramiding = 0,
+     default_qty_type = strategy.fixed, default_qty_value = 3, slippage = 1,
+     commission_type = strategy.commission.cash_per_contract, commission_value = 0.5,
+     use_bar_magnifier = true, process_orders_on_close = false)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Nur Umkehrungen am ±2σ-VWAP-Band. Ein Regler steuert alles:
+//  SIGNAL-QUALITÄT 1 … 10
+//     1 = viele Signale, lockere Regeln
+//    10 = nur die stärksten Top/Bottom-Ticks
+//
+//  Was der Regler verschärft:
+//    · Extrem der letzten X Kerzen   (15 → 240 Kerzen)
+//    · Mindest-Docht                 (15 % → 55 % der Kerze)
+//    · Mindest-Relativvolumen        (0.6x → 2.2x)
+//    · Umschwung vom Extrem          (0.3 → 2.0 × ATR)
+//    · Delta-Bedingungen             (ab Stufe 3 bzw. 4)
+//    · Ein Signal pro Ausflug        (ab Stufe 2)
+//    · Zusätzliche Überdehnung       (ab Stufe 7: bis +1σ über dem Band)
+//
+//  Ablauf: Setup (Absorption am Extrem jenseits des Bands) → Bestätigung
+//  (Schluss hinter der Setup-Kerze, Delta dreht) → Dreieck.
+//  Signale bei Kerzenschluss → kein Repaint.
+//  Läuft auf 15s-, 30s- und 1m-Charts: alle Längen sind in MINUTEN angegeben und
+//  werden automatisch auf den Chart umgerechnet. Auf 15s/30s kommt das Dreieck früher.
+//  Killzone: 18:00–20:00 New York KEINE Signale (einstellbar, abschaltbar).
+//  RSI-Konfluenz: Short nur bei RSI über 70, Long nur bei RSI unter 30 (1m).
+//
+//  STRATEGIE: Dreieck → Einstieg zur Eröffnung der nächsten Kerze.
+//    SL  = hinter dem Absorptions-Extrem (strukturelle Invalidierung) + Puffer.
+//          Puffer = ATR × Faktor, wächst mit Volatilitäts-Regime (ATR 30 min / 120 min)
+//          und Relativvolumen der Setup-Kerze. Mindestens X Ticks / Y × ATR.
+//          Liegt der SL zu weit weg → Trade wird ausgelassen (Stop wird nie enger gezogen,
+//          stattdessen passt sich bei "Risiko in $" die Kontraktzahl an).
+//    TPs = 1R · 2R · 3R (einstellbar), drei Teile. Hybrid: TP3 am VWAP, falls weiter weg.
+//    Nach TP1: SL auf Einstand · nach TP2: SL auf TP1 (beides abschaltbar).
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ═══════════════════════════ EINGABEN ═══════════════════════════
+const string G_Q = "Signal-Qualität"
+const string G_V = "VWAP"
+const string G_K = "Killzone"
+const string G_R = "RSI-Konfluenz"
+const string G_S = "Anzeige"
+
+int    quality  = input.int(6, "Stufe (1 = viele · 10 = nur die stärksten)", minval = 1, maxval = 10, group = G_Q)
+string tempo    = input.string("Normal", "Bestätigungs-Tempo", options = ["Schnell", "Normal", "Sicher"], group = G_Q, tooltip = "Wie weit der Preis nach dem Extrem schon zurückgelaufen sein muss, bevor das Dreieck kommt. Schnell = früherer Einstieg, aber mehr Fehlsignale. Sicher = Verhalten wie bisher.")
+
+string anchorIn = input.string("Session", "Anker", options = ["Session", "RTH (9:30 NY)", "Woche", "Monat"], group = G_V)
+float  bandMult = input.float(2.0, "Band (σ)", minval = 0.5, step = 0.25, group = G_V)
+bool   showVwap = input.bool(false, "VWAP & Bänder auf dem Chart zeigen", group = G_V)
+
+bool   useKZ    = input.bool(true, "Keine Signale in der Killzone", group = G_K)
+string kzSess   = input.session("1800-2000", "Killzone", group = G_K)
+string kzTz     = input.string("America/New_York", "Zeitzone der Killzone", group = G_K, tooltip = "1800-2000 New York = 6 PM – 8 PM (ET).")
+
+color  colShort = input.color(#00E5FF, "Short ▼", inline = "c", group = G_S)
+color  colLong  = input.color(#00E5FF, "Long ▲",  inline = "c", group = G_S)
+string tPos     = input.string("Oben rechts", "Tabelle", options = ["Oben rechts", "Oben links", "Unten rechts", "Unten links", "Mitte rechts"], group = G_S)
+string tSize    = input.string("Klein", "Textgröße", options = ["Winzig", "Klein", "Normal"], group = G_S)
+string tzIn     = input.string("Europe/Berlin", "Zeitzone", group = G_S)
+
+bool   useRSI   = input.bool(true, "RSI-Konfluenz verwenden", group = G_R)
+int    rsiLen   = input.int(14, "RSI-Länge (Minuten)", minval = 2, group = G_R)
+float  rsiOB    = input.float(70, "Short nur über", minval = 50, maxval = 100, group = G_R)
+float  rsiOS    = input.float(30, "Long nur unter", minval = 0, maxval = 50, group = G_R)
+
+bool   alertSig = input.bool(true, "alert() bei Signal", group = G_S, tooltip = "Alarm anlegen: Bedingung 'VWAP-TB' → 'Jeder alert()-Funktionsaufruf'.")
+
+// ═══════════════════════════ ZEITBASIS ═══════════════════════════
+// Alle Längen sind in Minuten gedacht und werden auf den Chart-Timeframe umgerechnet
+int   tfSec = timeframe.in_seconds()
+float tfK   = 60.0 / tfSec                     // Kerzen pro Minute (15s → 4, 30s → 2, 1m → 1)
+
+// ═══════════════════════════ STUFE → REGELN ═══════════════════════════
+float qT        = (quality - 1) / 9.0
+int   swingLen  = math.max(1, math.round((15 + qT * 225) * tfK))
+float wickMin   = 0.15 + qT * 0.40
+float rvMin     = 0.6 + qT * 1.6
+float tempoK    = tempo == "Schnell" ? 0.4 : tempo == "Normal" ? 0.7 : 1.0
+float dropATR   = (0.3 + qT * 1.7) * tempoK
+int   confBars  = math.max(1, math.round((8 - qT * 4) * tfK))
+bool  useDelta  = quality >= 3
+bool  confDelta = quality >= 4
+bool  useLock   = quality >= 2
+float resetSig  = 0.5 + qT * 1.0
+float extSig    = math.max(0, quality - 6) * 0.25
+float edgeFrac  = 0.33
+int   baseLen   = math.max(1, math.round((30) * tfK))
+int   atrLen    = math.max(1, math.round((30) * tfK))
+int   rsiBars   = math.max(1, math.round((rsiLen) * tfK))
+
+// ═══════════════════════════ VWAP + BÄNDER ═══════════════════════════
+bool rthNow    = not na(time(timeframe.period, "0930-1600", "America/New_York"))
+bool rthStart  = rthNow and not rthNow[1]
+bool chgD      = timeframe.change("D")
+bool chgW      = timeframe.change("W")
+bool chgM      = timeframe.change("M")
+bool anchorChg = anchorIn == "Woche" ? chgW : anchorIn == "Monat" ? chgM : anchorIn == "RTH (9:30 NY)" ? rthStart : chgD
+
+[vw, upB, loB] = ta.vwap(hlc3, anchorChg, bandMult)
+float sigma   = (upB - vw) / bandMult
+float resetUp = vw + resetSig * sigma
+float resetDn = vw - resetSig * sigma
+
+plot(showVwap ? vw  : na, "VWAP",         color.new(color.gray, 20), 1)
+plot(showVwap ? upB : na, "Oberes Band",  color.new(color.gray, 50), 1)
+plot(showVwap ? loB : na, "Unteres Band", color.new(color.gray, 50), 1)
+
+// Direkt nach einem VWAP-Neustart (Session = 18:00 NY) sind die Bänder extrem eng
+// → erst nach 15 Minuten werten, sonst gilt fast jede Kerze als "über dem Band"
+var int ancBar = na
+if anchorChg
+    ancBar := bar_index
+bool bandReady = not na(ancBar) and bar_index - ancBar >= math.max(1, math.round((15) * tfK))
+
+bool aboveBand = bandReady and high > upB
+bool belowBand = bandReady and low < loB
+bool stretchS  = high >= upB + extSig * sigma
+bool stretchL  = low  <= loB - extSig * sigma
+
+// ═══════════════════════════ KILLZONE ═══════════════════════════
+// inKZ = true heißt hier: Handel ERLAUBT (also außerhalb der Killzone)
+bool kzNow = not na(time(timeframe.period, kzSess, kzTz))
+bool inKZ  = not useKZ or not kzNow
+
+// ═══════════════════════════ FOOTPRINT ═══════════════════════════
+int       fpTicks = syminfo.root == "NQ" or syminfo.root == "MNQ" ? 2 : 1
+footprint fp      = request.footprint(fpTicks, 70)
+bool      fpOk    = not na(fp)
+
+float barVol   = nz(volume)
+float barDelta = 0.0
+if fpOk
+    barVol   := nz(fp.buy_volume()) + nz(fp.sell_volume())
+    barDelta := nz(fp.delta())
+
+float avgV = ta.sma(barVol, baseLen)
+float rv   = na(avgV) or avgV <= 0 ? na : barVol / avgV
+// ATR in 1-Minuten-Einheiten (auf 15s/30s hochgerechnet), damit die Schwellen gleich bleiben
+float atr  = ta.atr(atrLen) * math.sqrt(tfK)
+
+float rng  = high - low
+float topD = 0.0
+float botD = 0.0
+if fpOk and rng > 0 and (aboveBand or belowBand)
+    float topEdge = high - edgeFrac * rng
+    float botEdge = low + edgeFrac * rng
+    array<volume_row> rws = fp.rows()
+    for rw in rws
+        float mid = (rw.up_price() + rw.down_price()) / 2
+        float d   = nz(rw.delta())
+        if mid >= topEdge
+            topD += d
+        if mid <= botEdge
+            botD += d
+
+// ═══════════════════════════ RSI (Chart-Timeframe = 1m) ═══════════════════════════
+float rsi   = ta.rsi(close, rsiBars)
+bool  rsiS  = not useRSI or (not na(rsi) and rsi > rsiOB)
+bool  rsiL  = not useRSI or (not na(rsi) and rsi < rsiOS)
+
+// ═══════════════════════════ SETUP ═══════════════════════════
+bool  isHH   = high >= ta.highest(high, swingLen)
+bool  isLL   = low  <= ta.lowest(low, swingLen)
+float upWick = rng > 0 ? (high - math.max(open, close)) / rng : 0.0
+float dnWick = rng > 0 ? (math.min(open, close) - low) / rng : 0.0
+bool  volOk  = not na(rv) and rv >= rvMin
+bool  aggUp  = not useDelta or not fpOk or topD > 0 or barDelta > 0
+bool  aggDn  = not useDelta or not fpOk or botD < 0 or barDelta < 0
+
+bool setupS = inKZ and rsiS and aboveBand and stretchS and isHH and rng > 0 and upWick >= wickMin and volOk and aggUp
+bool setupL = inKZ and rsiL and belowBand and stretchL and isLL and rng > 0 and dnWick >= wickMin and volOk and aggDn
+
+// FAILING: jenseits des Bands, Aggressoren setzen sich durch (neues Extrem, Schluss am Extrem)
+bool failS = aboveBand and isHH and rng > 0 and upWick < 0.15 and close > open and (not fpOk or barDelta > 0)
+bool failL = belowBand and isLL and rng > 0 and dnWick < 0.15 and close < open and (not fpOk or barDelta < 0)
+
+// ═══════════════════════════ BESTÄTIGUNG + SIGNALE ═══════════════════════════
+var float sHi    = na
+var float sLo    = na
+var int   sBar   = na
+var float lHi    = na
+var float lLo    = na
+var int   lBar   = na
+var bool  lockS  = false
+var float lockSX = na
+var bool  lockL  = false
+var float lockLX = na
+var int   lastSigTime = na
+var int   lastSigDir  = 0
+var float sRv    = na
+var float lRv    = na
+var float sigRv  = na
+
+bool sigShort = false
+bool sigLong  = false
+
+if barstate.isconfirmed and not na(atr)
+    // Sperre aufheben: zurück Richtung VWAP oder altes Signal gescheitert
+    if lockS and (close < resetUp or high > lockSX)
+        lockS := false
+    if lockL and (close > resetDn or low < lockLX)
+        lockL := false
+
+    // Offene Setups verwerfen: neues Extrem oder zu lange her
+    if not na(sBar) and (high > sHi or bar_index - sBar > confBars)
+        sBar := na
+    if not na(lBar) and (low < lLo or bar_index - lBar > confBars)
+        lBar := na
+
+    // Bestätigung Short
+    if not na(sBar) and bar_index > sBar and not lockS and inKZ
+        bool dOk = not confDelta or not fpOk or barDelta < 0
+        if close < sLo and sHi - close >= dropATR * atr and dOk
+            sigShort    := true
+            lockS       := useLock
+            lockSX      := sHi
+            sigRv       := sRv
+            lastSigTime := time
+            lastSigDir  := -1
+            if alertSig
+                alert(syminfo.ticker + " ▼ SHORT (Stufe " + str.tostring(quality) + ") · Top über +" + str.tostring(bandMult) + "σ · Extrem " + str.tostring(sHi, format.mintick), alert.freq_once_per_bar_close)
+            sBar := na
+
+    // Bestätigung Long
+    if not na(lBar) and bar_index > lBar and not lockL and inKZ
+        bool dOk = not confDelta or not fpOk or barDelta > 0
+        if close > lHi and close - lLo >= dropATR * atr and dOk
+            sigLong     := true
+            lockL       := useLock
+            lockLX      := lLo
+            sigRv       := lRv
+            lastSigTime := time
+            lastSigDir  := 1
+            if alertSig
+                alert(syminfo.ticker + " ▲ LONG (Stufe " + str.tostring(quality) + ") · Bottom unter −" + str.tostring(bandMult) + "σ · Extrem " + str.tostring(lLo, format.mintick), alert.freq_once_per_bar_close)
+            lBar := na
+
+    // Neue Setups merken
+    if setupS and not lockS
+        sHi  := high
+        sLo  := low
+        sBar := bar_index
+        sRv  := rv
+    if setupL and not lockL
+        lHi  := high
+        lLo  := low
+        lBar := bar_index
+        lRv  := rv
+
+plotshape(sigShort, "Short-Signal", shape.triangledown, location.abovebar, colShort, size = size.small)
+plotshape(sigLong,  "Long-Signal",  shape.triangleup,   location.belowbar, colLong,  size = size.small)
+
+// ═══════════════════════════ TRADE-MANAGEMENT ═══════════════════════════
+const string G_T = "Trade · Stop-Loss"
+const string G_P = "Trade · Ziele"
+const string G_Z = "Trade · Größe & Zeit"
+
+float  bufATR    = input.float(0.15, "Puffer hinter dem Extrem (× ATR)", minval = 0, step = 0.05, group = G_T, tooltip = "SL sitzt hinter dem Hoch/Tief der Absorptions-Kerze. Der Puffer schützt vor einem letzten Stop-Run durch das Extrem.")
+int    bufTicks  = input.int(4, "Mindest-Puffer (Ticks)", minval = 0, group = G_T)
+bool   useVolReg = input.bool(true, "Puffer an Volatilität anpassen", group = G_T, tooltip = "ATR 30 min ÷ ATR 120 min, begrenzt auf 0.8–1.5×. Expandierende Vola → größerer Puffer.")
+bool   useVolK   = input.bool(true, "Puffer an Volumen anpassen", group = G_T, tooltip = "Hohes Relativvolumen an der Setup-Kerze = schneller Markt → größerer Puffer (1.0–1.5×).")
+float  minSLATR  = input.float(0.5, "SL mindestens (× ATR)", minval = 0, step = 0.1, group = G_T, tooltip = "Verhindert Stops im reinen Rauschen, wenn der Einstieg sehr nah am Extrem liegt.")
+float  maxSLATR  = input.float(3.0, "Trade auslassen, wenn SL über (× ATR)", minval = 0.5, step = 0.25, group = G_T)
+
+string tpMode    = input.string("R-Vielfache", "Ziel-Modus", options = ["R-Vielfache", "Hybrid (TP3 = VWAP)"], group = G_P, tooltip = "Hybrid: TP3 liegt am VWAP (natürliches Ziel einer Umkehr vom Band), sofern der weiter weg ist als TP2. Sonst TP3 = R-Vielfaches.")
+float  r1        = input.float(1.0, "TP1 (R)", minval = 0.25, step = 0.25, inline = "r", group = G_P)
+float  r2        = input.float(2.0, "TP2 (R)", minval = 0.25, step = 0.25, inline = "r", group = G_P)
+float  r3        = input.float(3.0, "TP3 (R)", minval = 0.25, step = 0.25, inline = "r", group = G_P)
+int    p1        = input.int(33, "Anteil TP1 (%)", minval = 10, maxval = 45, inline = "p", group = G_P)
+int    p2        = input.int(33, "Anteil TP2 (%)", minval = 10, maxval = 45, inline = "p", group = G_P, tooltip = "Rest geht an TP3.")
+bool   useBE     = input.bool(true, "Nach TP1: SL auf Einstand", group = G_P)
+int    beTicks   = input.int(1, "Einstand + Ticks", minval = 0, group = G_P)
+bool   useTrail  = input.bool(true, "Nach TP2: SL auf TP1", group = G_P)
+
+string sizeMode  = input.string("Fix", "Positionsgröße", options = ["Fix", "Risiko in $"], group = G_Z, tooltip = "Risiko in $: Kontrakte = Risiko ÷ (SL-Abstand × Punktwert). Weiter Stop → weniger Kontrakte, nie ein engerer Stop.")
+int    fixQty    = input.int(3, "Kontrakte (Fix)", minval = 3, group = G_Z)
+float  riskUSD   = input.float(300, "Risiko pro Trade ($)", minval = 1, group = G_Z)
+int    timeStop  = input.int(0, "Zeit-Stop (Minuten, 0 = aus)", minval = 0, group = G_Z, tooltip = "Schließt den ganzen Trade, wenn TP1 nach X Minuten noch nicht erreicht ist. Umkehrungen, die nicht schnell laufen, sind oft falsch.")
+bool   flatClose = input.bool(true, "Vor der CME-Pause flat (16:55–18:00 NY)", group = G_Z)
+
+float atrSlow  = ta.atr(math.max(1, math.round(120 * tfK))) * math.sqrt(tfK)
+float posAbs   = math.abs(strategy.position_size)
+bool  inFlatWin = flatClose and not na(time(timeframe.period, "1655-1800", "America/New_York"))
+
+var int    tDir     = 0
+var float  tSL      = na
+var float  tTP1     = na
+var float  tTP2     = na
+var float  tTP3     = na
+var float  tVW      = na
+var float  refPx    = na
+var float  curSL    = na
+var int    tQty     = 0
+var int    tQ1      = 0
+var int    tQ2      = 0
+var int    tQ3      = 0
+var int    entryBar = na
+var bool   fillDone = true
+var string lastSkip = ""
+
+// Ziele relativ zum Einstieg: R = Abstand Einstieg → SL
+f_targets(float ep, float sl, int dir) =>
+    float R  = math.abs(ep - sl)
+    float t1 = ep + dir * r1 * R
+    float t2 = ep + dir * r2 * R
+    float t3 = ep + dir * r3 * R
+    if tpMode == "Hybrid (TP3 = VWAP)" and not na(tVW) and dir * (tVW - ep) > dir * (t2 - ep)
+        t3 := tVW
+    [t1, t2, t3]
+
+if barstate.isconfirmed and not na(atr)
+    bool placed    = false
+    bool closedNow = false
+
+    // 1) Einstieg gefüllt → Ziele vom echten Einstiegskurs neu rechnen (SL bleibt strukturell)
+    if posAbs > 0 and not fillDone
+        refPx    := strategy.position_avg_price
+        entryBar := bar_index
+        fillDone := true
+        if tDir * (refPx - tSL) <= 0
+            strategy.close_all(comment = "Gap über SL")
+            closedNow := true
+        else
+            [a, b, c] = f_targets(refPx, tSL, tDir)
+            tTP1 := a
+            tTP2 := b
+            tTP3 := c
+
+    // 2) Zeit- und Session-Ausstieg
+    if posAbs > 0 and not closedNow and inFlatWin
+        strategy.close_all(comment = "Session-Ende")
+        closedNow := true
+    if posAbs > 0 and not closedNow and timeStop > 0 and posAbs >= tQty and bar_index - entryBar >= math.round(timeStop * tfK)
+        strategy.close_all(comment = "Zeit-Stop")
+        closedNow := true
+
+    // 3) Neues Signal → Einstieg
+    if (sigShort or sigLong) and strategy.position_size == 0 and not inFlatWin
+        int   dir    = sigShort ? -1 : 1
+        float ext    = sigShort ? lockSX : lockLX
+        float volReg = useVolReg and atrSlow > 0 ? math.max(0.8, math.min(1.5, atr / atrSlow)) : 1.0
+        float volK   = useVolK ? math.max(1.0, math.min(1.5, 1 + 0.25 * (nz(sigRv, 1) - 1))) : 1.0
+        float buf    = math.max(bufTicks * syminfo.mintick, bufATR * atr * volReg * volK)
+        float sl     = ext - dir * buf
+        float dist   = math.abs(close - sl)
+        if dist < minSLATR * atr
+            dist := minSLATR * atr
+            sl   := close - dir * dist
+        sl := math.round_to_mintick(sl)
+
+        int q = sizeMode == "Fix" ? fixQty : int(math.floor(riskUSD / (dist * syminfo.pointvalue)))
+        if dist > maxSLATR * atr
+            lastSkip := (dir == 1 ? "▲" : "▼") + " ausgelassen: SL " + str.tostring(math.round(dist / atr, 1)) + "× ATR"
+        else if q < 3
+            lastSkip := (dir == 1 ? "▲" : "▼") + " ausgelassen: Risiko < 3 Kontrakte"
+        else
+            int q1 = math.max(1, math.round(q * p1 / 100.0))
+            int q2 = math.max(1, math.round(q * p2 / 100.0))
+            if q - q1 - q2 < 1
+                q2 := q - q1 - 1
+            tDir     := dir
+            tSL      := sl
+            tVW      := vw
+            tQty     := q
+            tQ1      := q1
+            tQ2      := q2
+            tQ3      := q - q1 - q2
+            refPx    := close
+            fillDone := false
+            lastSkip := ""
+            [a, b, c] = f_targets(close, sl, dir)
+            tTP1 := a
+            tTP2 := b
+            tTP3 := c
+            strategy.entry(dir == 1 ? "Long" : "Short", dir == 1 ? strategy.long : strategy.short, qty = q)
+            placed := true
+            if alertSig
+                alert(syminfo.ticker + (dir == 1 ? " ▲ LONG " : " ▼ SHORT ") + str.tostring(q) + "x @ " + str.tostring(close, format.mintick) + " · SL " + str.tostring(sl, format.mintick) + " · TP1 " + str.tostring(tTP1, format.mintick) + " · TP2 " + str.tostring(tTP2, format.mintick) + " · TP3 " + str.tostring(tTP3, format.mintick), alert.freq_once_per_bar_close)
+
+    // 4) Exits setzen / nachziehen (jeder Teil hat eigenes Limit + gemeinsamen SL)
+    if placed or (posAbs > 0 and not closedNow)
+        int   stage = placed ? 0 : posAbs >= tQty ? 0 : posAbs > tQ3 ? 1 : 2
+        float be    = math.round_to_mintick(refPx + tDir * beTicks * syminfo.mintick)
+        curSL := stage == 0 ? tSL : stage == 1 ? (useBE ? be : tSL) : (useTrail ? tTP1 : useBE ? be : tSL)
+        string eid = tDir == 1 ? "Long" : "Short"
+        if stage < 1
+            strategy.exit("TP1", eid, qty = tQ1, limit = tTP1, stop = curSL, comment_profit = "TP1", comment_loss = "SL")
+        if stage < 2
+            strategy.exit("TP2", eid, qty = tQ2, limit = tTP2, stop = curSL, comment_profit = "TP2", comment_loss = stage == 1 and useBE ? "BE" : "SL")
+        strategy.exit("TP3", eid, qty = tQ3, limit = tTP3, stop = curSL, comment_profit = "TP3", comment_loss = stage == 2 and useTrail ? "Trail" : stage >= 1 and useBE ? "BE" : "SL")
+
+bool showLv = posAbs > 0 or (sigShort or sigLong) and not fillDone
+plot(showLv ? curSL : na, "SL",      color.new(#ff5252, 0),  2, plot.style_linebr)
+plot(showLv ? refPx : na, "Einstieg", color.new(color.gray, 30), 1, plot.style_linebr)
+plot(showLv ? tTP1  : na, "TP1",     color.new(#4caf50, 40), 1, plot.style_linebr)
+plot(showLv ? tTP2  : na, "TP2",     color.new(#4caf50, 20), 1, plot.style_linebr)
+plot(showLv ? tTP3  : na, "TP3",     color.new(#4caf50, 0),  2, plot.style_linebr)
+
+// ═══════════════════════════ TABELLE (6 Zeilen) ═══════════════════════════
+color C_BG    = #131722
+color C_FRAME = #2a2e39
+color C_TXT   = #d1d4dc
+color C_DIM   = #8a8f9c
+color C_GREEN = #2e7d32
+color C_RED   = #c62828
+
+string tblPos = switch tPos
+    "Oben links"   => position.top_left
+    "Unten rechts" => position.bottom_right
+    "Unten links"  => position.bottom_left
+    "Mitte rechts" => position.middle_right
+    => position.top_right
+
+f_cell(table t, int c, int r, string txt, color bg, color fg, string sz) =>
+    table.cell(t, c, r, txt, text_color = fg, bgcolor = bg, text_size = sz, text_halign = text.align_left)
+
+var table tbl = table.new(tblPos, 2, 6, bgcolor = C_BG, frame_color = C_FRAME, frame_width = 1, border_color = C_FRAME, border_width = 1)
+
+if barstate.islast
+    string sz = tSize == "Winzig" ? size.tiny : tSize == "Normal" ? size.normal : size.small
+    string sg = str.tostring(bandMult) + "σ"
+
+    string vPos  = (aboveBand ? "über +" + sg : belowBand ? "unter −" + sg : "innerhalb") + (na(rsi) ? "" : " · RSI " + str.tostring(math.round(rsi)))
+    string vStat = "–"
+    color  bStat = C_BG
+    if tfSec > 60
+        vStat := "15s–1m-Chart nutzen"
+    else if not inKZ
+        vStat := "Killzone – kein Trade"
+    else if setupS or setupL or not na(sBar) or not na(lBar)
+        vStat := "ABSORBING"
+        bStat := C_GREEN
+    else if failS or failL
+        vStat := "FAILING"
+        bStat := C_RED
+    string vDel = fpOk and barVol > 0 ? (barDelta >= 0 ? "+" : "") + str.tostring(math.round(100 * barDelta / barVol)) + " %" : "–"
+    string vVol = na(rv) ? "–" : str.tostring(math.round(rv, 1)) + "x"
+    string vSig = lastSigDir == 0 ? "–" : (lastSigDir == -1 ? "▼ SHORT " : "▲ LONG ") + str.format_time(lastSigTime, "HH:mm", tzIn)
+
+    f_cell(tbl, 0, 0, "VWAP · RSI", C_BG, C_DIM, sz)
+    f_cell(tbl, 1, 0, vPos,      C_BG, C_TXT, sz)
+    f_cell(tbl, 0, 1, "Status",  C_BG, C_DIM, sz)
+    f_cell(tbl, 1, 1, vStat,     bStat, bStat == C_BG ? C_TXT : color.white, sz)
+    f_cell(tbl, 0, 2, "Delta",   C_BG, C_DIM, sz)
+    f_cell(tbl, 1, 2, vDel,      C_BG, C_TXT, sz)
+    f_cell(tbl, 0, 3, "Volumen", C_BG, C_DIM, sz)
+    f_cell(tbl, 1, 3, vVol,      C_BG, C_TXT, sz)
+    f_cell(tbl, 0, 4, "Signal",  C_BG, C_DIM, sz)
+    f_cell(tbl, 1, 4, vSig,      C_BG, C_TXT, sz)
+
+    float  pa   = math.abs(strategy.position_size)
+    string vTr  = lastSkip == "" ? "flat" : lastSkip
+    color  bTr  = C_BG
+    if pa > 0
+        int st = pa >= tQty ? 0 : pa > tQ3 ? 1 : 2
+        vTr := (tDir == 1 ? "▲ " : "▼ ") + str.tostring(pa) + "x · SL " + str.tostring(curSL, format.mintick) + (st == 0 ? "" : st == 1 ? " · TP1 ✓" : " · TP2 ✓")
+        bTr := strategy.openprofit >= 0 ? C_GREEN : C_RED
+    f_cell(tbl, 0, 5, "Trade",   C_BG, C_DIM, sz)
+    f_cell(tbl, 1, 5, vTr,       bTr, bTr == C_BG ? C_TXT : color.white, sz)
