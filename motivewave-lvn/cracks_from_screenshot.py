@@ -68,20 +68,50 @@ def yellowness(rgb):
     return np.clip(v, 0, 1)
 
 
-def text_columns(yel, y, x0, x1, gap):
-    """Rechte Kante des Schild-Textes: Spalten mit Gelb ober-/unterhalb der Linienzeile."""
-    yi = int(round(y))
-    band = np.concatenate([yel[max(0, yi - 8):max(0, yi - 2), x0:x1], yel[yi + 3:yi + 9, x0:x1]], axis=0)
-    has = band.max(axis=0) > 0.4 if band.size else np.zeros(x1 - x0, bool)
-    cols = np.where(has)[0]
+def label_box(yel, y, W):
+    """Schild einer Linie suchen: gelbe Schrift auf Höhe der Linie, links im Bild.
+    Zeilen, die über die Bildbreite gelb sind (Strichlinien), werden ignoriert.
+    Rückgabe (x0, x1, y0, y1) oder None."""
+    H = yel.shape[0]
+    yi, R = int(round(y)), max(12, int(W * 0.012))
+    r0, r1 = max(0, yi - R), min(H, yi + R + 1)
+    on = yel[r0:r1] > 0.35
+    line_rows = on.mean(axis=1) > 0.08                 # Strichlinien (diese + Nachbarn)
+    txt = on.copy()
+    txt[line_rows] = False
+    cols = np.where(txt.any(axis=0))[0]
     if len(cols) == 0:
         return None
-    end = cols[0]
-    for c in cols[1:]:
-        if c - end > gap:
-            break
-        end = c
-    return x0 + max(0, cols[0] - 2), x0 + end + 3
+
+    def clusters(cs, gap):
+        out, start, prev = [], cs[0], cs[0]
+        for c in cs[1:]:
+            if c - prev > gap:
+                out.append((start, prev))
+                start = c
+            prev = c
+        out.append((start, prev))
+        return out
+
+    c = yi - r0
+    for a, b in clusters(cols, max(3, int(W * 0.003))):  # links zuerst
+        rows = np.where(txt[:, a:b + 1].any(axis=1) | line_rows)[0]
+        if len(rows) == 0:
+            continue
+        top = bot = min(rows, key=lambda r: abs(r - c))  # zusammenhängend um die Mitte
+        rs = set(rows)
+        while top - 1 in rs:
+            top -= 1
+        while bot + 1 in rs:
+            bot += 1
+        h = bot - top + 1
+        if h < 6 or h > 3 * R:
+            continue
+        # mit Buchstabenabstand neu gruppieren, damit ".50" dazugehört
+        a2, b2 = clusters(cols[cols >= a], max(3, int(0.8 * h)))[0]
+        if (b2 - a2 + 1) >= 2.5 * h:                     # breit genug für eine Zahl
+            return max(0, a2 - 2), b2 + 3, max(0, r0 + top - 2), min(H, r0 + bot + 3)
+    return None
 
 
 def ocr(img, scale, psm):
@@ -89,18 +119,24 @@ def ocr(img, scale, psm):
     im = img.resize((img.width * scale, img.height * scale), Image.LANCZOS)
     im = ImageOps.expand(im, border=24, fill=255)
     txt = pytesseract.image_to_string(im, config=f"--psm {psm} -c tessedit_char_whitelist=0123456789.")
-    m = NUM.search(txt.replace(" ", "").replace("\n", ""))
-    return float(m.group()) if m else None
+    t = re.sub(r"[^0-9.]", " ", txt).strip()
+    m = NUM.search(t.replace(" ", ""))
+    if m:
+        return float(m.group())
+    # Punkt nicht erkannt ("3101750" / "30990 50"): Schilder haben immer 2 Nachkommastellen
+    m = re.fullmatch(r"(\d{3,6})\s*(\d{2})", t)
+    return float(f"{m.group(1)}.{m.group(2)}") if m else None
 
 
-def read_label(yel, y, lx0, lx1, half_h):
-    h = yel.shape[0]
-    cols = text_columns(yel, y, lx0, lx1, gap=max(4, int(half_h)))
-    if cols is None:
+def read_label(yel, y, W, dump=None):
+    box = label_box(yel, y, W)
+    if box is None:
         return None
-    y0, y1 = max(0, int(y - half_h)), min(h, int(y + half_h) + 2)
-    crop = yel[y0:y1, cols[0]:cols[1]]
+    x0, x1, y0, y1 = box
+    crop = yel[y0:y1, x0:x1]
     img = Image.fromarray((255 - crop * 255).astype(np.uint8))     # dunkle Schrift auf weiß
+    if dump is not None:
+        img.save(dump / f"schild_y{int(y)}.png")
     a, b = ocr(img, 4, 7), ocr(img, 6, 8)
     return a if a is not None and a == b else None                   # nur wenn beide Läufe gleich
 
@@ -178,7 +214,6 @@ def process(name, image, args, step, off, color):
     mask = color_mask(rgb, color, args.tol) | (yel > 0.3)
 
     lw = int(W * args.label_w)
-    lx0, lx1 = (0, lw) if args.label_side == "left" else (W - lw, W)
     cx0, cx1 = (lw, W) if args.label_side == "left" else (0, W - lw)
 
     ys = find_lines(mask, args.min_frac, cx0, cx1)
@@ -186,8 +221,11 @@ def process(name, image, args, step, off, color):
         diagnose(path, rgb, mask, cx0, cx1, args.min_frac)
         sys.exit(f"{path}: nur {len(ys)} Linie(n) gefunden.")
 
-    half_h = 0.0048 * W                                  # halbe Schrifthöhe (MotiveWave-Standard)
-    labels = [read_label(yel, y, lx0, lx1, half_h) for y in ys]
+    dump = None
+    if args.debug:
+        dump = Path.home() / "Documents" / "MotiveWave_Cracks" / "debug"
+        dump.mkdir(parents=True, exist_ok=True)
+    labels = [read_label(yel, y, W, dump) for y in ys]
 
     # Eichung
     if args.low is not None and args.high is not None:
@@ -196,6 +234,8 @@ def process(name, image, args, step, off, color):
         pairs = [(y, p) for y, p in zip(ys, labels) if p is not None and on_grid(p, step, off)]
         fitres = ransac(pairs, tol_px=1.5)
         if fitres is None:
+            print(f"{path}: {len(ys)} Linien gefunden, Schilder gelesen: {labels}")
+            print("  → mit 'cracks --debug' werden die Schild-Ausschnitte nach ~/Documents/MotiveWave_Cracks/debug gelegt.")
             sys.exit(f"{path}: Eichung fehlgeschlagen (zu wenige lesbare Schilder). Mit --low/--high eichen.")
         a, b = fitres
     tol_price = lambda a: max(0.6 * step, 1.5 * abs(a))  # Schild muss innerhalb ±1.5 px passen
