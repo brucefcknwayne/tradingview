@@ -6,9 +6,22 @@ Sensitivity 10, Use Historical Minute Bars an) exakt 1:1 in TradingView anzeigen
 | Datei | Zweck |
 |---|---|
 | `LvnFileExport.java` | Baustein für MotiveWave: schreibt die LVN-Preise nach `~/Documents/MotiveWave_Cracks/<SYMBOL>.txt` |
+| `cracks_from_screenshot.py` | Weg ohne MotiveWave-Support: liest die Cracks aus einem Screenshot (Linie per Pixel, Schild per OCR, gegenseitige Prüfung) |
 | `Cracks_indicator.pine` | TradingView-Indikator: zeigt eingefügte Preise als gelbe, gestrichelte Linien mit Preisschild |
 
-## Weg zu 1:1
+## Weg ohne MotiveWave-Support (Screenshot)
+
+1. Einmalig: `brew install tesseract` und `pip3 install numpy pillow pytesseract`.
+2. MotiveWave: Chart so hoch wie möglich, Preisachse linear, alle Cracks sichtbar.
+   Cmd+Shift+4 → Leertaste → Chartfenster anklicken (Retina-Auflösung).
+3. `python3 cracks_from_screenshot.py ~/Desktop/<Bildschirmfoto>.png --copy`
+4. Mit "PRÜFEN" markierte Werte (meist überlappende Schilder) kurz im Chart ansehen.
+5. In TradingView in "Cracks · MotiveWave LVN" → Feld NQ einfügen.
+
+Jede Linie wird zweimal bestimmt: über die Pixel-Höhe (Raster x.50) und über ihr eigenes Schild
+(nur Gelb, zwei OCR-Läufe müssen übereinstimmen). Nur wenn beides passt, gilt der Wert als bestätigt.
+
+## Weg mit Quellcode (Alternative)
 
 1. Offiziellen Quellcode der Volume-Profile-Study bei MotiveWave holen (SDK-Seite, Quellcode-Paket der
    eingebauten Studies; sonst Support-Anfrage).
