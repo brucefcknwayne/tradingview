@@ -144,14 +144,38 @@ def load_images(paths):
         return [(f"Zwischenablage {i + 1}", im) for i, im in enumerate(clip)] or sys.exit("Kein Bild in der Zwischenablage.")
     if clip is None:
         sys.exit("Kein Bild in der Zwischenablage. Screenshot mit Cmd+Ctrl+Shift+4 machen (Ctrl = in die Zwischenablage).")
+    try:                                              # zur Kontrolle ablegen
+        d = Path.home() / "Documents" / "MotiveWave_Cracks"
+        d.mkdir(parents=True, exist_ok=True)
+        clip.save(d / "letzter_screenshot.png")
+    except Exception:
+        pass
     return [("Zwischenablage", clip)]
+
+
+def diagnose(path, rgb, mask, x0, x1, min_frac):
+    H, W, _ = rgb.shape
+    frac = mask[:, x0:x1].sum(axis=1) / max(1, x1 - x0)
+    print(f"DIAGNOSE {path}: Bild {W}×{H} px, gelbe Pixel gesamt {mask.mean() * 100:.2f} %")
+    print(f"  beste Zeile: {frac.max() * 100:.1f} % gelb (nötig: {min_frac * 100:.0f} %) bei y={int(frac.argmax())}")
+    px = rgb.reshape(-1, 3)
+    sat = px[(px.max(axis=1).astype(int) - px.min(axis=1)) > 80]
+    if len(sat):
+        cols, cnt = np.unique((sat // 16) * 16, axis=0, return_counts=True)
+        top = cols[np.argsort(-cnt)[:6]]
+        print("  häufigste kräftige Farben (RGB):", ", ".join(f"({c[0]},{c[1]},{c[2]})" for c in top))
+    if W < 600 or H < 400:
+        print("  Bild sehr klein – war wirklich der Chart in der Zwischenablage?")
+    print("  → Schick mir diese Ausgabe (und ~/Documents/MotiveWave_Cracks/letzter_screenshot.png).")
 
 
 def process(name, image, args, step, off, color):
     path = name
     rgb = np.asarray(image.convert("RGB"))
     H, W, _ = rgb.shape
-    mask = color_mask(rgb, color, args.tol)
+    yel = yellowness(rgb)
+    # Gelb = nah an der Linienfarbe ODER allgemein gelblich (dunkleres Gelb, Farbprofil, Kantenglättung)
+    mask = color_mask(rgb, color, args.tol) | (yel > 0.3)
 
     lw = int(W * args.label_w)
     lx0, lx1 = (0, lw) if args.label_side == "left" else (W - lw, W)
@@ -159,10 +183,10 @@ def process(name, image, args, step, off, color):
 
     ys = find_lines(mask, args.min_frac, cx0, cx1)
     if len(ys) < 2:
-        sys.exit(f"{path}: nur {len(ys)} Linie(n) gefunden – --color/--tol/--min-frac prüfen.")
+        diagnose(path, rgb, mask, cx0, cx1, args.min_frac)
+        sys.exit(f"{path}: nur {len(ys)} Linie(n) gefunden.")
 
     half_h = 0.0048 * W                                  # halbe Schrifthöhe (MotiveWave-Standard)
-    yel = yellowness(rgb)
     labels = [read_label(yel, y, lx0, lx1, half_h) for y in ys]
 
     # Eichung
@@ -206,7 +230,7 @@ def main():
     ap.add_argument("--high", type=float, help="Eichung von Hand (nur 1 Bild): Preis der obersten Linie")
     ap.add_argument("--color", default="ffff00", help="Linienfarbe hex")
     ap.add_argument("--tol", type=int, default=70, help="Farbtoleranz je Kanal")
-    ap.add_argument("--min-frac", type=float, default=0.25, help="Mindestanteil Gelb pro Zeile")
+    ap.add_argument("--min-frac", type=float, default=0.2, help="Mindestanteil Gelb pro Zeile")
     ap.add_argument("--label-w", type=float, default=0.055, help="Schildbreite als Anteil der Bildbreite")
     ap.add_argument("--label-side", choices=["left", "right"], default="left")
     ap.add_argument("--out", help="Ausgabedatei (Standard: ~/Documents/MotiveWave_Cracks/cracks.txt)")
