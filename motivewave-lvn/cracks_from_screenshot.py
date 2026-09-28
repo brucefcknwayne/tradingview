@@ -200,18 +200,22 @@ def main():
     off = args.offset % step
     color = tuple(int(args.color[i:i + 2], 16) for i in (0, 2, 4))
 
-    confirmed, unsure, min_px = set(), {}, 1e9
+    confirmed, cand = set(), []
     for path in args.images:
         res, pxs = process(path, args, step, off, color)
-        min_px = min(min_px, pxs)
         for price, good, lab in res:
             if good:
                 confirmed.add(price)
             else:
-                unsure.setdefault(price, (lab, pxs))
-    # unsichere Werte, die in einem anderen Bild bestätigt (±1 Schritt) wurden, verwerfen
-    unsure = {p: v for p, v in unsure.items()
-              if p not in confirmed and not any(abs(p - c) <= step + 1e-9 for c in confirmed)}
+                cand.append((pxs, price, lab))
+    # Unsichere Werte: ±1 Schritt um einen bestätigten → verwerfen; sonst gewinnt das
+    # schärfere Bild (Cracks liegen bei Sensitivity 10 nie nur 1 Schritt auseinander).
+    unsure = {}
+    for pxs, p, lab in sorted(cand, key=lambda c: -c[0]):
+        near = lambda q: abs(p - q) <= step + 1e-9
+        if any(near(c) for c in confirmed) or any(near(u) for u in unsure):
+            continue
+        unsure[p] = (lab, pxs)
 
     dec = max(2, -int(math.floor(math.log10(args.tick))))
     fmt = f"{{:.{dec}f}}"

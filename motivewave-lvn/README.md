@@ -15,6 +15,7 @@ Sensitivity 10, Use Historical Minute Bars an) exakt 1:1 in TradingView anzeigen
 2. MotiveWave: Chart so hoch wie möglich, Preisachse linear, alle Cracks sichtbar.
    Cmd+Shift+4 → Leertaste → Chartfenster anklicken (Retina-Auflösung).
 3. `python3 cracks_from_screenshot.py ~/Desktop/<Bildschirmfoto>.png --copy`
+   (mehrere Bilder, z. B. obere/untere Hälfte reingezoomt, einfach hintereinander angeben)
 4. Mit "PRÜFEN" markierte Werte (meist überlappende Schilder) kurz im Chart ansehen.
 5. In TradingView in "Cracks · MotiveWave LVN" → Feld NQ einfügen.
 
