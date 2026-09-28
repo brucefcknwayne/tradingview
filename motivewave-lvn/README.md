@@ -7,9 +7,17 @@ Sensitivity 10, Use Historical Minute Bars an) exakt 1:1 in TradingView anzeigen
 |---|---|
 | `LvnFileExport.java` | Baustein für MotiveWave: schreibt die LVN-Preise nach `~/Documents/MotiveWave_Cracks/<SYMBOL>.txt` |
 | `cracks_from_screenshot.py` | Weg ohne MotiveWave-Support: liest die Cracks aus einem Screenshot (Linie per Pixel, Schild per OCR, gegenseitige Prüfung) |
+| `claude-projekt-anweisungen.txt` | Anweisungen für ein Claude-Projekt: Screenshot rein → Preisliste raus (einfachster Weg) |
 | `Cracks_indicator.pine` | TradingView-Indikator: zeigt eingefügte Preise als gelbe, gestrichelte Linien mit Preisschild |
 
-## Weg ohne MotiveWave-Support (Screenshot)
+## Einfachster Weg: Claude-Projekt
+
+1. claude.ai → Projekte → Neues Projekt "Cracks".
+2. Inhalt von `claude-projekt-anweisungen.txt` in die Projekt-Anweisungen kopieren.
+3. Täglich: Cmd+Ctrl+Shift+4 → Chartfenster → im Projekt neuen Chat, Cmd+V, senden.
+4. Codeblock kopieren → TradingView "Cracks · MotiveWave LVN" → Feld NQ → Cmd+V.
+
+## Weg ohne MotiveWave-Support (Screenshot, lokal)
 
 1. Einmalig: `brew install tesseract` und `pip3 install numpy pillow pytesseract`.
 2. Einmalig in `~/.zshrc`: `alias cracks='python3 ~/cracks_from_screenshot.py'` (Pfad anpassen).
