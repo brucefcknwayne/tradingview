@@ -23,6 +23,28 @@ REGELN
 8. Bei GC (Gold) gelten statt ".50" die Endungen, die auf den Schildern stehen – Regel 2 dann
    nur als Plausibilitätsprüfung (alle Werte haben dieselbe Endung-Struktur).
 
+DREIFACH-PRÜFUNG (Pflicht, bei JEDEM Screenshot, bevor du antwortest)
+Mach die drei Durchgänge im Stillen, zeig sie nicht. Ausgegeben wird erst danach.
+
+Durchgang 1 – von OBEN nach UNTEN: jedes gelbe Schild Ziffer für Ziffer ablesen, Liste A.
+Durchgang 2 – von UNTEN nach OBEN, unabhängig von Liste A (nicht abschreiben, neu ablesen): Liste B.
+Durchgang 3 – Gegenprobe, Liste C:
+  a) Die gelben gestrichelten Linien im Chart zählen. Anzahl muss = Anzahl Werte sein.
+  b) Jeder Wert muss auf ".50" enden (NQ/ES) und von oben nach unten streng fallen.
+  c) Abstands-Check: Preisabstand zwischen zwei Nachbar-Linien muss zum Pixelabstand passen
+     (doppelter Pixelabstand ≈ doppelter Preisabstand). Zusätzlich mit der Preisachse rechts
+     vergleichen: eine Linie auf Höhe der Achsenbeschriftung 30600.00 muss etwa 30600 sein.
+  d) Ziffern, die man leicht verwechselt, bei jedem Wert gezielt nochmal ansehen:
+     3↔8, 5↔6, 6↔8, 0↔8, 1↔7, 4↔9.
+
+Nur wenn A, B und C bei JEDEM Wert exakt gleich sind, gilt der Wert als richtig.
+Weicht ein Wert ab: Bild an dieser Stelle nochmal genau lesen. Ist er danach eindeutig,
+übernehmen. Bleibt er unklar, NICHT in die Liste, sondern unter UNSICHER mit beiden Lesarten.
+
+Wenn alles eindeutig ist, schreib unter die Liste: "3× geprüft ✓".
+Wenn etwas unsicher bleibt, gib die sicheren Werte trotzdem aus, schreib "NICHT vollständig
+bestätigt" und nenne die unsicheren Stellen. Nie einen unsicheren Wert als sicher ausgeben.
+
 ANTWORTFORMAT (genau so, sonst nichts)
 Ein Codeblock mit einem Preis pro Zeile, aufsteigend sortiert, Dezimalpunkt, zwei Nachkommastellen:
 
@@ -33,7 +55,7 @@ Ein Codeblock mit einem Preis pro Zeile, aufsteigend sortiert, Dezimalpunkt, zwe
 ```
 
 Danach genau eine Zeile:
-Linien gezählt: N · Werte gelesen: M
+Linien gezählt: N · Werte gelesen: M · 3× geprüft ✓   (bzw. "NICHT vollständig bestätigt")
 
 Und nur falls nötig:
 UNSICHER:
