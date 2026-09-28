@@ -7,15 +7,16 @@ Sensitivity 10, Use Historical Minute Bars an) exakt 1:1 in TradingView anzeigen
 |---|---|
 | `LvnFileExport.java` | Baustein für MotiveWave: schreibt die LVN-Preise nach `~/Documents/MotiveWave_Cracks/<SYMBOL>.txt` |
 | `cracks_from_screenshot.py` | Weg ohne MotiveWave-Support: liest die Cracks aus einem Screenshot (Linie per Pixel, Schild per OCR, gegenseitige Prüfung) |
-| `claude-code/cracks.md` | Claude-Code-Befehl `/cracks`: Claude macht den Screenshot selbst, liest 3× geprüft, Ergebnis in die Zwischenablage |
+| `claude-code/cracks.md` | Claude-Code-Befehl `/cracks`: Claude schiebt den Chart selbst hoch/runter, liest jede Seite 3× geprüft, Ergebnis in die Zwischenablage |
+| `claude-code/mwctl.py` | Steuer-Werkzeug dafür: Fenster-Screenshot, Maus ziehen/scrollen (nach `~/.claude/mwctl.py`) |
 | `claude-projekt-anweisungen.txt` | Anweisungen für ein Claude-Projekt: Screenshot rein → Preisliste raus (einfachster Weg) |
 | `Cracks_indicator.pine` | TradingView-Indikator: zeigt eingefügte Preise als gelbe, gestrichelte Linien mit Preisschild |
 
 ## Am bequemsten: Claude Code `/cracks`
 
 1. Einmalig: Claude Code installieren (`curl -fsSL https://claude.ai/install.sh | bash`), `claude` starten, anmelden.
-2. `mkdir -p ~/.claude/commands` und `cracks.md` dorthin kopieren.
-3. Systemeinstellungen → Datenschutz & Sicherheit → Bildschirmaufnahme → Terminal erlauben.
+2. `cracks.md` nach `~/.claude/commands/`, `mwctl.py` nach `~/.claude/`; `pip3 install pyobjc-framework-Quartz pillow`.
+3. Systemeinstellungen → Datenschutz & Sicherheit → Bildschirmaufnahme UND Bedienungshilfen → Terminal erlauben.
 4. Täglich: MotiveWave offen lassen, Terminal → `claude` → `/cracks` → in TradingView Cmd+V.
 
 ## Claude-Projekt (Screenshot selbst schicken)
