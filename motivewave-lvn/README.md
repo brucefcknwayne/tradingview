@@ -7,10 +7,18 @@ Sensitivity 10, Use Historical Minute Bars an) exakt 1:1 in TradingView anzeigen
 |---|---|
 | `LvnFileExport.java` | Baustein für MotiveWave: schreibt die LVN-Preise nach `~/Documents/MotiveWave_Cracks/<SYMBOL>.txt` |
 | `cracks_from_screenshot.py` | Weg ohne MotiveWave-Support: liest die Cracks aus einem Screenshot (Linie per Pixel, Schild per OCR, gegenseitige Prüfung) |
+| `claude-code/cracks.md` | Claude-Code-Befehl `/cracks`: Claude macht den Screenshot selbst, liest 3× geprüft, Ergebnis in die Zwischenablage |
 | `claude-projekt-anweisungen.txt` | Anweisungen für ein Claude-Projekt: Screenshot rein → Preisliste raus (einfachster Weg) |
 | `Cracks_indicator.pine` | TradingView-Indikator: zeigt eingefügte Preise als gelbe, gestrichelte Linien mit Preisschild |
 
-## Einfachster Weg: Claude-Projekt
+## Am bequemsten: Claude Code `/cracks`
+
+1. Einmalig: Claude Code installieren (`curl -fsSL https://claude.ai/install.sh | bash`), `claude` starten, anmelden.
+2. `mkdir -p ~/.claude/commands` und `cracks.md` dorthin kopieren.
+3. Systemeinstellungen → Datenschutz & Sicherheit → Bildschirmaufnahme → Terminal erlauben.
+4. Täglich: MotiveWave offen lassen, Terminal → `claude` → `/cracks` → in TradingView Cmd+V.
+
+## Claude-Projekt (Screenshot selbst schicken)
 
 1. claude.ai → Projekte → Neues Projekt "Cracks".
 2. Inhalt von `claude-projekt-anweisungen.txt` in die Projekt-Anweisungen kopieren.
