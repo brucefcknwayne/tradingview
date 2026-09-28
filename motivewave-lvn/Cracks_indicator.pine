@@ -1,0 +1,81 @@
+//@version=6
+indicator("Cracks · MotiveWave LVN", shorttitle = "Cracks", overlay = true, max_lines_count = 500, max_labels_count = 500)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Zeigt die LVN-Linien ("Cracks") aus MotiveWave 1:1 an.
+//  Es wird NICHTS nachberechnet – die Preise kommen aus dem Export
+//  (LvnFileExport.java → Datei ~/Documents/MotiveWave_Cracks/<SYMBOL>.txt)
+//  und werden hier ins passende Feld eingefügt.
+//
+//  Format: Zahlen mit Dezimalpunkt, getrennt durch Zeilenumbruch, Leerzeichen,
+//  Komma oder Semikolon.  Beispiel:  30289.50 30339.50 30390.50
+//  Das Feld wird per syminfo.root gewählt (MNQ→NQ, MES→ES, MGC→GC).
+//  Wichtig: in TradingView denselben Kontrakt öffnen wie in MotiveWave
+//  (z. B. NQZ2026), sonst passen die Preise um den Roll-Abstand nicht.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const string G_L = "Levels (aus MotiveWave-Export einfügen)"
+const string G_A = "Anzeige"
+
+string nqTxt  = input.text_area("", "NQ / MNQ", group = G_L)
+string esTxt  = input.text_area("", "ES / MES", group = G_L)
+string gcTxt  = input.text_area("", "GC / MGC", group = G_L)
+string anyTxt = input.text_area("", "Andere Symbole", group = G_L, tooltip = "Wird genommen, wenn das Symbol weder NQ, ES noch GC ist.")
+
+color  lineCol  = input.color(color.yellow, "Linienfarbe", group = G_A)
+string styleIn  = input.string("Gestrichelt", "Linienstil", options = ["Durchgezogen", "Gestrichelt", "Gepunktet"], group = G_A)
+int    lineW    = input.int(1, "Linienbreite", minval = 1, maxval = 4, group = G_A)
+bool   showLbl  = input.bool(true, "Preisschild", group = G_A)
+int    lblOff   = input.int(5, "Preisschild-Abstand (Kerzen)", minval = 0, maxval = 50, group = G_A)
+bool   showInfo = input.bool(true, "Info-Tabelle", group = G_A)
+
+// ── Helfer ───────────────────────────────────────────────────────────────────
+rootKey() =>
+    string r = syminfo.root
+    r == "MNQ" ? "NQ" : r == "MES" ? "ES" : r == "MGC" ? "GC" : r
+
+parseLevels(string txt) =>
+    string s = str.replace_all(txt, "\n", " ")
+    s := str.replace_all(s, "\t", " ")
+    s := str.replace_all(s, ";", " ")
+    s := str.replace_all(s, ",", " ")
+    array<float> out = array.new<float>()
+    for p in str.split(s, " ")
+        if str.length(p) > 0
+            float v = str.tonumber(p)
+            if not na(v)
+                out.push(v)
+    out.sort(order.ascending)
+    out
+
+string key = rootKey()
+string src = key == "NQ" ? nqTxt : key == "ES" ? esTxt : key == "GC" ? gcTxt : anyTxt
+string lnStyle = styleIn == "Durchgezogen" ? line.style_solid : styleIn == "Gepunktet" ? line.style_dotted : line.style_dashed
+
+var array<float> levels = parseLevels(src)
+var array<line>  lns    = array.new<line>()
+var array<label> lbls   = array.new<label>()
+
+// ── Linien einmal auf der ersten Kerze anlegen (extend.both = über den ganzen Chart)
+int nLv = math.min(levels.size(), 500)
+if barstate.isfirst and nLv > 0
+    for i = 0 to nLv - 1
+        float p = levels.get(i)
+        lns.push(line.new(bar_index, p, bar_index + 1, p, extend = extend.both, color = lineCol, style = lnStyle, width = lineW))
+        if showLbl
+            lbls.push(label.new(bar_index, p, str.tostring(p, format.mintick), style = label.style_label_left, color = lineCol, textcolor = color.black, size = size.small))
+
+// ── Preisschilder rechts neben der letzten Kerze halten
+if barstate.islast and showLbl
+    for lb in lbls
+        lb.set_x(bar_index + lblOff)
+
+// ── Info: wie viele Levels gelesen wurden (Kontrolle gegen MotiveWave)
+var table info = table.new(position.top_right, 2, 3, bgcolor = color.new(color.black, 20), border_width = 1)
+if barstate.islast and showInfo
+    table.cell(info, 0, 0, "Symbol", text_color = color.white, text_size = size.small)
+    table.cell(info, 1, 0, syminfo.ticker + " → " + key, text_color = color.white, text_size = size.small)
+    table.cell(info, 0, 1, "Cracks", text_color = color.white, text_size = size.small)
+    table.cell(info, 1, 1, str.tostring(levels.size()), text_color = lineCol, text_size = size.small)
+    table.cell(info, 0, 2, "Bereich", text_color = color.white, text_size = size.small)
+    table.cell(info, 1, 2, levels.size() > 0 ? str.tostring(levels.first(), format.mintick) + " – " + str.tostring(levels.last(), format.mintick) : "leer", text_color = color.white, text_size = size.small)
