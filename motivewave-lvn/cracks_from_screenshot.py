@@ -15,6 +15,7 @@ Ablauf pro Bild:
 
 Beispiel:
   python3 cracks_from_screenshot.py chart.png --copy
+  python3 cracks_from_screenshot.py oben.png unten.png --copy        (mehrere Bilder zusammenführen)
   python3 cracks_from_screenshot.py chart.png --low 30289.50 --high 31017.50   (Eichung von Hand)
 
 Installation (Mac):  brew install tesseract && pip3 install numpy pillow pytesseract
@@ -126,32 +127,11 @@ def on_grid(p, step, off):
     return abs(((p - off) / step) - round((p - off) / step)) < 1e-6
 
 
-# ── Hauptprogramm ────────────────────────────────────────────────────────────
-def main():
-    ap = argparse.ArgumentParser(description="MotiveWave-Cracks aus Screenshot")
-    ap.add_argument("image")
-    ap.add_argument("--tick", type=float, default=0.25, help="Tickgröße (NQ/ES 0.25, GC 0.10)")
-    ap.add_argument("--rows", type=int, default=4, help="Tick Interval der Study")
-    ap.add_argument("--offset", type=float, default=0.5, help="Rasterversatz (NQ: 0.5 → x.50)")
-    ap.add_argument("--low", type=float, help="Eichung von Hand: Preis der untersten Linie")
-    ap.add_argument("--high", type=float, help="Eichung von Hand: Preis der obersten Linie")
-    ap.add_argument("--color", default="ffff00", help="Linienfarbe hex")
-    ap.add_argument("--tol", type=int, default=70, help="Farbtoleranz je Kanal")
-    ap.add_argument("--min-frac", type=float, default=0.25, help="Mindestanteil Gelb pro Zeile")
-    ap.add_argument("--label-w", type=float, default=0.055, help="Schildbreite als Anteil der Bildbreite")
-    ap.add_argument("--label-side", choices=["left", "right"], default="left")
-    ap.add_argument("--out", help="Ausgabedatei (Standard: <bild>_cracks.txt)")
-    ap.add_argument("--copy", action="store_true", help="in die Zwischenablage (pbcopy)")
-    ap.add_argument("--debug", action="store_true", help="Tabelle y / Schild / Schätzung")
-    args = ap.parse_args()
-
-    img = Image.open(args.image).convert("RGB")
-    rgb = np.asarray(img)
+# ── ein Bild auswerten ───────────────────────────────────────────────────────
+def process(path, args, step, off, color):
+    rgb = np.asarray(Image.open(path).convert("RGB"))
     H, W, _ = rgb.shape
-    color = tuple(int(args.color[i:i + 2], 16) for i in (0, 2, 4))
     mask = color_mask(rgb, color, args.tol)
-    step = args.tick * args.rows
-    off = args.offset % step
 
     lw = int(W * args.label_w)
     lx0, lx1 = (0, lw) if args.label_side == "left" else (W - lw, W)
@@ -159,12 +139,11 @@ def main():
 
     ys = find_lines(mask, args.min_frac, cx0, cx1)
     if len(ys) < 2:
-        sys.exit(f"Nur {len(ys)} Linie(n) gefunden – --color/--tol/--min-frac prüfen.")
+        sys.exit(f"{path}: nur {len(ys)} Linie(n) gefunden – --color/--tol/--min-frac prüfen.")
 
-    gaps = np.diff(sorted(ys))
     half_h = 0.0048 * W                                  # halbe Schrifthöhe (MotiveWave-Standard)
     yel = yellowness(rgb)
-    labels = [read_label(yel, y, lx0, lx1, max(half_h, 0.0045 * W)) for y in ys]
+    labels = [read_label(yel, y, lx0, lx1, half_h) for y in ys]
 
     # Eichung
     if args.low is not None and args.high is not None:
@@ -173,7 +152,7 @@ def main():
         pairs = [(y, p) for y, p in zip(ys, labels) if p is not None and on_grid(p, step, off)]
         fitres = ransac(pairs, tol_px=1.5)
         if fitres is None:
-            sys.exit("Eichung fehlgeschlagen (zu wenige lesbare Schilder). Mit --low/--high von Hand eichen.")
+            sys.exit(f"{path}: Eichung fehlgeschlagen (zu wenige lesbare Schilder). Mit --low/--high eichen.")
         a, b = fitres
     tol_price = lambda a: max(0.6 * step, 1.5 * abs(a))  # Schild muss innerhalb ±1.5 px passen
     for _ in range(3):                                   # Gerade nur über bestätigte Schilder
@@ -183,39 +162,74 @@ def main():
             a, b = np.polyfit([y for y, _ in ok], [l for _, l in ok], 1)
     px_per_step = step / abs(a)
 
-    result, unsure = [], []
+    res = []                                             # (Preis, bestätigt, gelesenes Schild)
     for y, lab in zip(ys, labels):
         est = a * y + b
-        snapped = off + round((est - off) / step) * step
-        if lab is not None and on_grid(lab, step, off) and abs(lab - est) <= tol_price(a):
-            result.append((lab, ""))
-        else:
-            result.append((snapped, "?"))
-            unsure.append((snapped, lab))
+        good = lab is not None and on_grid(lab, step, off) and abs(lab - est) <= tol_price(a)
+        price = lab if good else off + round((est - off) / step) * step
+        res.append((round(price, 6), good, lab))
         if args.debug:
-            print(f"y={y:8.1f}  Schild={lab}  Schätzung={est:10.2f}  → {result[-1][0]:.2f}{result[-1][1]}")
+            print(f"{Path(path).name}: y={y:8.1f}  Schild={lab}  Schätzung={est:10.2f}  → {price:.2f}{'' if good else '?'}")
+    print(f"{Path(path).name}: {len(ys)} Linien, {px_per_step:.1f} px pro Rasterschritt, "
+          f"{sum(r[1] for r in res)} bestätigt")
+    return res, px_per_step
+
+
+# ── Hauptprogramm ────────────────────────────────────────────────────────────
+def main():
+    ap = argparse.ArgumentParser(description="MotiveWave-Cracks aus Screenshot(s)")
+    ap.add_argument("images", nargs="+", help="ein oder mehrere Screenshots (z. B. obere + untere Hälfte)")
+    ap.add_argument("--tick", type=float, default=0.25, help="Tickgröße (NQ/ES 0.25, GC 0.10)")
+    ap.add_argument("--rows", type=int, default=4, help="Tick Interval der Study")
+    ap.add_argument("--offset", type=float, default=0.5, help="Rasterversatz (NQ: 0.5 → x.50)")
+    ap.add_argument("--low", type=float, help="Eichung von Hand (nur 1 Bild): Preis der untersten Linie")
+    ap.add_argument("--high", type=float, help="Eichung von Hand (nur 1 Bild): Preis der obersten Linie")
+    ap.add_argument("--color", default="ffff00", help="Linienfarbe hex")
+    ap.add_argument("--tol", type=int, default=70, help="Farbtoleranz je Kanal")
+    ap.add_argument("--min-frac", type=float, default=0.25, help="Mindestanteil Gelb pro Zeile")
+    ap.add_argument("--label-w", type=float, default=0.055, help="Schildbreite als Anteil der Bildbreite")
+    ap.add_argument("--label-side", choices=["left", "right"], default="left")
+    ap.add_argument("--out", help="Ausgabedatei (Standard: <erstes Bild>_cracks.txt)")
+    ap.add_argument("--copy", action="store_true", help="in die Zwischenablage (pbcopy)")
+    ap.add_argument("--debug", action="store_true", help="Tabelle y / Schild / Schätzung")
+    args = ap.parse_args()
+    if args.low is not None and len(args.images) > 1:
+        sys.exit("--low/--high geht nur mit einem Bild.")
+
+    step = args.tick * args.rows
+    off = args.offset % step
+    color = tuple(int(args.color[i:i + 2], 16) for i in (0, 2, 4))
+
+    confirmed, unsure, min_px = set(), {}, 1e9
+    for path in args.images:
+        res, pxs = process(path, args, step, off, color)
+        min_px = min(min_px, pxs)
+        for price, good, lab in res:
+            if good:
+                confirmed.add(price)
+            else:
+                unsure.setdefault(price, (lab, pxs))
+    # unsichere Werte, die in einem anderen Bild bestätigt (±1 Schritt) wurden, verwerfen
+    unsure = {p: v for p, v in unsure.items()
+              if p not in confirmed and not any(abs(p - c) <= step + 1e-9 for c in confirmed)}
 
     dec = max(2, -int(math.floor(math.log10(args.tick))))
     fmt = f"{{:.{dec}f}}"
-    seen, final = set(), []
-    for p, flag in sorted(result):
-        k = round(p, 6)
-        if k not in seen:
-            seen.add(k)
-            final.append(fmt.format(p))
+    final = [fmt.format(p) for p in sorted(confirmed | set(unsure))]
     text = "\n".join(final) + "\n"
 
-    out = Path(args.out) if args.out else Path(args.image).with_name(Path(args.image).stem + "_cracks.txt")
+    first = Path(args.images[0])
+    out = Path(args.out) if args.out else first.with_name(first.stem + "_cracks.txt")
     out.write_text(text)
     print(text, end="")
-    print(f"--- {len(final)} Cracks ({len(ys)} Linien) → {out}")
-    print(f"Auflösung: {px_per_step:.1f} px pro Rasterschritt")
+    print(f"--- {len(final)} Cracks → {out}")
     if unsure:
         print(f"PRÜFEN ({len(unsure)}): Schild unlesbar/unpassend, Preis aus Pixel-Höhe genommen:")
-        for p, lab in unsure:
-            print(f"   {fmt.format(p)}   (Schild gelesen: {lab})")
-        if px_per_step < 3:
-            print("   Bei unter 3 px/Schritt kann dieser Wert ±1 Schritt daneben liegen.")
+        for p in sorted(unsure):
+            lab, pxs = unsure[p]
+            hint = "  ← kann ±1 Schritt daneben liegen" if pxs < 3 else ""
+            print(f"   {fmt.format(p)}   (Schild gelesen: {lab}){hint}")
+        print("   Tipp: reingezoomt ein 2. Bild von diesem Bereich machen und beide Bilder übergeben.")
     else:
         print("Alle Linien per Schild UND Pixel-Höhe bestätigt.")
     if args.copy:
