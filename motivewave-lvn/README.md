@@ -12,12 +12,12 @@ Sensitivity 10, Use Historical Minute Bars an) exakt 1:1 in TradingView anzeigen
 ## Weg ohne MotiveWave-Support (Screenshot)
 
 1. Einmalig: `brew install tesseract` und `pip3 install numpy pillow pytesseract`.
-2. MotiveWave: Chart so hoch wie möglich, Preisachse linear, alle Cracks sichtbar.
-   Cmd+Shift+4 → Leertaste → Chartfenster anklicken (Retina-Auflösung).
-3. `python3 cracks_from_screenshot.py ~/Desktop/<Bildschirmfoto>.png --copy`
-   (mehrere Bilder, z. B. obere/untere Hälfte reingezoomt, einfach hintereinander angeben)
+2. Einmalig in `~/.zshrc`: `alias cracks='python3 ~/cracks_from_screenshot.py'` (Pfad anpassen).
+3. MotiveWave: Chart so hoch wie möglich, alle Cracks sichtbar. **Cmd+Ctrl+Shift+4** → Leertaste →
+   Chartfenster anklicken (Bild landet in der Zwischenablage). Im Terminal: `cracks`.
+   Ergebnis liegt danach in der Zwischenablage und in `~/Documents/MotiveWave_Cracks/cracks.txt`.
 4. Mit "PRÜFEN" markierte Werte (meist überlappende Schilder) kurz im Chart ansehen.
-5. In TradingView in "Cracks · MotiveWave LVN" → Feld NQ einfügen.
+5. In TradingView in "Cracks · MotiveWave LVN" → Feld NQ → Cmd+V.
 
 Jede Linie wird zweimal bestimmt: über die Pixel-Höhe (Raster x.50) und über ihr eigenes Schild
 (nur Gelb, zwei OCR-Läufe müssen übereinstimmen). Nur wenn beides passt, gilt der Wert als bestätigt.

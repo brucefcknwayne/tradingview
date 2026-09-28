@@ -13,14 +13,17 @@ Ablauf pro Bild:
  4. Passt ein Schild nicht (z. B. zwei Schilder überlappen), wird der Preis
     aus der Pixel-Höhe genommen und mit "?" markiert → kurz selbst prüfen.
 
-Beispiel:
-  python3 cracks_from_screenshot.py chart.png --copy
-  python3 cracks_from_screenshot.py oben.png unten.png --copy        (mehrere Bilder zusammenführen)
-  python3 cracks_from_screenshot.py chart.png --low 30289.50 --high 31017.50   (Eichung von Hand)
+Normalfall – Bild aus der ZWISCHENABLAGE, nichts speichern:
+  1. Cmd+Ctrl+Shift+4 → Leertaste → MotiveWave-Chartfenster anklicken
+  2. python3 cracks_from_screenshot.py
+  3. Die Preise liegen jetzt in der Zwischenablage → in TradingView Cmd+V
+
+Weitere Aufrufe:
+  python3 cracks_from_screenshot.py oben.png unten.png     (Dateien, mehrere zusammenführen)
+  python3 cracks_from_screenshot.py --low 30289.50 --high 31017.50   (Eichung von Hand)
 
 Installation (Mac):  brew install tesseract && pip3 install numpy pillow pytesseract
-Tipp: Screenshot in voller Retina-Auflösung (Cmd+Shift+4, Leertaste, Fenster
-anklicken) und Chart möglichst hoch – je mehr Pixel pro Punkt, desto sicherer.
+Tipp: Chartfenster möglichst hoch – je mehr Pixel pro Punkt, desto sicherer.
 """
 import argparse
 import math
@@ -30,7 +33,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image, ImageGrab, ImageOps
 
 NUM = re.compile(r"\d{3,6}\.\d{1,2}")
 
@@ -128,8 +131,25 @@ def on_grid(p, step, off):
 
 
 # ── ein Bild auswerten ───────────────────────────────────────────────────────
-def process(path, args, step, off, color):
-    rgb = np.asarray(Image.open(path).convert("RGB"))
+def load_images(paths):
+    """(Name, Bild)-Liste: Dateien, oder ohne Angabe das Bild aus der Zwischenablage."""
+    if paths:
+        return [(Path(p).name, Image.open(p)) for p in paths]
+    try:
+        clip = ImageGrab.grabclipboard()
+    except Exception as e:                            # z. B. Linux ohne xclip
+        sys.exit(f"Zwischenablage nicht lesbar ({e}). Bilddatei als Argument angeben.")
+    if isinstance(clip, list):                        # Datei im Finder kopiert → Pfad(e)
+        clip = [Image.open(c) for c in clip if str(c).lower().endswith((".png", ".jpg", ".jpeg", ".tif", ".tiff"))]
+        return [(f"Zwischenablage {i + 1}", im) for i, im in enumerate(clip)] or sys.exit("Kein Bild in der Zwischenablage.")
+    if clip is None:
+        sys.exit("Kein Bild in der Zwischenablage. Screenshot mit Cmd+Ctrl+Shift+4 machen (Ctrl = in die Zwischenablage).")
+    return [("Zwischenablage", clip)]
+
+
+def process(name, image, args, step, off, color):
+    path = name
+    rgb = np.asarray(image.convert("RGB"))
     H, W, _ = rgb.shape
     mask = color_mask(rgb, color, args.tol)
 
@@ -169,8 +189,8 @@ def process(path, args, step, off, color):
         price = lab if good else off + round((est - off) / step) * step
         res.append((round(price, 6), good, lab))
         if args.debug:
-            print(f"{Path(path).name}: y={y:8.1f}  Schild={lab}  Schätzung={est:10.2f}  → {price:.2f}{'' if good else '?'}")
-    print(f"{Path(path).name}: {len(ys)} Linien, {px_per_step:.1f} px pro Rasterschritt, "
+            print(f"{path}: y={y:8.1f}  Schild={lab}  Schätzung={est:10.2f}  → {price:.2f}{'' if good else '?'}")
+    print(f"{path}: {len(ys)} Linien, {px_per_step:.1f} px pro Rasterschritt, "
           f"{sum(r[1] for r in res)} bestätigt")
     return res, px_per_step
 
@@ -178,7 +198,7 @@ def process(path, args, step, off, color):
 # ── Hauptprogramm ────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser(description="MotiveWave-Cracks aus Screenshot(s)")
-    ap.add_argument("images", nargs="+", help="ein oder mehrere Screenshots (z. B. obere + untere Hälfte)")
+    ap.add_argument("images", nargs="*", help="Screenshot-Dateien; ohne Angabe: Bild aus der Zwischenablage")
     ap.add_argument("--tick", type=float, default=0.25, help="Tickgröße (NQ/ES 0.25, GC 0.10)")
     ap.add_argument("--rows", type=int, default=4, help="Tick Interval der Study")
     ap.add_argument("--offset", type=float, default=0.5, help="Rasterversatz (NQ: 0.5 → x.50)")
@@ -189,11 +209,13 @@ def main():
     ap.add_argument("--min-frac", type=float, default=0.25, help="Mindestanteil Gelb pro Zeile")
     ap.add_argument("--label-w", type=float, default=0.055, help="Schildbreite als Anteil der Bildbreite")
     ap.add_argument("--label-side", choices=["left", "right"], default="left")
-    ap.add_argument("--out", help="Ausgabedatei (Standard: <erstes Bild>_cracks.txt)")
-    ap.add_argument("--copy", action="store_true", help="in die Zwischenablage (pbcopy)")
+    ap.add_argument("--out", help="Ausgabedatei (Standard: ~/Documents/MotiveWave_Cracks/cracks.txt)")
+    ap.add_argument("--no-copy", action="store_true", help="Ergebnis NICHT in die Zwischenablage legen")
+    ap.add_argument("--copy", action="store_true", help=argparse.SUPPRESS)   # alt, ist jetzt Standard
     ap.add_argument("--debug", action="store_true", help="Tabelle y / Schild / Schätzung")
     args = ap.parse_args()
-    if args.low is not None and len(args.images) > 1:
+    images = load_images(args.images)
+    if args.low is not None and len(images) > 1:
         sys.exit("--low/--high geht nur mit einem Bild.")
 
     step = args.tick * args.rows
@@ -201,8 +223,8 @@ def main():
     color = tuple(int(args.color[i:i + 2], 16) for i in (0, 2, 4))
 
     confirmed, cand = set(), []
-    for path in args.images:
-        res, pxs = process(path, args, step, off, color)
+    for name, image in images:
+        res, pxs = process(name, image, args, step, off, color)
         for price, good, lab in res:
             if good:
                 confirmed.add(price)
@@ -222,8 +244,8 @@ def main():
     final = [fmt.format(p) for p in sorted(confirmed | set(unsure))]
     text = "\n".join(final) + "\n"
 
-    first = Path(args.images[0])
-    out = Path(args.out) if args.out else first.with_name(first.stem + "_cracks.txt")
+    out = Path(args.out) if args.out else Path.home() / "Documents" / "MotiveWave_Cracks" / "cracks.txt"
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(text)
     print(text, end="")
     print(f"--- {len(final)} Cracks → {out}")
@@ -233,12 +255,16 @@ def main():
             lab, pxs = unsure[p]
             hint = "  ← kann ±1 Schritt daneben liegen" if pxs < 3 else ""
             print(f"   {fmt.format(p)}   (Schild gelesen: {lab}){hint}")
-        print("   Tipp: reingezoomt ein 2. Bild von diesem Bereich machen und beide Bilder übergeben.")
+        print("   Tipp: diesen Bereich reingezoomt zusätzlich screenshotten (Cmd+Shift+4 = Datei) und beide")
+        print("         Dateien übergeben: python3 cracks_from_screenshot.py bild1.png bild2.png")
     else:
         print("Alle Linien per Schild UND Pixel-Höhe bestätigt.")
-    if args.copy:
-        subprocess.run(["pbcopy"], input=text.encode(), check=False)
-        print("In Zwischenablage kopiert.")
+    if not args.no_copy:
+        try:
+            subprocess.run(["pbcopy"], input=text.encode(), check=True)
+            print("Preise in der Zwischenablage → in TradingView mit Cmd+V einfügen.")
+        except (OSError, subprocess.CalledProcessError):
+            print("Zwischenablage nicht verfügbar (kein Mac?) – Datei nutzen.")
 
 
 if __name__ == "__main__":
