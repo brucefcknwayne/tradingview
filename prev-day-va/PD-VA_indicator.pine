@@ -10,7 +10,10 @@ indicator("Vortag VAH / VAL / POC", shorttitle = "PD VA", overlay = true, max_li
 //    Ab dann endet die Linie an dieser Kerze.
 //  • Nicht getakte Levels laufen auch über mehrere Tage weiter (naked POC usw.).
 //  • Profil-Basis: voller Handelstag (CME 18:00–17:00 ET) oder nur RTH.
-//  • Am genauesten auf 1m (Volumen wird pro Kerze gleichmäßig über High–Low verteilt).
+//  • Instrument (NQ/MNQ, ES/MES, GC/MGC) wird automatisch erkannt, Zeilengröße
+//    = 1 Tick des Instruments (feinste mögliche Auflösung).
+//  • Profil wird immer aus 1m-Daten gebaut, auch auf 5m/15m-Charts
+//    (request.security_lower_tf, läuft mit Essential-Abo).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const string G_S = "Session"
@@ -21,7 +24,9 @@ string sessMode = input.string("Voller Handelstag (ETH)", "Profil-Basis", option
 string rthSess  = input.session("0930-1600", "RTH-Zeit", group = G_S)
 string rthTz    = input.string("America/New_York", "Zeitzone RTH", group = G_S)
 
-int    rowTicks = input.int(4, "Zeilengröße (Ticks)", minval = 1, group = G_P, tooltip = "4 Ticks = 1 Punkt auf NQ/MNQ.")
+string rowMode  = input.string("Auto", "Zeilengröße", options = ["Auto", "Manuell"], group = G_P, tooltip = "Auto: NQ/MNQ 0.25, ES/MES 0.25, GC/MGC 0.10 (je 1 Tick). Andere Symbole: 1 Tick.")
+int    rowTicks = input.int(4, "Manuell (Ticks)", minval = 1, group = G_P)
+bool   showInfo = input.bool(true, "Info-Box (erkanntes Instrument)", group = G_P)
 float  vaPct    = input.float(70, "Value Area %", minval = 10, maxval = 100, step = 1, group = G_P) / 100
 
 bool   showPoc  = input.bool(true, "POC", inline = "poc", group = G_L)
@@ -54,7 +59,7 @@ string lineStyle = styleIn == "Gestrichelt" ? line.style_dashed : styleIn == "Ge
 f_profile(float[] hs, float[] ls, float[] vs, float rowSize, float pct) =>
     float lo = ls.min()
     float hi = hs.max()
-    float rs = math.max(rowSize, (hi - lo) / 2000)
+    float rs = math.max(rowSize, (hi - lo) / 5000)
     int   n  = math.max(1, int(math.ceil((hi - lo) / rs)))
     float[] bins = array.new_float(n, 0.0)
     for i = 0 to hs.size() - 1
@@ -87,6 +92,20 @@ f_add(float price, string name, color col, int x1) =>
     label lb = showLbl ? label.new(time, price, name + " " + str.tostring(price, format.mintick), xloc.bar_time, color = color.new(color.black, 100), textcolor = col, style = label.style_label_left, size = size.small) : na
     levels.push(Level.new(ln, lb, price))
 
+// ─── Instrument erkennen → Zeilengröße ──────────────────────────────────────
+string root = syminfo.root
+string inst = root == "NQ" or root == "MNQ" ? "NQ" : root == "ES" or root == "MES" ? "ES" : root == "GC" or root == "MGC" ? "GC" : root
+float autoRow = switch inst
+    "NQ" => 0.25
+    "ES" => 0.25
+    "GC" => 0.10
+    => syminfo.mintick
+float rowSize = rowMode == "Auto" ? math.max(autoRow, syminfo.mintick) : rowTicks * syminfo.mintick
+
+// 1m-Daten (auf 1m-Chart = die Chart-Kerze selbst)
+string ltf = timeframe.in_seconds() > 60 ? "1" : timeframe.period
+[ltfH, ltfL, ltfV] = request.security_lower_tf(syminfo.tickerid, ltf, [high, low, volume])
+
 // ─── Session-Logik ──────────────────────────────────────────────────────────
 bool isRth  = sessMode == "Nur RTH"
 bool newDay = timeframe.change("1D")
@@ -98,7 +117,7 @@ bool collect = isRth ? inRth : true
 
 // Tag abgeschlossen → Profil berechnen, Linien ab Tagesanfang zeichnen
 if endP and dH.size() > 0 and not na(dStart)
-    [pocPx, vahPx, valPx] = f_profile(dH, dL, dV, rowTicks * syminfo.mintick, vaPct)
+    [pocPx, vahPx, valPx] = f_profile(dH, dL, dV, rowSize, vaPct)
     if showVah
         f_add(vahPx, "PD VAH", colVah, dStart)
     if showPoc
@@ -117,9 +136,20 @@ if startP
     dStart := time
 
 if collect and not na(dStart)
-    dH.push(high)
-    dL.push(low)
-    dV.push(nz(volume))
+    if ltfH.size() > 0
+        for j = 0 to ltfH.size() - 1
+            dH.push(ltfH.get(j))
+            dL.push(ltfL.get(j))
+            dV.push(nz(ltfV.get(j)))
+    else
+        dH.push(high)
+        dL.push(low)
+        dV.push(nz(volume))
+
+// Info-Box
+var table info = table.new(position.bottom_right, 1, 1)
+if showInfo and barstate.islast
+    table.cell(info, 0, 0, inst + " · Zeile " + str.tostring(rowSize) + " · Daten " + ltf + "m", text_color = color.gray, text_size = size.small)
 
 // Zu viele offene Levels → älteste nicht mehr verlängern
 while levels.size() > maxOpen
