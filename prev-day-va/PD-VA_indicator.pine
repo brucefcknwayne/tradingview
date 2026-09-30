@@ -35,6 +35,9 @@ var int     dStart   = na
 var line[]  lvLines  = array.new_line()
 var label[] lvLabels = array.new_label()
 var float[] lvPrices = array.new_float()
+var int     dbgBars  = 0
+var float   dbgVol   = 0.0
+var float   dbgRow   = 0.0
 
 // ─── Zeilengröße (Auto erkennt NQ/MNQ, ES/MES, GC/MGC) ───────────────────────
 string root    = syminfo.root
@@ -109,7 +112,10 @@ if endP and dH.size() > 0 and not na(dStart)
             lvLines.push(line.new(dStart, px, time, px, xloc.bar_time, extend.none, col, line.style_solid, lineW))
             lvLabels.push(showLbl ? label.new(time, px, nm + str.tostring(px, format.mintick), xloc.bar_time, color = color.new(color.black, 100), textcolor = col, style = label.style_label_left, size = size.small) : na)
             lvPrices.push(px)
-    dStart := na
+    dbgBars := dH.size()
+    dbgVol  := dV.sum()
+    dbgRow  := nRows > 0 ? (dH.max() - dL.min()) / nRows : rowSize
+    dStart  := na
 
 if startP
     dH.clear()
@@ -155,6 +161,12 @@ if cnt > 0
             lvLabels.remove(i)
             lvLines.remove(i)
             lvPrices.remove(i)
+
+// Diagnose-Box: so viele Kerzen/Volumen hatte das letzte Tagesprofil
+var table info = table.new(position.bottom_right, 1, 1, bgcolor = color.new(color.black, 30))
+if barstate.islast
+    string warn = dbgVol == 0 ? "  ⚠ KEIN VOLUMEN (Symbol ohne Volumen?)" : dbgBars < 50 ? "  ⚠ ZU WENIG KERZEN – 1m-Chart nehmen" : ""
+    table.cell(info, 0, 0, "PD VA · TF " + timeframe.period + " · Vortag: " + str.tostring(dbgBars) + " Kerzen · Vol " + str.tostring(dbgVol, format.volume) + " · Zeile " + str.tostring(dbgRow, format.mintick) + " Pkt" + warn, text_color = color.white, text_size = size.small)
 
 alertcondition(anyTaken, "Vortag-Level getaked", "PD VAH/VAL/POC wurde getaked")
 plot(na, "dummy", display = display.none)
