@@ -13,5 +13,5 @@
 | `pullback-1r/` | RSI(2)-Pullback 1:1 mit Training/Test-Tabelle (Ergebnis: ~51 %, kein Vorteil) |
 | `multi-10/` | 10 Standard-Setups 1:1 in einer Strategie mit Vergleichstabelle (Ergebnis: alle unter 50 %) |
 | `orderblocks/` | 1H-Orderblocks auf kleineren Charts |
-| `prev-day-va/` | Vortag POC/VAH/VAL (Volume Profile, Auto-Tick für NQ/ES/GC, 1m-Daten), Linien ab Vortagsbeginn bis zum Take |
+| `prev-day-va/` | Vortag POC/VAH/VAL (Volume Profile, rechnet wie TV-VP: Row Layout/Size, 2-Zeilen-VA, 1m-Daten), Linien ab Vortagsbeginn bis zum Take |
 | `adamcapitals/` | Nutzer-Strategie aus der AdamCapitals-PDF: Failed Zone → Breaker → Inducement (LIQ) → Limit in unmitigated Zone, SL hinter Zone, TP 1:7, Teilgewinn 1:4 + BE, max. 2 Trades/Tag (aktuelles Projekt) |
