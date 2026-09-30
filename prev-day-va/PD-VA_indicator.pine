@@ -1,80 +1,54 @@
 //@version=6
 indicator("Vortag VAH / VAL / POC", shorttitle = "PD VA", overlay = true, max_lines_count = 500, max_labels_count = 500)
-plot(na, "dummy", display = display.none)   // Pflicht-Output, zeichnet nichts
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Berechnet das Volume Profile des VORTAGS (POC, VAH, VAL) aus den Chart-Kerzen.
-//
-//  • Linien starten am Anfang des Vortags und laufen nach rechts weiter,
-//    bis der Preis das Level berührt ("getaked").
-//  • Getaked = Kerze (inkl. Gap vom letzten Schluss) geht durch das Level.
-//    Ab dann endet die Linie an dieser Kerze.
-//  • Nicht getakte Levels laufen auch über mehrere Tage weiter (naked POC usw.).
-//  • Profil-Basis: voller Handelstag (CME 18:00–17:00 ET) oder nur RTH.
-//  • Rechnet wie das TradingView Volume Profile (Anchored/Session):
-//    - Row Layout "Anzahl Zeilen" oder "Ticks pro Zeile" → gleiche Werte wie im
-//      VP-Tool eintragen, dann stimmen POC/VAH/VAL überein.
-//    - Volumen jeder 1m-Kerze anteilig nach Überlappung auf die Zeilen verteilt.
-//    - Value Area: ab POC immer die 2 Zeilen darüber vs. 2 darunter vergleichen,
-//      das stärkere Paar kommt dazu, bis 70 % erreicht sind.
-//    - POC = Mitte der Zeile, VAH = Oberkante, VAL = Unterkante.
-//  • "Auto (1 Tick)": erkennt NQ/MNQ, ES/MES, GC/MGC und nimmt 1 Tick pro Zeile.
-//  • Profil wird immer aus 1m-Daten gebaut, auch auf 5m/15m-Charts
-//    (request.security_lower_tf, läuft mit Essential-Abo).
-// ─────────────────────────────────────────────────────────────────────────────
+// Volume Profile des Vortags (POC/VAH/VAL). Linien starten am Vortagsbeginn und
+// laufen weiter, bis der Preis das Level berührt. Rechnet wie das TV-VP-Tool:
+// gleiche Row-Einstellungen eintragen. Auf >1m-Charts werden 1m-Daten genutzt.
 
 const string G_S = "Session"
 const string G_P = "Profil"
 const string G_L = "Linien"
 
-string sessMode = input.string("Voller Handelstag (ETH)", "Profil-Basis", options = ["Voller Handelstag (ETH)", "Nur RTH"], group = G_S)
-string rthSess  = input.session("0930-1600", "RTH-Zeit", group = G_S)
-string rthTz    = input.string("America/New_York", "Zeitzone RTH", group = G_S)
+string sessMode  = input.string("Voller Handelstag (ETH)", "Profil-Basis", options = ["Voller Handelstag (ETH)", "Nur RTH"], group = G_S)
+string rthSess   = input.session("0930-1600", "RTH-Zeit", group = G_S)
+string rthTz     = input.string("America/New_York", "Zeitzone RTH", group = G_S)
+string rowMode   = input.string("Anzahl Zeilen", "Row Layout", options = ["Anzahl Zeilen", "Ticks pro Zeile", "Auto (1 Tick)"], group = G_P, tooltip = "So einstellen wie im TradingView VP-Tool.")
+int    rowSizeIn = input.int(24, "Row Size", minval = 1, maxval = 5000, group = G_P, tooltip = "Anzahl Zeilen: TV-Standard 24. Ticks pro Zeile: 4 = 1 Punkt auf NQ.")
+float  vaPct     = input.float(70, "Value Area %", minval = 10, maxval = 100, group = G_P) / 100
+bool   vaPairs   = input.bool(true, "VA in 2-Zeilen-Schritten (wie TV)", group = G_P)
+bool   showPoc   = input.bool(true, "POC", inline = "poc", group = G_L)
+color  colPoc    = input.color(#FF9800, "", inline = "poc", group = G_L)
+bool   showVah   = input.bool(true, "VAH", inline = "vah", group = G_L)
+color  colVah    = input.color(#2196F3, "", inline = "vah", group = G_L)
+bool   showVal   = input.bool(true, "VAL", inline = "val", group = G_L)
+color  colVal    = input.color(#2196F3, "", inline = "val", group = G_L)
+int    lineW     = input.int(2, "Linienbreite", minval = 1, maxval = 5, group = G_L)
+bool   showLbl   = input.bool(true, "Beschriftung", group = G_L)
+bool   delTaken  = input.bool(false, "Getakte Linien löschen", group = G_L)
+int    maxOpen   = input.int(30, "Max. offene Levels", minval = 3, maxval = 150, group = G_L)
 
-string rowMode  = input.string("Anzahl Zeilen", "Row Layout", options = ["Anzahl Zeilen", "Ticks pro Zeile", "Auto (1 Tick)"], group = G_P, tooltip = "Genau so einstellen wie im TradingView VP-Tool (Einstellungen → Row Layout / Row Size).")
-int    rowSizeIn = input.int(24, "Row Size", minval = 1, maxval = 5000, group = G_P, tooltip = "Anzahl Zeilen: TV-Standard ist 24. Ticks pro Zeile: z. B. 4 = 1 Punkt auf NQ.")
-string vaMethod = input.string("Wie TradingView (2 Zeilen)", "Value-Area-Methode", options = ["Wie TradingView (2 Zeilen)", "1 Zeile"], group = G_P)
-bool   showInfo = input.bool(true, "Info-Box (erkanntes Instrument)", group = G_P)
-float  vaPct    = input.float(70, "Value Area %", minval = 10, maxval = 100, step = 1, group = G_P) / 100
+// ─── State ──────────────────────────────────────────────────────────────────
+var float[] dH       = array.new_float()
+var float[] dL       = array.new_float()
+var float[] dV       = array.new_float()
+var int     dStart   = na
+var line[]  lvLines  = array.new_line()
+var label[] lvLabels = array.new_label()
+var float[] lvPrices = array.new_float()
 
-bool   showPoc  = input.bool(true, "POC", inline = "poc", group = G_L)
-color  colPoc   = input.color(#FF9800, "", inline = "poc", group = G_L)
-bool   showVah  = input.bool(true, "VAH", inline = "vah", group = G_L)
-color  colVah   = input.color(#2196F3, "", inline = "vah", group = G_L)
-bool   showVal  = input.bool(true, "VAL", inline = "val", group = G_L)
-color  colVal   = input.color(#2196F3, "", inline = "val", group = G_L)
-int    lineW    = input.int(2, "Linienbreite", minval = 1, maxval = 5, group = G_L)
-string styleIn  = input.string("Durchgezogen", "Linienstil", options = ["Durchgezogen", "Gestrichelt", "Gepunktet"], group = G_L)
-bool   showLbl  = input.bool(true, "Beschriftung", group = G_L)
-bool   delTaken = input.bool(false, "Getakte Linien löschen", group = G_L)
-int    maxOpen  = input.int(30, "Max. offene Levels", minval = 3, maxval = 150, group = G_L, tooltip = "Ältere offene Levels werden nicht mehr verlängert.")
+// ─── Zeilengröße (Auto erkennt NQ/MNQ, ES/MES, GC/MGC) ───────────────────────
+string root    = syminfo.root
+string inst    = root == "NQ" or root == "MNQ" ? "NQ" : root == "ES" or root == "MES" ? "ES" : root == "GC" or root == "MGC" ? "GC" : root
+float  autoRow = inst == "NQ" or inst == "ES" ? 0.25 : inst == "GC" ? 0.10 : syminfo.mintick
+float  rowSize = rowMode == "Auto (1 Tick)" ? math.max(autoRow, syminfo.mintick) : rowSizeIn * syminfo.mintick
+int    nRows   = rowMode == "Anzahl Zeilen" ? rowSizeIn : 0
 
-// ─── Typen & State ──────────────────────────────────────────────────────────
-type Level
-    line  ln
-    label lb
-    float price
-
-var float[] dH     = array.new_float()
-var float[] dL     = array.new_float()
-var float[] dV     = array.new_float()
-var int     dStart = na
-var Level[] levels = array.new<Level>()
-
-string lineStyle = styleIn == "Gestrichelt" ? line.style_dashed : styleIn == "Gepunktet" ? line.style_dotted : line.style_solid
-
-// ─── Volume Profile → POC / VAH / VAL ───────────────────────────────────────
-f_profile(float[] hs, float[] ls, float[] vs, float rowSize, int nRows, float pct, bool pairs) =>
+// ─── Profil → [POC, VAH, VAL] ───────────────────────────────────────────────
+f_profile(float[] hs, float[] ls, float[] vs) =>
     float lo = ls.min()
     float hi = hs.max()
-    int   n  = 1
-    float rs = syminfo.mintick
-    if nRows > 0
-        n  := nRows
-        rs := math.max(hi - lo, syminfo.mintick) / n
-    else
-        rs := math.max(rowSize, (hi - lo) / 5000)
-        n  := math.max(1, int(math.ceil((hi - lo) / rs)))
+    float rs = nRows > 0 ? math.max(hi - lo, syminfo.mintick) / nRows : math.max(rowSize, (hi - lo) / 5000)
+    int   n  = nRows > 0 ? nRows : math.max(1, int(math.ceil((hi - lo) / rs)))
     float[] bins = array.new_float(n, 0.0)
     for i = 0 to hs.size() - 1
         float h = hs.get(i)
@@ -90,72 +64,51 @@ f_profile(float[] hs, float[] ls, float[] vs, float rowSize, int nRows, float pc
                 float ov = math.min(h, bl + rs) - math.max(l, bl)
                 if ov > 0
                     bins.set(b, bins.get(b) + v * ov / (h - l))
-    int   poc = bins.indexof(bins.max())
-    float target = bins.sum() * pct
-    float acc = bins.get(poc)
-    int   up = poc
-    int   dn = poc
-    int   step = pairs ? 2 : 1
+    int   poc    = bins.indexof(bins.max())
+    float target = bins.sum() * vaPct
+    float acc    = bins.get(poc)
+    int   up     = poc
+    int   dn     = poc
+    int   step   = vaPairs ? 2 : 1
     while acc < target and (up < n - 1 or dn > 0)
         float vUp = 0.0
         float vDn = 0.0
         for k = 1 to step
             vUp += up + k <= n - 1 ? bins.get(up + k) : 0.0
             vDn += dn - k >= 0 ? bins.get(dn - k) : 0.0
-        bool canUp = up < n - 1
-        bool canDn = dn > 0
-        if canUp and (not canDn or vUp >= vDn)
+        if up < n - 1 and (dn <= 0 or vUp >= vDn)
             up := math.min(n - 1, up + step)
             acc += vUp
         else
             dn := math.max(0, dn - step)
             acc += vDn
-    float pocPx = math.round_to_mintick(lo + (poc + 0.5) * rs)
-    float vahPx = math.round_to_mintick(lo + (up + 1) * rs)
-    float valPx = math.round_to_mintick(lo + dn * rs)
-    [pocPx, vahPx, valPx]
+    [math.round_to_mintick(lo + (poc + 0.5) * rs), math.round_to_mintick(lo + (up + 1) * rs), math.round_to_mintick(lo + dn * rs)]
 
-f_add(float price, string name, color col, int x1) =>
-    line  ln = line.new(x1, price, time, price, xloc.bar_time, extend.none, col, lineStyle, lineW)
-    label lb = showLbl ? label.new(time, price, name + " " + str.tostring(price, format.mintick), xloc.bar_time, color = color.new(color.black, 100), textcolor = col, style = label.style_label_left, size = size.small) : na
-    levels.push(Level.new(ln, lb, price))
-
-// ─── Instrument erkennen → Zeilengröße ──────────────────────────────────────
-string root = syminfo.root
-string inst = root == "NQ" or root == "MNQ" ? "NQ" : root == "ES" or root == "MES" ? "ES" : root == "GC" or root == "MGC" ? "GC" : root
-float autoRow = switch inst
-    "NQ" => 0.25
-    "ES" => 0.25
-    "GC" => 0.10
-    => syminfo.mintick
-float rowSize = rowMode == "Auto (1 Tick)" ? math.max(autoRow, syminfo.mintick) : rowSizeIn * syminfo.mintick
-int   nRows   = rowMode == "Anzahl Zeilen" ? rowSizeIn : 0
-
-// 1m-Daten (auf 1m-Chart = die Chart-Kerze selbst)
-string ltf = timeframe.in_seconds() > 60 ? "1" : timeframe.period
+// ─── 1m-Daten (auf 1m-Chart wird die Chart-Kerze selbst genommen) ────────────
+bool   useLtf = timeframe.in_seconds() > 60
+string ltf    = useLtf ? "1" : timeframe.period
 [ltfH, ltfL, ltfV] = request.security_lower_tf(syminfo.tickerid, ltf, [high, low, volume])
 
 // ─── Session-Logik ──────────────────────────────────────────────────────────
-bool isRth  = sessMode == "Nur RTH"
-bool newDay = timeframe.change("1D")
-bool inRth  = not na(time(timeframe.period, rthSess, rthTz))
-
+bool isRth   = sessMode == "Nur RTH"
+bool newDay  = timeframe.change("1D")
+bool inRth   = not na(time(timeframe.period, rthSess, rthTz))
 bool startP  = isRth ? inRth and (not inRth[1] or newDay) : newDay
 bool endP    = isRth ? inRth[1] and (not inRth or newDay) : newDay
 bool collect = isRth ? inRth : true
 
-// Tag abgeschlossen → Profil berechnen, Linien ab Tagesanfang zeichnen
+// Tag fertig → Profil berechnen, Linien ab Vortagsbeginn zeichnen
 if endP and dH.size() > 0 and not na(dStart)
-    [pocPx, vahPx, valPx] = f_profile(dH, dL, dV, rowSize, nRows, vaPct, vaMethod == "Wie TradingView (2 Zeilen)")
-    if showVah
-        f_add(vahPx, "PD VAH", colVah, dStart)
-    if showPoc
-        f_add(pocPx, "PD POC", colPoc, dStart)
-    if showVal
-        f_add(valPx, "PD VAL", colVal, dStart)
-    dH.clear()
-    dL.clear()
-    dV.clear()
+    [pocPx, vahPx, valPx] = f_profile(dH, dL, dV)
+    for k = 0 to 2
+        bool   on  = k == 0 ? showVah : k == 1 ? showPoc : showVal
+        float  px  = k == 0 ? vahPx : k == 1 ? pocPx : valPx
+        color  col = k == 0 ? colVah : k == 1 ? colPoc : colVal
+        string nm  = k == 0 ? "PD VAH " : k == 1 ? "PD POC " : "PD VAL "
+        if on
+            lvLines.push(line.new(dStart, px, time, px, xloc.bar_time, extend.none, col, line.style_solid, lineW))
+            lvLabels.push(showLbl ? label.new(time, px, nm + str.tostring(px, format.mintick), xloc.bar_time, color = color.new(color.black, 100), textcolor = col, style = label.style_label_left, size = size.small) : na)
+            lvPrices.push(px)
     dStart := na
 
 if startP
@@ -164,8 +117,9 @@ if startP
     dV.clear()
     dStart := time
 
+// Daten des laufenden Tages sammeln
 if collect and not na(dStart)
-    if ltfH.size() > 0
+    if useLtf and ltfH.size() > 0
         for j = 0 to ltfH.size() - 1
             dH.push(ltfH.get(j))
             dL.push(ltfL.get(j))
@@ -175,36 +129,34 @@ if collect and not na(dStart)
         dL.push(low)
         dV.push(nz(volume))
 
-// Info-Box
-var table info = table.new(position.bottom_right, 1, 1)
-if showInfo and barstate.islast
-    table.cell(info, 0, 0, inst + " · " + (nRows > 0 ? str.tostring(nRows) + " Zeilen" : "Zeile " + str.tostring(rowSize)) + " · Daten " + ltf + "m", text_color = color.gray, text_size = size.small)
-
 // Zu viele offene Levels → älteste nicht mehr verlängern
-while levels.size() > maxOpen
-    Level old = levels.shift()
-    if not na(old.lb)
-        old.lb.delete()
+while lvPrices.size() > maxOpen
+    lvLines.shift()
+    label.delete(lvLabels.shift())
+    lvPrices.shift()
 
 // ─── Offene Levels verlängern / Take prüfen ─────────────────────────────────
-bool anyTaken = false
-if levels.size() > 0
-    float hiX = math.max(high, nz(close[1], high))
-    float loX = math.min(low, nz(close[1], low))
-    for i = levels.size() - 1 to 0
-        Level lv = levels.get(i)
-        lv.ln.set_x2(time)
-        if not na(lv.lb)
-            lv.lb.set_x(time)
-        if hiX >= lv.price and loX <= lv.price
+bool  anyTaken = false
+float hiX      = math.max(high, nz(close[1], high))
+float loX      = math.min(low, nz(close[1], low))
+int   cnt      = lvPrices.size()
+if cnt > 0
+    for i = cnt - 1 to 0
+        float px = lvPrices.get(i)
+        line.set_x2(lvLines.get(i), time)
+        label lb = lvLabels.get(i)
+        if not na(lb)
+            label.set_x(lb, time)
+        if hiX >= px and loX <= px
             anyTaken := true
-            if not na(lv.lb)
-                lv.lb.delete()
+            label.delete(lb)
             if delTaken
-                lv.ln.delete()
-            levels.remove(i)
+                line.delete(lvLines.get(i))
+            lvLabels.remove(i)
+            lvLines.remove(i)
+            lvPrices.remove(i)
 
-// Alarm
 alertcondition(anyTaken, "Vortag-Level getaked", "PD VAH/VAL/POC wurde getaked")
+plot(na, "dummy", display = display.none)
 
-// ENDE – wenn du diese Zeile nicht siehst, wurde nicht alles kopiert
+// ENDE
