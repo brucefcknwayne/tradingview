@@ -158,6 +158,7 @@ while levels.size() > maxOpen
         old.lb.delete()
 
 // ─── Offene Levels verlängern / Take prüfen ─────────────────────────────────
+bool anyTaken = false
 if levels.size() > 0
     float hiX = math.max(high, nz(close[1], high))
     float loX = math.min(low, nz(close[1], low))
@@ -167,8 +168,13 @@ if levels.size() > 0
         if not na(lv.lb)
             lv.lb.set_x(time)
         if hiX >= lv.price and loX <= lv.price
+            anyTaken := true
             if not na(lv.lb)
                 lv.lb.delete()
             if delTaken
                 lv.ln.delete()
             levels.remove(i)
+
+// Alarm + Pflicht-Output (TradingView erkennt Zeichnungen in Funktionen nicht)
+alertcondition(anyTaken, "Vortag-Level getaked", "PD VAH/VAL/POC wurde getaked")
+plot(na, "dummy", display = display.none)
