@@ -48,20 +48,26 @@ float  rowSize = rowMode == "Auto (1 Tick)" ? math.max(autoRow, syminfo.mintick)
 int    nRows   = rowMode == "Anzahl Zeilen" ? numRows : 0
 
 // ─── Profil → [POC, VAH, VAL] ───────────────────────────────────────────────
+// Ticks-Modus (wie FRVP "Ticks pro Zeile"): jede Zeile = eine Preisstufe,
+// Kerzenvolumen gleichmäßig auf alle Stufen von Low bis High (inkl.) verteilt.
+// Zeilen-Modus: Bereich in n gleiche Zeilen, Volumen anteilig nach Überlappung.
 f_profile(float[] hs, float[] ls, float[] vs) =>
-    float lo = ls.min()
-    float hi = hs.max()
-    float rs = nRows > 0 ? math.max(hi - lo, syminfo.mintick) / nRows : math.max(rowSize, (hi - lo) / 5000)
-    int   n  = nRows > 0 ? nRows : math.max(1, int(math.ceil((hi - lo) / rs)))
+    float lo    = ls.min()
+    float hi    = hs.max()
+    bool  ticks = nRows == 0
+    float rs    = ticks ? math.max(rowSize, (hi - lo) / 5000) : math.max(hi - lo, syminfo.mintick) / nRows
+    int   n     = ticks ? int(math.floor((hi - lo) / rs + 1e-6)) + 1 : nRows
     float[] bins = array.new_float(n, 0.0)
     for i = 0 to hs.size() - 1
         float h = hs.get(i)
         float l = ls.get(i)
         float v = vs.get(i)
-        int b0 = math.max(0, math.min(n - 1, int(math.floor((l - lo) / rs))))
-        int b1 = math.max(0, math.min(n - 1, int(math.floor((h - lo) / rs))))
-        if h <= l or b0 == b1
-            bins.set(b0, bins.get(b0) + v)
+        int b0 = math.max(0, math.min(n - 1, int(math.floor((l - lo) / rs + 1e-6))))
+        int b1 = math.max(0, math.min(n - 1, int(math.floor((h - lo) / rs + 1e-6))))
+        if ticks or h <= l or b0 == b1
+            float share = v / (b1 - b0 + 1)
+            for b = b0 to b1
+                bins.set(b, bins.get(b) + share)
         else
             for b = b0 to b1
                 float bl = lo + b * rs
@@ -86,7 +92,10 @@ f_profile(float[] hs, float[] ls, float[] vs) =>
         else
             dn := math.max(0, dn - step)
             acc += vDn
-    [math.round_to_mintick(lo + (poc + 0.5) * rs), math.round_to_mintick(lo + (up + 1) * rs), math.round_to_mintick(lo + dn * rs)]
+    float pocPx = ticks ? lo + poc * rs : lo + (poc + 0.5) * rs
+    float vahPx = ticks ? lo + up * rs : lo + (up + 1) * rs
+    float valPx = lo + dn * rs
+    [math.round_to_mintick(pocPx), math.round_to_mintick(vahPx), math.round_to_mintick(valPx)]
 
 // ─── 1m-Daten (auf 1m-Chart wird die Chart-Kerze selbst genommen) ────────────
 bool   useLtf = timeframe.in_seconds() > 60
