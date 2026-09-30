@@ -12,8 +12,9 @@ const string G_L = "Linien"
 string sessMode  = input.string("Voller Handelstag (ETH)", "Profil-Basis", options = ["Voller Handelstag (ETH)", "Nur RTH"], group = G_S)
 string rthSess   = input.session("0930-1600", "RTH-Zeit", group = G_S)
 string rthTz     = input.string("America/New_York", "Zeitzone RTH", group = G_S)
-string rowMode   = input.string("Anzahl Zeilen", "Row Layout", options = ["Anzahl Zeilen", "Ticks pro Zeile", "Auto (1 Tick)"], group = G_P, tooltip = "So einstellen wie im TradingView VP-Tool.")
-int    rowSizeIn = input.int(24, "Row Size", minval = 1, maxval = 5000, group = G_P, tooltip = "Anzahl Zeilen: TV-Standard 24. Ticks pro Zeile: 4 = 1 Punkt auf NQ.")
+string rowMode   = input.string("Auto (1 Tick)", "Row Layout", options = ["Auto (1 Tick)", "Ticks pro Zeile", "Anzahl Zeilen"], group = G_P, tooltip = "Auto = feinste Auflösung (NQ/ES 0.25, GC 0.10). Sonst so einstellen wie im TradingView VP-Tool.")
+int    tickRow   = input.int(4, "Ticks pro Zeile", minval = 1, maxval = 1000, group = G_P, tooltip = "Nur bei Row Layout = Ticks pro Zeile. 4 = 1 Punkt auf NQ.")
+int    numRows   = input.int(100, "Anzahl Zeilen", minval = 10, maxval = 5000, group = G_P, tooltip = "Nur bei Row Layout = Anzahl Zeilen.")
 float  vaPct     = input.float(70, "Value Area %", minval = 10, maxval = 100, group = G_P) / 100
 bool   vaPairs   = input.bool(true, "VA in 2-Zeilen-Schritten (wie TV)", group = G_P)
 bool   showPoc   = input.bool(true, "POC", inline = "poc", group = G_L)
@@ -43,8 +44,8 @@ var float   dbgRow   = 0.0
 string root    = syminfo.root
 string inst    = root == "NQ" or root == "MNQ" ? "NQ" : root == "ES" or root == "MES" ? "ES" : root == "GC" or root == "MGC" ? "GC" : root
 float  autoRow = inst == "NQ" or inst == "ES" ? 0.25 : inst == "GC" ? 0.10 : syminfo.mintick
-float  rowSize = rowMode == "Auto (1 Tick)" ? math.max(autoRow, syminfo.mintick) : rowSizeIn * syminfo.mintick
-int    nRows   = rowMode == "Anzahl Zeilen" ? rowSizeIn : 0
+float  rowSize = rowMode == "Auto (1 Tick)" ? math.max(autoRow, syminfo.mintick) : tickRow * syminfo.mintick
+int    nRows   = rowMode == "Anzahl Zeilen" ? numRows : 0
 
 // ─── Profil → [POC, VAH, VAL] ───────────────────────────────────────────────
 f_profile(float[] hs, float[] ls, float[] vs) =>
