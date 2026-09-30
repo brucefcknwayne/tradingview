@@ -1,5 +1,6 @@
 //@version=6
 indicator("Vortag VAH / VAL / POC", shorttitle = "PD VA", overlay = true, max_lines_count = 500, max_labels_count = 500)
+plot(na, "dummy", display = display.none)   // Pflicht-Output, zeichnet nichts
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Berechnet das Volume Profile des VORTAGS (POC, VAH, VAL) aus den Chart-Kerzen.
@@ -203,6 +204,7 @@ if levels.size() > 0
                 lv.ln.delete()
             levels.remove(i)
 
-// Alarm + Pflicht-Output (TradingView erkennt Zeichnungen in Funktionen nicht)
+// Alarm
 alertcondition(anyTaken, "Vortag-Level getaked", "PD VAH/VAL/POC wurde getaked")
-plot(na, "dummy", display = display.none)
+
+// ENDE – wenn du diese Zeile nicht siehst, wurde nicht alles kopiert
