@@ -1,5 +1,5 @@
 //@version=6
-indicator("Gotham Cracks Levels", shorttitle = "Cracks", overlay = true, max_lines_count = 500, max_labels_count = 500)
+indicator("Gotham Levels", shorttitle = "Gotham Levels", overlay = true, max_lines_count = 500, max_labels_count = 500)
 plot(na, "dummy", display = display.none)   // Pflicht-Output, zeichnet nichts
 
 // ═════════════════════════════════════════════════════════════════════════
