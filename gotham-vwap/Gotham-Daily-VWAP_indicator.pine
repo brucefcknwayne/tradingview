@@ -10,7 +10,7 @@ indicator("Gotham Daily VWAP", overlay = true, max_bars_back = 5000)
 //   RTH weight = RTH volume / (RTH volume + K)
 // K automatic = median RTH volume 25 min after the open, last 20 days.
 //
-// Plus a ±0.5 stdev zone around it (stdev of the blended distribution), shaded
+// Plus the inner (2σ) and outer (3σ) bands, and a ±0.5 stdev zone around it (stdev of the blended distribution), shaded
 // grey: the stretch of price the mean is currently comfortable with.
 // ═════════════════════════════════════════════════════════════════════════
 
@@ -28,6 +28,12 @@ kMan  = input.float(150000, "K manual / fallback", minval = 1, step = 1000, grou
 
 vwapColor = input.color(color.gray, "VWAP color", group = "Display")
 vwapWidth = input.int(2, "VWAP width", minval = 1, maxval = 5, group = "Display")
+bandMult   = input.float(2.0, "Inner band (× stdev)", minval = 0.5, maxval = 5.0, step = 0.1, group = "Bands", tooltip = "0.5 – 5. Hidden with the switch below.")
+sdOuter    = input.float(3.0, "Outer band (× stdev)", minval = 0.5, maxval = 8.0, step = 0.1, group = "Bands", tooltip = "Clamped to at least the inner band.")
+showInner  = input.bool(true, "Show inner band", group = "Bands")
+showOuter  = input.bool(true, "Show outer band", group = "Bands")
+bandColor  = input.color(color.gray, "Inner band color", group = "Bands")
+band2Color = input.color(color.new(color.gray, 55), "Outer band color", group = "Bands")
 sdZone    = input.float(0.5, "Zone (× stdev)", minval = 0.0, maxval = 5.0, step = 0.1, group = "Display", tooltip = "0 hides it.")
 showZone  = input.bool(true, "Shade the zone", group = "Display")
 zoneLine  = input.color(color.new(color.gray, 65), "Zone line color", group = "Display")
@@ -142,6 +148,14 @@ if ovnV > 0
         stdevV := math.sqrt(math.max(l * (varR + dR * dR) + (1.0 - l) * (varO + dO * dO), 0.0))
 
 plot(vwapV, "Gotham Daily VWAP", color = vwapColor, linewidth = vwapWidth)
+
+// outer band clamped to at least the inner one
+bandDist  = nz(bandMult * stdevV)
+bandDist2 = math.max(nz(sdOuter * stdevV), bandDist)
+plot(showInner ? vwapV + bandDist  : na, "Upper band",         color = color.new(bandColor, 30), linewidth = 2)
+plot(showInner ? vwapV - bandDist  : na, "Lower band",         color = color.new(bandColor, 30), linewidth = 2)
+plot(showOuter ? vwapV + bandDist2 : na, "Upper band (outer)", color = band2Color, linewidth = 1)
+plot(showOuter ? vwapV - bandDist2 : na, "Lower band (outer)", color = band2Color, linewidth = 1)
 
 zUp = plot(sdZone > 0 ? vwapV + sdZone * stdevV : na, "Zone +", color = zoneLine, linewidth = 1)
 zDn = plot(sdZone > 0 ? vwapV - sdZone * stdevV : na, "Zone -", color = zoneLine, linewidth = 1)
