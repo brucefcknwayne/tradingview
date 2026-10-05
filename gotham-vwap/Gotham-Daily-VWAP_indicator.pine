@@ -9,6 +9,9 @@ indicator("Gotham Daily VWAP", overlay = true, max_bars_back = 5000)
 // VWAP after the NY open, paced by a volume clock rather than wall-clock time:
 //   RTH weight = RTH volume / (RTH volume + K)
 // K automatic = median RTH volume 25 min after the open, last 20 days.
+//
+// Plus a ±0.5 stdev zone around it (stdev of the blended distribution), shaded
+// grey: the stretch of price the mean is currently comfortable with.
 // ═════════════════════════════════════════════════════════════════════════
 
 // ─────────────── Time ───────────────
@@ -25,6 +28,10 @@ kMan  = input.float(150000, "K manual / fallback", minval = 1, step = 1000, grou
 
 vwapColor = input.color(color.gray, "VWAP color", group = "Display")
 vwapWidth = input.int(2, "VWAP width", minval = 1, maxval = 5, group = "Display")
+sdZone    = input.float(0.5, "Zone (× stdev)", minval = 0.0, maxval = 5.0, step = 0.1, group = "Display", tooltip = "0 hides it.")
+showZone  = input.bool(true, "Shade the zone", group = "Display")
+zoneLine  = input.color(color.new(color.gray, 65), "Zone line color", group = "Display")
+zoneFill  = input.color(color.new(color.gray, 85), "Zone fill color", group = "Display")
 
 tz = tzSel == "Exchange" ? syminfo.timezone : tzSel
 
@@ -53,10 +60,12 @@ sinceRth = (curMin - rthMin + 1440) % 1440
 newOvn = na(sinceOvn[1]) or sinceOvn < sinceOvn[1]
 newRth = na(sinceRth[1]) or sinceRth < sinceRth[1]
 
-var float ovnPV = 0.0
-var float ovnV  = 0.0
-var float rthPV = 0.0
-var float rthV  = 0.0
+var float ovnPV  = 0.0
+var float ovnV   = 0.0
+var float ovnPPV = 0.0
+var float rthPV  = 0.0
+var float rthV   = 0.0
+var float rthPPV = 0.0
 var int   anchorMs  = 0
 var bool  kCaptured = false
 var float kCur      = kMan
@@ -73,12 +82,14 @@ medianOf(array<float> arr, float fb) =>
     r
 
 if newOvn
-    ovnPV := 0.0
-    ovnV  := 0.0
+    ovnPV  := 0.0
+    ovnV   := 0.0
+    ovnPPV := 0.0
 
 if newRth
-    rthPV := 0.0
-    rthV  := 0.0
+    rthPV  := 0.0
+    rthV   := 0.0
+    rthPPV := 0.0
     anchorMs  := time
     kCaptured := false
     kCur      := kAuto ? medianOf(kHist, kMan) : kMan
@@ -92,12 +103,14 @@ pBar = hlc3
 takeBar = not (vwapAfterBlackout and inBlackout)
 
 if inOvn and takeBar
-    ovnPV += pBar * vBar
-    ovnV  += vBar
+    ovnPV  += pBar * vBar
+    ovnV   += vBar
+    ovnPPV += pBar * pBar * vBar
 
 if inRth and takeBar
-    rthPV += pBar * vBar
-    rthV  += vBar
+    rthPV  += pBar * vBar
+    rthV   += vBar
+    rthPPV += pBar * pBar * vBar
 
 // K sample: RTH volume 25 minutes after the open, once per day, last 20 kept
 if inRth and not kCaptured and (time - anchorMs) >= 25 * 60000
@@ -106,16 +119,30 @@ if inRth and not kCaptured and (time - anchorMs) >= 25 * 60000
         array.shift(kHist)
     kCaptured := true
 
-float vwapV = na
+float vwapV  = na
+float stdevV = na
 
 if ovnV > 0
-    vo = ovnPV / ovnV
+    vo   = ovnPV / ovnV
+    varO = math.max(ovnPPV / ovnV - vo * vo, 0.0)
     if not inRth or rthV <= 0
-        vwapV := vo
+        vwapV  := vo
+        stdevV := math.sqrt(varO)
     else
-        vr = rthPV / rthV
-        kk = kCur > 0 ? kCur : kMan
-        l  = math.min(math.max(vBefore / (vBefore + kk), 0.0), 1.0)
-        vwapV := l * vr + (1.0 - l) * vo
+        vr   = rthPV / rthV
+        varR = math.max(rthPPV / rthV - vr * vr, 0.0)
+        kk   = kCur > 0 ? kCur : kMan
+        l    = math.min(math.max(vBefore / (vBefore + kk), 0.0), 1.0)
+        b    = l * vr + (1.0 - l) * vo
+        dR   = vr - b
+        dO   = vo - b
+        vwapV  := b
+        // stdev of the blended distribution, not a blend of the two stdevs:
+        // the distance of each mean from the blended mean is part of the spread
+        stdevV := math.sqrt(math.max(l * (varR + dR * dR) + (1.0 - l) * (varO + dO * dO), 0.0))
 
 plot(vwapV, "Gotham Daily VWAP", color = vwapColor, linewidth = vwapWidth)
+
+zUp = plot(sdZone > 0 ? vwapV + sdZone * stdevV : na, "Zone +", color = zoneLine, linewidth = 1)
+zDn = plot(sdZone > 0 ? vwapV - sdZone * stdevV : na, "Zone -", color = zoneLine, linewidth = 1)
+fill(zUp, zDn, color = showZone and sdZone > 0 ? zoneFill : color.new(color.gray, 100), title = "Zone fill")
