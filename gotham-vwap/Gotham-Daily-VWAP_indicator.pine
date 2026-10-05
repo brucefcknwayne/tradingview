@@ -20,11 +20,13 @@ openHHMM   = input.string("1800", "Daily market open (HHMM)", group = "Time", to
 blockHours = input.float(2.0, "Blackout after open (hours)", minval = 0.0, maxval = 12.0, step = 0.5, group = "Time", tooltip = "Only used when 'Start VWAP after blackout' is on.")
 vwapAfterBlackout = input.bool(false, "Start VWAP after blackout", group = "Time", tooltip = "On = blackout bars are excluded from the VWAP calculation.")
 
-// ─────────────── VWAP blend ───────────────
-rthHH = input.int(930,  "NY open (HHMM)",      0, 2359, 5, group = "VWAP blend", tooltip = "When the RTH profile starts building and the blend begins.")
-endHH = input.int(1700, "Session end (HHMM)",  0, 2359, 5, group = "VWAP blend", tooltip = "Runs up to the last minute before this: 1700 = through 16:59.")
-kAuto = input.bool(true, "K automatic", group = "VWAP blend", tooltip = "Auto = median RTH volume 25 minutes after the open, over the last 20 days.")
-kMan  = input.float(150000, "K manual / fallback", minval = 1, step = 1000, group = "VWAP blend", tooltip = "Used when K automatic is off, and for the first days before samples exist.")
+// ─────────────── VWAP blend (fixed, not adjustable) ───────────────
+// NY open 09:30, session end 17:00 (through 16:59), K automatic with 150000
+// as fallback for the first days before samples exist.
+const int   rthHH = 930
+const int   endHH = 1700
+const bool  kAuto = true
+const float kMan  = 150000
 
 vwapColor = input.color(color.gray, "VWAP color", group = "Display")
 vwapWidth = input.int(2, "VWAP width", minval = 1, maxval = 5, group = "Display")
@@ -51,9 +53,6 @@ hhmm(int v) => int(v / 100) * 60 + v % 100
 ovnMin = openMin
 rthMin = hhmm(rthHH)
 endMin = hhmm(endHH)
-
-if barstate.isfirst and endMin <= rthMin
-    runtime.error("Session end (" + str.tostring(endHH) + ") must be AFTER the NY open (" + str.tostring(rthHH) + "), otherwise the VWAP never blends.")
 
 inOvn = ovnMin > endMin ? (curMin >= ovnMin or curMin < endMin) : (curMin >= ovnMin and curMin < endMin)
 inRth = curMin >= rthMin and curMin < endMin
