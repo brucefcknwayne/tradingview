@@ -1,30 +1,30 @@
 //@version=6
 indicator("Gotham Levels", shorttitle = "Gotham Levels", overlay = true, max_lines_count = 500, max_labels_count = 500)
-plot(na, "dummy", display = display.none)   // Pflicht-Output, zeichnet nichts
+plot(na, "dummy", display = display.none)   // required output, draws nothing
 
 // ═════════════════════════════════════════════════════════════════════════
-// Zeigt die Cracks-Levels aus MotiveWave als weiße Linien mit Label rechts
-// ("5M  7788.25"). Die Levels werden eingefügt, nicht berechnet.
+// Shows the MotiveWave Cracks levels as white lines with a label on the right
+// ("5M  7788.25"). Levels are pasted in, not computed.
 //
-// Format (Gruppen mit ; oder Zeilenumbruch trennen, Dezimalpunkt):
+// Format (separate groups with ; or a line break, decimal point):
 //   7D=7788.25,7801.50;30D=7650.00;60D=7512.25;90D=7400.75
-// oder eine Zeile pro Level:
+// or one line per level:
 //   5M 7788.25
 //   30D 7650.00
 //
-// Dazu die Multi-Timeframe-RSI-Tabelle aus dem Gotham Signals Indi.
+// Plus the multi-timeframe RSI table from the Gotham Signals Indi.
 // ═════════════════════════════════════════════════════════════════════════
 
 // ─────────────── Levels ───────────────
-txtAll     = input.text_area("", "Cracks-Levels einfügen", group = "Cracks", tooltip = "TAG=Preis,Preis;TAG=Preis   Beispiel: 7D=7788.25,7801.5;30D=7650\nOder eine Zeile pro Level: 5M 7788.25")
-onlyTags   = input.string("", "Nur diese Tags zeigen (leer = alle)", group = "Cracks", tooltip = "Komma-getrennt, z. B. 7D,30D")
-lvlColor   = input.color(color.white, "Farbe", group = "Cracks - Stil")
-lvlWidth   = input.int(1, "Linienbreite", minval = 1, maxval = 5, group = "Cracks - Stil")
-styleIn    = input.string("Durchgezogen", "Linienstil", options = ["Durchgezogen", "Gestrichelt", "Gepunktet"], group = "Cracks - Stil")
-showLabels = input.bool(true, "Labels zeigen", group = "Cracks - Stil")
-lookBack   = input.int(1500, "Linie X Kerzen nach links", minval = 20, maxval = 5000, group = "Cracks - Stil")
-extendBars = input.int(20, "Linie X Kerzen nach rechts", minval = 0, maxval = 300, group = "Cracks - Stil")
-maxDistPct = input.float(0.0, "Levels weiter als X% vom Preis ausblenden", minval = 0.0, step = 0.5, group = "Cracks - Stil", tooltip = "0 = alle zeigen.")
+txtAll     = input.text_area("", "Paste Cracks levels", group = "Cracks", tooltip = "TAG=price,price;TAG=price   Example: 7D=7788.25,7801.5;30D=7650\nOr one line per level: 5M 7788.25")
+onlyTags   = input.string("", "Only show these tags (empty = all)", group = "Cracks", tooltip = "Comma-separated, e.g. 7D,30D")
+lvlColor   = input.color(color.white, "Color", group = "Cracks - Style")
+lvlWidth   = input.int(1, "Line width", minval = 1, maxval = 5, group = "Cracks - Style")
+styleIn    = input.string("Solid", "Line style", options = ["Solid", "Dashed", "Dotted"], group = "Cracks - Style")
+showLabels = input.bool(true, "Show labels", group = "Cracks - Style")
+lookBack   = input.int(1500, "Extend left (bars)", minval = 20, maxval = 5000, group = "Cracks - Style")
+extendBars = input.int(20, "Extend right (bars)", minval = 0, maxval = 300, group = "Cracks - Style")
+maxDistPct = input.float(0.0, "Hide levels further than X% from price", minval = 0.0, step = 0.5, group = "Cracks - Style", tooltip = "0 = show all.")
 
 // ─────────────── RSI ───────────────
 rsiLen     = input.int(14, "RSI length", minval = 2, group = "RSI")
@@ -37,7 +37,7 @@ rsiTblPos  = input.string("Middle right", "RSI table position", options = ["Midd
 var array<line>  dLines  = array.new<line>()
 var array<label> dLabels = array.new<label>()
 
-lineStyle = styleIn == "Gestrichelt" ? line.style_dashed : styleIn == "Gepunktet" ? line.style_dotted : line.style_solid
+lineStyle = styleIn == "Dashed" ? line.style_dashed : styleIn == "Dotted" ? line.style_dotted : line.style_solid
 
 tagVisible(string tag) =>
     f = str.upper(str.replace_all(onlyTags, " ", ""))
@@ -58,14 +58,14 @@ drawAll(string txt) =>
         ei = str.pos(g, "=")
         if str.length(g) > 0
             if not na(ei)
-                // TAG=Preis,Preis
+                // TAG=price,price
                 tag = str.upper(str.trim(str.substring(g, 0, ei)))
                 for s in str.split(str.substring(g, ei + 1), ",")
                     t = str.trim(s)
                     if str.length(t) > 0
                         drawOne(nz(str.tonumber(t)), tag)
             else
-                // "5M 7788.25" – Zahl = Preis, Rest = Tag
+                // "5M 7788.25" – number = price, rest = tag
                 string tag = ""
                 float  px  = na
                 for tok in str.split(g, " ")
@@ -130,4 +130,4 @@ if barstate.islast and showRsiTbl
         table.cell(rt, 1, row, tooFine ? "below chart TF" : na(v) ? "-" : str.tostring(v, "#.#"), bgcolor = valBg2, text_color = tooFine ? color.gray : color.white, text_size = size.small)
         table.cell(rt, 2, row, side, bgcolor = valBg2, text_color = sideCol, text_size = size.small)
 
-// ENDE
+// END

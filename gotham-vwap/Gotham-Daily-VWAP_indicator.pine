@@ -2,13 +2,13 @@
 indicator("Gotham Daily VWAP", overlay = true, max_bars_back = 5000)
 
 // ═════════════════════════════════════════════════════════════════════════
-// Nur der Blend-VWAP aus dem Gotham Signals Indi v2 (Port des MotiveWave
-// "VWAP Blend", com.zera) – keine Bänder, keine Signale.
+// Only the blended VWAP from Gotham Signals Indi v2 (port of the MotiveWave
+// "VWAP Blend", com.zera) – no bands, no signals.
 //
-// Startet als Overnight-VWAP (ab Daily Open) und wandert nach dem NY-Open in
-// den RTH-VWAP. Das Tempo bestimmt eine Volumen-Uhr, nicht die Uhrzeit:
-//   Gewicht RTH = RTH-Volumen / (RTH-Volumen + K)
-// K automatisch = Median des RTH-Volumens 25 min nach Open, letzte 20 Tage.
+// Starts as the overnight VWAP (from the daily open) and migrates into the RTH
+// VWAP after the NY open, paced by a volume clock rather than wall-clock time:
+//   RTH weight = RTH volume / (RTH volume + K)
+// K automatic = median RTH volume 25 min after the open, last 20 days.
 // ═════════════════════════════════════════════════════════════════════════
 
 // ─────────────── Time ───────────────

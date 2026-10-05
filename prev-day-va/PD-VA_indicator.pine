@@ -1,32 +1,32 @@
 //@version=6
-indicator("Vortag VAH / VAL / POC", shorttitle = "PD VA", overlay = true, max_lines_count = 500, max_labels_count = 500)
+indicator("Previous Day VAH / VAL / POC", shorttitle = "PD VA", overlay = true, max_lines_count = 500, max_labels_count = 500)
 
-// Volume Profile des Vortags (POC/VAH/VAL). Linien starten am Vortagsbeginn und
-// laufen weiter, bis der Preis das Level berührt. Rechnet wie das TV-VP-Tool:
-// gleiche Row-Einstellungen eintragen. Auf >1m-Charts werden 1m-Daten genutzt.
+// Previous day volume profile (POC/VAH/VAL). Lines start at the beginning of the
+// previous day and keep running until price touches the level. Calculates like
+// the TradingView VP tool: use the same row settings. Charts above 1m use 1m data.
 
 const string G_S = "Session"
-const string G_P = "Profil"
-const string G_L = "Linien"
+const string G_P = "Profile"
+const string G_L = "Lines"
 
-string sessMode  = input.string("Voller Handelstag (ETH)", "Profil-Basis", options = ["Voller Handelstag (ETH)", "Nur RTH"], group = G_S)
-string rthSess   = input.session("0930-1600", "RTH-Zeit", group = G_S)
-string rthTz     = input.string("America/New_York", "Zeitzone RTH", group = G_S)
-string rowMode   = input.string("Auto (1 Tick)", "Row Layout", options = ["Auto (1 Tick)", "Ticks pro Zeile", "Anzahl Zeilen"], group = G_P, tooltip = "Auto = feinste Auflösung (NQ/ES 0.25, GC 0.10). Sonst so einstellen wie im TradingView VP-Tool.")
-int    tickRow   = input.int(4, "Ticks pro Zeile", minval = 1, maxval = 1000, group = G_P, tooltip = "Nur bei Row Layout = Ticks pro Zeile. 4 = 1 Punkt auf NQ.")
-int    numRows   = input.int(100, "Anzahl Zeilen", minval = 10, maxval = 5000, group = G_P, tooltip = "Nur bei Row Layout = Anzahl Zeilen.")
+string sessMode  = input.string("Full trading day (ETH)", "Profile basis", options = ["Full trading day (ETH)", "RTH only"], group = G_S)
+string rthSess   = input.session("0930-1600", "RTH time", group = G_S)
+string rthTz     = input.string("America/New_York", "RTH timezone", group = G_S)
+string rowMode   = input.string("Auto (1 Tick)", "Row Layout", options = ["Auto (1 Tick)", "Ticks per row", "Number of rows"], group = G_P, tooltip = "Auto = finest resolution (NQ/ES 0.25, GC 0.10). Otherwise match the TradingView VP tool.")
+int    tickRow   = input.int(4, "Ticks per row", minval = 1, maxval = 1000, group = G_P, tooltip = "Only for Row Layout = Ticks per row. 4 = 1 point on NQ.")
+int    numRows   = input.int(100, "Number of rows", minval = 10, maxval = 5000, group = G_P, tooltip = "Only for Row Layout = Number of rows.")
 float  vaPct     = input.float(70, "Value Area %", minval = 10, maxval = 100, group = G_P) / 100
-bool   vaPairs   = input.bool(true, "VA in 2-Zeilen-Schritten (wie TV)", group = G_P)
+bool   vaPairs   = input.bool(true, "VA in 2-row steps (like TV)", group = G_P)
 bool   showPoc   = input.bool(true, "POC", inline = "poc", group = G_L)
 color  colPoc    = input.color(#FF9800, "", inline = "poc", group = G_L)
 bool   showVah   = input.bool(true, "VAH", inline = "vah", group = G_L)
 color  colVah    = input.color(#2196F3, "", inline = "vah", group = G_L)
 bool   showVal   = input.bool(true, "VAL", inline = "val", group = G_L)
 color  colVal    = input.color(#2196F3, "", inline = "val", group = G_L)
-int    lineW     = input.int(2, "Linienbreite", minval = 1, maxval = 5, group = G_L)
-bool   showLbl   = input.bool(true, "Beschriftung", group = G_L)
-bool   delTaken  = input.bool(false, "Getakte Linien löschen", group = G_L)
-int    maxOpen   = input.int(30, "Max. offene Levels", minval = 3, maxval = 150, group = G_L)
+int    lineW     = input.int(2, "Line width", minval = 1, maxval = 5, group = G_L)
+bool   showLbl   = input.bool(true, "Labels", group = G_L)
+bool   delTaken  = input.bool(false, "Delete taken lines", group = G_L)
+int    maxOpen   = input.int(30, "Max. open levels", minval = 3, maxval = 150, group = G_L)
 
 // ─── State ──────────────────────────────────────────────────────────────────
 var float[] dH       = array.new_float()
@@ -40,17 +40,17 @@ var int     dbgBars  = 0
 var float   dbgVol   = 0.0
 var float   dbgRow   = 0.0
 
-// ─── Zeilengröße (Auto erkennt NQ/MNQ, ES/MES, GC/MGC) ───────────────────────
+// ─── Row size (Auto detects NQ/MNQ, ES/MES, GC/MGC) ──────────────────────────
 string root    = syminfo.root
 string inst    = root == "NQ" or root == "MNQ" ? "NQ" : root == "ES" or root == "MES" ? "ES" : root == "GC" or root == "MGC" ? "GC" : root
 float  autoRow = inst == "NQ" or inst == "ES" ? 0.25 : inst == "GC" ? 0.10 : syminfo.mintick
 float  rowSize = rowMode == "Auto (1 Tick)" ? math.max(autoRow, syminfo.mintick) : tickRow * syminfo.mintick
-int    nRows   = rowMode == "Anzahl Zeilen" ? numRows : 0
+int    nRows   = rowMode == "Number of rows" ? numRows : 0
 
-// ─── Profil → [POC, VAH, VAL] ───────────────────────────────────────────────
-// Ticks-Modus (wie FRVP "Ticks pro Zeile"): jede Zeile = eine Preisstufe,
-// Kerzenvolumen gleichmäßig auf alle Stufen von Low bis High (inkl.) verteilt.
-// Zeilen-Modus: Bereich in n gleiche Zeilen, Volumen anteilig nach Überlappung.
+// ─── Profile → [POC, VAH, VAL] ───────────────────────────────────────────────
+// Ticks mode (like FRVP "Ticks per row"): each row = one price level, bar volume
+// split evenly across all levels from low to high (inclusive).
+// Rows mode: range split into n equal rows, volume shared by overlap.
 f_profile(float[] hs, float[] ls, float[] vs) =>
     float lo    = ls.min()
     float hi    = hs.max()
@@ -97,20 +97,20 @@ f_profile(float[] hs, float[] ls, float[] vs) =>
     float valPx = lo + dn * rs
     [math.round_to_mintick(pocPx), math.round_to_mintick(vahPx), math.round_to_mintick(valPx)]
 
-// ─── 1m-Daten (auf 1m-Chart wird die Chart-Kerze selbst genommen) ────────────
+// ─── 1m data (on a 1m chart the chart bar itself is used) ───────────────────
 bool   useLtf = timeframe.in_seconds() > 60
 string ltf    = useLtf ? "1" : timeframe.period
 [ltfH, ltfL, ltfV] = request.security_lower_tf(syminfo.tickerid, ltf, [high, low, volume])
 
-// ─── Session-Logik ──────────────────────────────────────────────────────────
-bool isRth   = sessMode == "Nur RTH"
+// ─── Session logic ──────────────────────────────────────────────────────────
+bool isRth   = sessMode == "RTH only"
 bool newDay  = timeframe.change("1D")
 bool inRth   = not na(time(timeframe.period, rthSess, rthTz))
 bool startP  = isRth ? inRth and (not inRth[1] or newDay) : newDay
 bool endP    = isRth ? inRth[1] and (not inRth or newDay) : newDay
 bool collect = isRth ? inRth : true
 
-// Tag fertig → Profil berechnen, Linien ab Vortagsbeginn zeichnen
+// Day finished → build profile, draw lines from the start of that day
 if endP and dH.size() > 0 and not na(dStart)
     [pocPx, vahPx, valPx] = f_profile(dH, dL, dV)
     for k = 0 to 2
@@ -133,7 +133,7 @@ if startP
     dV.clear()
     dStart := time
 
-// Daten des laufenden Tages sammeln
+// Collect data of the running day
 if collect and not na(dStart)
     if useLtf and ltfH.size() > 0
         for j = 0 to ltfH.size() - 1
@@ -145,13 +145,13 @@ if collect and not na(dStart)
         dL.push(low)
         dV.push(nz(volume))
 
-// Zu viele offene Levels → älteste nicht mehr verlängern
+// Too many open levels → stop extending the oldest
 while lvPrices.size() > maxOpen
     lvLines.shift()
     label.delete(lvLabels.shift())
     lvPrices.shift()
 
-// ─── Offene Levels verlängern / Take prüfen ─────────────────────────────────
+// ─── Extend open levels / check for take ────────────────────────────────────
 bool  anyTaken = false
 float hiX      = math.max(high, nz(close[1], high))
 float loX      = math.min(low, nz(close[1], low))
@@ -172,13 +172,13 @@ if cnt > 0
             lvLines.remove(i)
             lvPrices.remove(i)
 
-// Diagnose-Box: so viele Kerzen/Volumen hatte das letzte Tagesprofil
+// Diagnostics box: bars/volume of the last day profile
 var table info = table.new(position.bottom_right, 1, 1, bgcolor = color.new(color.black, 30))
 if barstate.islast
-    string warn = dbgVol == 0 ? "  ⚠ KEIN VOLUMEN (Symbol ohne Volumen?)" : dbgBars < 50 ? "  ⚠ ZU WENIG KERZEN – 1m-Chart nehmen" : ""
-    table.cell(info, 0, 0, "PD VA · TF " + timeframe.period + " · Vortag: " + str.tostring(dbgBars) + " Kerzen · Vol " + str.tostring(dbgVol, format.volume) + " · Zeile " + str.tostring(dbgRow, format.mintick) + " Pkt" + warn, text_color = color.white, text_size = size.small)
+    string warn = dbgVol == 0 ? "  ⚠ NO VOLUME (symbol without volume?)" : dbgBars < 50 ? "  ⚠ TOO FEW BARS – use a 1m chart" : ""
+    table.cell(info, 0, 0, "PD VA · TF " + timeframe.period + " · Prev day: " + str.tostring(dbgBars) + " bars · Vol " + str.tostring(dbgVol, format.volume) + " · Row " + str.tostring(dbgRow, format.mintick) + " pts" + warn, text_color = color.white, text_size = size.small)
 
-alertcondition(anyTaken, "Vortag-Level getaked", "PD VAH/VAL/POC wurde getaked")
+alertcondition(anyTaken, "Previous day level taken", "PD VAH/VAL/POC was taken")
 plot(na, "dummy", display = display.none)
 
-// ENDE
+// END
