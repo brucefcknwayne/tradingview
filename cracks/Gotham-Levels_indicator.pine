@@ -12,6 +12,20 @@ plot(na, "dummy", display = display.none)   // required output, draws nothing
 //   5M 7788.25
 //   30D 7650.00
 //
+// LEVEL TESTER: every level is replayed over the loaded chart history.
+//   Test   = price comes into the level (within the touch tolerance) from
+//            above (support test) or below (resistance test).
+//   Hold   = price then bounces X points away from it in the direction it
+//            came from, before closing Y points through it.
+//   Break  = price closes Y points through it first.
+//   Neither within Z bars = not counted.
+// Hold rate = holds / (holds + breaks). Levels below the minimum rate are
+// "weak" and can be hidden. Levels found in several lists (60D AND 90D) are
+// merged into one line and count as confluence.
+//
+// History is limited by the plan (Essential ≈ 10k bars ≈ 1 week on 1m), so
+// for more tests per level run it on a 5m or 15m chart.
+//
 // Plus the multi-timeframe RSI table from the Gotham Signals Indi.
 // ═════════════════════════════════════════════════════════════════════════
 
@@ -26,6 +40,23 @@ lookBack   = input.int(1500, "Extend left (bars)", minval = 20, maxval = 5000, g
 extendBars = input.int(20, "Extend right (bars)", minval = 0, maxval = 300, group = "Cracks - Style")
 maxDistPct = input.float(0.0, "Hide levels further than X% from price", minval = 0.0, step = 0.5, group = "Cracks - Style", tooltip = "0 = show all.")
 
+// ─────────────── Level tester ───────────────
+testOn       = input.bool(true, "Test levels on chart history", group = "Level tester")
+touchTol     = input.float(1.0, "Touch tolerance (points)", minval = 0.0, step = 0.25, group = "Level tester", tooltip = "How close price has to come to count as a test.")
+reactPts     = input.float(15.0, "Hold = bounce of X points", minval = 0.25, step = 0.25, group = "Level tester")
+breakPts     = input.float(5.0, "Break = close X points through", minval = 0.0, step = 0.25, group = "Level tester")
+maxBars      = input.int(30, "Decide within X bars", minval = 1, maxval = 500, group = "Level tester", tooltip = "If neither hold nor break happens within this many bars, the test is not counted.")
+minTests     = input.int(2, "Min. tests for a rating", minval = 1, group = "Level tester")
+minRate      = input.float(50.0, "Weak = hold rate below X %", minval = 0.0, maxval = 100.0, step = 5.0, group = "Level tester")
+strongRate   = input.float(70.0, "Strong = hold rate from X % (thicker line)", minval = 0.0, maxval = 100.0, step = 5.0, group = "Level tester")
+hideWeak     = input.bool(true, "Hide weak levels", group = "Level tester")
+hideUntested = input.bool(false, "Hide untested levels", group = "Level tester", tooltip = "Levels with fewer tests than the minimum. Off = shown faded.")
+mergeTol     = input.float(1.0, "Merge levels closer than X points", minval = 0.0, step = 0.25, group = "Level tester", tooltip = "Same level in several lists (e.g. 60D and 90D) becomes one line tagged 60D/90D.")
+minLists     = input.int(1, "Only levels in at least X lists", minval = 1, maxval = 10, group = "Level tester", tooltip = "2 = the level has to appear in e.g. 60D AND 90D.")
+showTbl      = input.bool(true, "Show strongest-levels table", group = "Level tester")
+tblRows      = input.int(10, "Table rows", minval = 3, maxval = 30, group = "Level tester")
+tblPosIn     = input.string("Top right", "Table position", options = ["Top right", "Top left", "Bottom right", "Bottom left", "Middle left"], group = "Level tester")
+
 // ─────────────── RSI ───────────────
 rsiLen     = input.int(14, "RSI length", minval = 2, group = "RSI")
 rsiOB      = input.float(70.0, "Overbought (for shorts)", minval = 50.0, maxval = 100.0, step = 1.0, group = "RSI")
@@ -33,9 +64,15 @@ rsiOS      = input.float(30.0, "Oversold (for longs)", minval = 0.0, maxval = 50
 showRsiTbl = input.bool(true, "Show the multi-timeframe RSI table", group = "RSI")
 rsiTblPos  = input.string("Middle right", "RSI table position", options = ["Middle right", "Middle left", "Bottom right", "Bottom left", "Top left", "Top right"], group = "RSI")
 
-// ─────────────── Level drawing ───────────────
-var array<line>  dLines  = array.new<line>()
-var array<label> dLabels = array.new<label>()
+// ─────────────── Level state ───────────────
+var array<float>  lvPx    = array.new<float>()
+var array<string> lvTag   = array.new<string>()
+var array<int>    lvLists = array.new<int>()
+var array<int>    lvHold  = array.new<int>()
+var array<int>    lvBrk   = array.new<int>()
+var array<int>    lvSide  = array.new<int>()     // 1 = support test running, -1 = resistance test, 0 = none
+var array<int>    lvStart = array.new<int>()
+var array<bool>   lvWasIn = array.new<bool>()
 
 lineStyle = styleIn == "Dashed" ? line.style_dashed : styleIn == "Dotted" ? line.style_dotted : line.style_solid
 
@@ -43,15 +80,31 @@ tagVisible(string tag) =>
     f = str.upper(str.replace_all(onlyTags, " ", ""))
     str.length(f) == 0 or str.contains("," + f + ",", "," + str.upper(tag) + ",")
 
-drawOne(float px, string tag) =>
-    inRange = maxDistPct <= 0 or math.abs(px - close) <= close * maxDistPct / 100.0
-    if px > 0 and inRange and tagVisible(tag)
-        array.push(dLines, line.new(math.max(0, bar_index - lookBack), px, bar_index + extendBars, px, xloc = xloc.bar_index, color = lvlColor, style = lineStyle, width = lvlWidth))
-        if showLabels
-            body = (str.length(tag) > 0 ? tag + "  " : "") + str.tostring(px, format.mintick)
-            array.push(dLabels, label.new(bar_index + extendBars, px, body, xloc = xloc.bar_index, style = label.style_label_left, color = color.new(color.black, 100), textcolor = lvlColor, size = size.normal))
+// adds a level, or merges it into an existing one within the merge tolerance
+addLevel(float px, string tag) =>
+    if px > 0 and tagVisible(tag)
+        int found = -1
+        if lvPx.size() > 0
+            for i = 0 to lvPx.size() - 1
+                if math.abs(lvPx.get(i) - px) <= mergeTol
+                    found := i
+                    break
+        if found >= 0
+            t = lvTag.get(found)
+            if not str.contains("/" + t + "/", "/" + tag + "/")
+                lvTag.set(found, str.length(t) > 0 ? t + "/" + tag : tag)
+                lvLists.set(found, lvLists.get(found) + 1)
+        else
+            lvPx.push(px)
+            lvTag.push(tag)
+            lvLists.push(1)
+            lvHold.push(0)
+            lvBrk.push(0)
+            lvSide.push(0)
+            lvStart.push(0)
+            lvWasIn.push(false)
 
-drawAll(string txt) =>
+parseAll(string txt) =>
     norm = str.replace_all(str.replace_all(txt, "\r", ""), "\n", ";")
     for grp in str.split(norm, ";")
         g  = str.trim(grp)
@@ -63,7 +116,7 @@ drawAll(string txt) =>
                 for s in str.split(str.substring(g, ei + 1), ",")
                     t = str.trim(s)
                     if str.length(t) > 0
-                        drawOne(nz(str.tonumber(t)), tag)
+                        addLevel(nz(str.tonumber(t)), tag)
             else
                 // "5M 7788.25" – number = price, rest = tag
                 string tag = ""
@@ -77,7 +130,44 @@ drawAll(string txt) =>
                         else
                             px := v
                 if not na(px)
-                    drawOne(px, tag)
+                    addLevel(px, tag)
+
+if barstate.isfirst and str.length(str.trim(txtAll)) > 0
+    parseAll(txtAll)
+
+// ─────────────── Tester: replay every level on every bar ───────────────
+float prevClose = close[1]
+
+if testOn and lvPx.size() > 0
+    for i = 0 to lvPx.size() - 1
+        float px   = lvPx.get(i)
+        int   side = lvSide.get(i)
+        // running test → hold, break or expire
+        if side != 0
+            bool hold = side == 1 ? high >= px + reactPts : low <= px - reactPts
+            bool brk  = side == 1 ? close <= px - breakPts : close >= px + breakPts
+            if hold
+                lvHold.set(i, lvHold.get(i) + 1)
+                side := 0
+            else if brk
+                lvBrk.set(i, lvBrk.get(i) + 1)
+                side := 0
+            else if bar_index - lvStart.get(i) >= maxBars
+                side := 0
+        // new test = price comes into the level after being away from it
+        bool inNow = high >= px - touchTol and low <= px + touchTol
+        if side == 0 and inNow and not lvWasIn.get(i) and not na(prevClose)
+            side := prevClose > px ? 1 : prevClose < px ? -1 : 0
+            lvStart.set(i, bar_index)
+        lvSide.set(i, side)
+        lvWasIn.set(i, inNow)
+
+// ─────────────── Drawing ───────────────
+var array<line>  dLines  = array.new<line>()
+var array<label> dLabels = array.new<label>()
+
+tblPos = tblPosIn == "Top left" ? position.top_left : tblPosIn == "Bottom right" ? position.bottom_right : tblPosIn == "Bottom left" ? position.bottom_left : tblPosIn == "Middle left" ? position.middle_left : position.top_right
+var table tt = table.new(tblPos, 4, 32, border_width = 1, frame_color = color.gray, frame_width = 1)
 
 if barstate.islast
     for ln in dLines
@@ -86,8 +176,53 @@ if barstate.islast
     for lb in dLabels
         label.delete(lb)
     array.clear(dLabels)
-    if str.length(str.trim(txtAll)) > 0
-        drawAll(txtAll)
+
+    int n = lvPx.size()
+    array<float> scores = array.new<float>()
+    if n > 0
+        for i = 0 to n - 1
+            float px    = lvPx.get(i)
+            int   tests = lvHold.get(i) + lvBrk.get(i)
+            float rate  = tests > 0 ? 100.0 * lvHold.get(i) / tests : na
+            bool  rated = testOn and tests >= minTests
+            bool  weak  = rated and rate < minRate
+            bool  strong = rated and rate >= strongRate
+            bool  inRange = maxDistPct <= 0 or math.abs(px - close) <= close * maxDistPct / 100.0
+            bool  show  = inRange and lvLists.get(i) >= minLists and not (hideWeak and weak) and not (hideUntested and testOn and not rated)
+            scores.push(show and rated ? rate * 1000 + tests : -1.0)
+            if show
+                color col = testOn and not rated ? color.new(lvlColor, 60) : lvlColor
+                dLines.push(line.new(math.max(0, bar_index - lookBack), px, bar_index + extendBars, px, xloc = xloc.bar_index, color = col, style = lineStyle, width = strong ? lvlWidth + 1 : lvlWidth))
+                if showLabels
+                    string t    = lvTag.get(i)
+                    string stat = testOn ? (tests > 0 ? "  " + str.tostring(lvHold.get(i)) + "/" + str.tostring(tests) + " " + str.tostring(rate, "#") + "%" : "  –") : ""
+                    dLabels.push(label.new(bar_index + extendBars, px, (str.length(t) > 0 ? t + "  " : "") + str.tostring(px, format.mintick) + stat, xloc = xloc.bar_index, style = label.style_label_left, color = color.new(color.black, 100), textcolor = col, size = size.normal))
+
+    // strongest-levels table
+    table.clear(tt, 0, 0, 3, 31)
+    if showTbl and testOn and n > 0
+        hdr = color.new(color.gray, 70)
+        cel = color.new(color.gray, 88)
+        table.cell(tt, 0, 0, "Strongest", bgcolor = hdr, text_color = color.white, text_size = size.small)
+        table.cell(tt, 1, 0, "Lists",     bgcolor = hdr, text_color = color.white, text_size = size.small)
+        table.cell(tt, 2, 0, "Hold",      bgcolor = hdr, text_color = color.white, text_size = size.small)
+        table.cell(tt, 3, 0, "%",         bgcolor = hdr, text_color = color.white, text_size = size.small)
+        idx = array.sort_indices(scores, order.descending)
+        int row = 1
+        for k = 0 to n - 1
+            int j = idx.get(k)
+            if scores.get(j) < 0 or row > tblRows
+                break
+            int   tests = lvHold.get(j) + lvBrk.get(j)
+            float rate  = 100.0 * lvHold.get(j) / tests
+            color rc    = rate >= strongRate ? color.lime : rate >= minRate ? color.white : color.red
+            table.cell(tt, 0, row, str.tostring(lvPx.get(j), format.mintick), bgcolor = cel, text_color = color.white, text_size = size.small)
+            table.cell(tt, 1, row, lvTag.get(j), bgcolor = cel, text_color = color.gray, text_size = size.small)
+            table.cell(tt, 2, row, str.tostring(lvHold.get(j)) + "/" + str.tostring(tests), bgcolor = cel, text_color = color.white, text_size = size.small)
+            table.cell(tt, 3, row, str.tostring(rate, "#") + "%", bgcolor = cel, text_color = rc, text_size = size.small)
+            row += 1
+        table.cell(tt, 0, row, "Tested on " + str.tostring(bar_index + 1) + " bars · " + timeframe.period, bgcolor = cel, text_color = color.gray, text_size = size.tiny)
+        table.merge_cells(tt, 0, row, 3, row)
 
 // ═════════════════ Multi-timeframe RSI ═════════════════
 // Same overbought/oversold read on 1m, 5m, 15m, 45m, 1H and 4H at once.

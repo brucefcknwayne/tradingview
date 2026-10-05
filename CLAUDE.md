@@ -14,6 +14,6 @@
 | `multi-10/` | 10 Standard-Setups 1:1 in einer Strategie mit Vergleichstabelle (Ergebnis: alle unter 50 %) |
 | `orderblocks/` | 1H-Orderblocks auf kleineren Charts |
 | `prev-day-va/` | Vortag POC/VAH/VAL (Volume Profile, rechnet wie TV-VP: Row Layout/Size, 2-Zeilen-VA, 1m-Daten), Linien ab Vortagsbeginn bis zum Take |
-| `cracks/` | Gotham Levels: MotiveWave-Cracks (7D/30D/60D/90D …) per Paste als weiße Linien + Multi-TF-RSI-Tabelle |
+| `cracks/` | Gotham Levels: MotiveWave-Cracks (7D/30D/60D/90D …) per Paste als weiße Linien + Level-Tester (Hold-Rate je Level, schwache ausblenden, Konfluenz 60D/90D) + Multi-TF-RSI-Tabelle |
 | `gotham-vwap/` | Gotham Daily VWAP: Blend-VWAP (Overnight → RTH per Volumen-Uhr) aus dem Gotham Signals Indi v2 + 2σ/3σ-Bänder + ±0.5σ-Zone grau gefüllt |
 | `adamcapitals/` | Nutzer-Strategie aus der AdamCapitals-PDF: Failed Zone → Breaker → Inducement (LIQ) → Limit in unmitigated Zone, SL hinter Zone, TP 1:7, Teilgewinn 1:4 + BE, max. 2 Trades/Tag (aktuelles Projekt) |
