@@ -22,7 +22,7 @@ lvlColor   = input.color(color.white, "Color", group = "Cracks - Style")
 lvlWidth   = input.int(1, "Line width", minval = 1, maxval = 5, group = "Cracks - Style")
 styleIn    = input.string("Solid", "Line style", options = ["Solid", "Dashed", "Dotted"], group = "Cracks - Style")
 showLabels = input.bool(true, "Show labels", group = "Cracks - Style")
-lookBack   = input.int(1500, "Extend left (bars)", minval = 20, maxval = 5000, group = "Cracks - Style")
+lookBack   = input.int(500, "Extend left (bars)", minval = 20, maxval = 5000, group = "Cracks - Style")
 extendBars = input.int(20, "Extend right (bars)", minval = 0, maxval = 300, group = "Cracks - Style")
 maxDistPct = input.float(0.0, "Hide levels further than X% from price", minval = 0.0, step = 0.5, group = "Cracks - Style", tooltip = "0 = show all.")
 
