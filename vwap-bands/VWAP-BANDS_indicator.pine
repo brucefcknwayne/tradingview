@@ -1,43 +1,43 @@
 //@version=6
-indicator("VWAP · 0.5σ & 2–3σ Zonen", shorttitle = "VWAP-Bands", overlay = true)
+indicator("VWAP · 0.5σ & 2–3σ Zones", shorttitle = "VWAP-Bands", overlay = true)
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  VWAP mit drei Zonen:
-//    · Mitte:  ±0.5σ um den VWAP (Fair-Value-Zone)
-//    · Oben:   +2σ bis +3σ  (Überdehnung nach oben)
-//    · Unten:  −2σ bis −3σ  (Überdehnung nach unten)
-//  Die Linien brechen beim Anker-Neustart ab (keine Verbindungslinie).
+//  VWAP with three zones:
+//    · Middle: ±0.5σ around VWAP (fair value zone)
+//    · Upper:  +2σ to +3σ  (upside extension)
+//    · Lower:  −2σ to −3σ  (downside extension)
+//  Lines break on anchor reset (no connecting line).
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ═══════════════════════════ EINGABEN ═══════════════════════════
+// ═══════════════════════════ INPUTS ═══════════════════════════
 const string G_V = "VWAP"
-const string G_Z = "Zonen (σ)"
-const string G_C = "Farben"
+const string G_Z = "Zones (σ)"
+const string G_C = "Colors"
 
-string anchorIn = input.string("Session", "Anker", options = ["Session", "RTH (9:30 NY)", "Woche", "Monat"], group = G_V)
-float  src      = input.source(hlc3, "Quelle", group = G_V)
+string anchorIn = input.string("Session", "Anchor", options = ["Session", "RTH (9:30 NY)", "Week", "Month"], group = G_V)
+float  src      = input.source(hlc3, "Source", group = G_V)
 
-float  midSig   = input.float(0.5, "Mittlere Zone ±", minval = 0.1, step = 0.1, group = G_Z)
-float  inSig    = input.float(2.0, "Äußere Zone von", minval = 0.5, step = 0.25, inline = "o", group = G_Z)
-float  outSig   = input.float(3.0, "bis",             minval = 0.5, step = 0.25, inline = "o", group = G_Z)
-bool   showMid  = input.bool(true, "Mittlere Zone zeigen",  group = G_Z)
-bool   showOut  = input.bool(true, "Äußere Zonen zeigen",   group = G_Z)
-bool   showLn   = input.bool(true, "Band-Linien zeigen",    group = G_Z)
+float  midSig   = input.float(0.5, "Middle zone ±", minval = 0.1, step = 0.1, group = G_Z)
+float  inSig    = input.float(2.0, "Outer zone from", minval = 0.5, step = 0.25, inline = "o", group = G_Z)
+float  outSig   = input.float(3.0, "to",              minval = 0.5, step = 0.25, inline = "o", group = G_Z)
+bool   showMid  = input.bool(true, "Show middle zone",  group = G_Z)
+bool   showOut  = input.bool(true, "Show outer zones",  group = G_Z)
+bool   showLn   = input.bool(true, "Show band lines",   group = G_Z)
 
-color  colVw    = input.color(color.new(#FFD600, 0),  "VWAP",           group = G_C)
-color  colMid   = input.color(color.new(#9E9E9E, 85), "Mittlere Zone",  group = G_C)
-color  colUp    = input.color(color.new(#F23645, 85), "Obere Zone",     group = G_C)
-color  colDn    = input.color(color.new(#089981, 85), "Untere Zone",    group = G_C)
+color  colVw    = input.color(color.new(#FFD600, 0),  "VWAP",        group = G_C)
+color  colMid   = input.color(color.new(#9E9E9E, 85), "Middle zone", group = G_C)
+color  colUp    = input.color(color.new(#F23645, 85), "Upper zone",  group = G_C)
+color  colDn    = input.color(color.new(#089981, 85), "Lower zone",  group = G_C)
 
 // ═══════════════════════════ VWAP + σ ═══════════════════════════
 bool rthNow    = not na(time(timeframe.period, "0930-1600", "America/New_York"))
 bool rthStart  = rthNow and not rthNow[1]
-bool anchorChg = anchorIn == "Woche" ? timeframe.change("W") : anchorIn == "Monat" ? timeframe.change("M") : anchorIn == "RTH (9:30 NY)" ? rthStart : timeframe.change("D")
+bool anchorChg = anchorIn == "Week" ? timeframe.change("W") : anchorIn == "Month" ? timeframe.change("M") : anchorIn == "RTH (9:30 NY)" ? rthStart : timeframe.change("D")
 
 [vw, upB, loB] = ta.vwap(src, anchorChg, 1.0)
 float sigma = upB - vw
 
-// Am Anker-Bar na → Linien und Flächen brechen sauber ab
+// na on the anchor bar → lines and fills break cleanly
 float vwP   = anchorChg ? na : vw
 float mUp   = anchorChg ? na : vw + midSig * sigma
 float mDn   = anchorChg ? na : vw - midSig * sigma
@@ -46,7 +46,7 @@ float oUp   = anchorChg ? na : vw + outSig * sigma
 float iDn   = anchorChg ? na : vw - inSig  * sigma
 float oDn   = anchorChg ? na : vw - outSig * sigma
 
-// ═══════════════════════════ ZEICHNEN ═══════════════════════════
+// ═══════════════════════════ DRAWING ═══════════════════════════
 color lnMid = showMid and showLn ? color.new(colMid, 50) : na
 color lnUp  = showOut and showLn ? color.new(colUp,  50) : na
 color lnDn  = showOut and showLn ? color.new(colDn,  50) : na
@@ -60,6 +60,6 @@ pOU = plot(oUp, "+3σ",   lnUp,  1, plot.style_linebr)
 pID = plot(iDn, "−2σ",   lnDn,  1, plot.style_linebr)
 pOD = plot(oDn, "−3σ",   lnDn,  1, plot.style_linebr)
 
-fill(pMU, pMD, showMid ? colMid : na, "Mittlere Zone")
-fill(pIU, pOU, showOut ? colUp  : na, "Obere Zone")
-fill(pID, pOD, showOut ? colDn  : na, "Untere Zone")
+fill(pMU, pMD, showMid ? colMid : na, "Middle zone")
+fill(pIU, pOU, showOut ? colUp  : na, "Upper zone")
+fill(pID, pOD, showOut ? colDn  : na, "Lower zone")
