@@ -6,6 +6,7 @@ indicator("VWAP · 0.5σ & 2–3σ Zones", shorttitle = "VWAP-Bands", overlay = 
 //    · Middle: ±0.5σ around VWAP (fair value zone)
 //    · Upper:  +2σ to +3σ  (upside extension)
 //    · Lower:  −2σ to −3σ  (downside extension)
+//  Band lines white, zone fills grey.
 //  Lines break on anchor reset (no connecting line).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -25,9 +26,9 @@ bool   showOut  = input.bool(true, "Show outer zones",  group = G_Z)
 bool   showLn   = input.bool(true, "Show band lines",   group = G_Z)
 
 color  colVw    = input.color(color.new(#FFD600, 0),  "VWAP",        group = G_C)
+color  colLn    = input.color(color.new(#FFFFFF, 0),  "Band lines",  group = G_C)
 color  colMid   = input.color(color.new(#9E9E9E, 85), "Middle zone", group = G_C)
-color  colUp    = input.color(color.new(#F23645, 85), "Upper zone",  group = G_C)
-color  colDn    = input.color(color.new(#089981, 85), "Lower zone",  group = G_C)
+color  colOut   = input.color(color.new(#9E9E9E, 85), "Outer zones", group = G_C)
 
 // ═══════════════════════════ VWAP + σ ═══════════════════════════
 bool rthNow    = not na(time(timeframe.period, "0930-1600", "America/New_York"))
@@ -47,19 +48,18 @@ float iDn   = anchorChg ? na : vw - inSig  * sigma
 float oDn   = anchorChg ? na : vw - outSig * sigma
 
 // ═══════════════════════════ DRAWING ═══════════════════════════
-color lnMid = showMid and showLn ? color.new(colMid, 50) : na
-color lnUp  = showOut and showLn ? color.new(colUp,  50) : na
-color lnDn  = showOut and showLn ? color.new(colDn,  50) : na
+color lnMid = showMid and showLn ? colLn : na
+color lnOut = showOut and showLn ? colLn : na
 
 plot(vwP, "VWAP", colVw, 2, plot.style_linebr)
 
 pMU = plot(mUp, "+0.5σ", lnMid, 1, plot.style_linebr)
 pMD = plot(mDn, "−0.5σ", lnMid, 1, plot.style_linebr)
-pIU = plot(iUp, "+2σ",   lnUp,  1, plot.style_linebr)
-pOU = plot(oUp, "+3σ",   lnUp,  1, plot.style_linebr)
-pID = plot(iDn, "−2σ",   lnDn,  1, plot.style_linebr)
-pOD = plot(oDn, "−3σ",   lnDn,  1, plot.style_linebr)
+pIU = plot(iUp, "+2σ",   lnOut, 1, plot.style_linebr)
+pOU = plot(oUp, "+3σ",   lnOut, 1, plot.style_linebr)
+pID = plot(iDn, "−2σ",   lnOut, 1, plot.style_linebr)
+pOD = plot(oDn, "−3σ",   lnOut, 1, plot.style_linebr)
 
 fill(pMU, pMD, showMid ? colMid : na, "Middle zone")
-fill(pIU, pOU, showOut ? colUp  : na, "Upper zone")
-fill(pID, pOD, showOut ? colDn  : na, "Lower zone")
+fill(pIU, pOU, showOut ? colOut : na, "Upper zone")
+fill(pID, pOD, showOut ? colOut : na, "Lower zone")
