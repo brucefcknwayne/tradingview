@@ -25,10 +25,10 @@ bool   showMid  = input.bool(true, "Show middle zone",  group = G_Z)
 bool   showOut  = input.bool(true, "Show outer zones",  group = G_Z)
 bool   showLn   = input.bool(true, "Show band lines",   group = G_Z)
 
-color  colVw    = input.color(color.new(#FFD600, 0),  "VWAP",        group = G_C)
+color  colVw    = input.color(color.new(#9E9E9E, 0),  "VWAP",        group = G_C)
 color  colLn    = input.color(color.new(#FFFFFF, 0),  "Band lines",  group = G_C)
-color  colMid   = input.color(color.new(#9E9E9E, 85), "Middle zone", group = G_C)
-color  colOut   = input.color(color.new(#9E9E9E, 85), "Outer zones", group = G_C)
+color  colMid   = input.color(color.new(#9E9E9E, 92), "Middle zone", group = G_C)
+color  colOut   = input.color(color.new(#9E9E9E, 92), "Outer zones", group = G_C)
 
 // ═══════════════════════════ VWAP + σ ═══════════════════════════
 bool rthNow    = not na(time(timeframe.period, "0930-1600", "America/New_York"))
