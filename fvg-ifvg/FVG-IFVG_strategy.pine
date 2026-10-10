@@ -1,0 +1,268 @@
+//@version=6
+strategy("FVG / IFVG Sofort-Entry", shorttitle = "FVG-IFVG", overlay = true, pyramiding = 0,
+     default_qty_type = strategy.fixed, default_qty_value = 1, slippage = 1,
+     commission_type = strategy.commission.cash_per_contract, commission_value = 2.5,
+     use_bar_magnifier = true, process_orders_on_close = true,
+     max_boxes_count = 500, max_lines_count = 500, max_labels_count = 500)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Strategie-Version des "FVG & IFVG ICT [TradingFinder]"-Indikators.
+//
+//  EINSTIEG (sofort beim Schluss der Signal-Kerze):
+//   • Bullisches FVG  (Tief > Hoch von vor 2 Kerzen)            → LONG
+//   • Bärisches FVG   (Hoch < Tief von vor 2 Kerzen)            → SHORT
+//   • Bullisches IFVG (Schluss ÜBER einem bärischen FVG)        → LONG
+//   • Bärisches IFVG  (Schluss UNTER einem bullischen FVG)      → SHORT
+//
+//  SL  = letztes Swing-Tief (Long) / Swing-Hoch (Short) + Puffer
+//  TP  = SL-Abstand × R:R (ab 0.1 frei einstellbar)
+//  SL größer als "Max. SL" (z. B. 50 Pkt. NQ) → kein Trade.
+//
+//  GEGENSIGNAL im Trade (z. B. Short offen, bullisches FVG/IFVG kommt):
+//   Trade im Verlust → schließen und sofort Long mit SL am letzten Swing-Tief.
+//   Trade im Gewinn  → je nach Einstellung halten oder ebenfalls drehen.
+//
+//  Signale nur bei Kerzenschluss → kein Repaint.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const string G_E = "Signale"
+const string G_R = "Risiko"
+const string G_G = "Gegensignal im Trade"
+const string G_Z = "Handelszeit"
+const string G_A = "Anzeige"
+
+bool   useFVG    = input.bool(true, "Entry bei neuem FVG", group = G_E)
+bool   useIFVG   = input.bool(true, "Entry bei neuem IFVG (invertiertes FVG)", group = G_E)
+bool   allowL    = input.bool(true, "Longs", inline = "d", group = G_E)
+bool   allowS    = input.bool(true, "Shorts", inline = "d", group = G_E)
+float  minFvgPts = input.float(0, "Min. FVG-Größe (Punkte)", minval = 0, step = 0.25, group = G_E)
+float  minFvgATR = input.float(0, "Min. FVG-Größe (× ATR 14)", minval = 0, step = 0.05, group = G_E, tooltip = "Filtert winzige Lücken. 0 = jedes FVG zählt. Es gilt der größere der beiden Werte.")
+int    fvgLife   = input.int(500, "FVG gültig für Inversion (Kerzen)", minval = 10, maxval = 4998, group = G_E, tooltip = "So lange kann ein FVG noch zum IFVG werden. Wie 'Validity Period' im Original.")
+
+float  rr        = input.float(1.0, "R:R (TP = SL-Abstand × R)", minval = 0.1, step = 0.1, group = G_R)
+float  maxSL     = input.float(50, "Max. SL (Punkte) – größer = kein Trade", minval = 0.25, step = 0.25, group = G_R)
+float  minSL     = input.float(0, "Min. SL (Punkte)", minval = 0, step = 0.25, group = G_R, tooltip = "Schützt vor Mini-Stops, bei denen Gebühren/Slippage den Gewinn auffressen. 0 = aus.")
+int    swL       = input.int(3, "Swing: Kerzen links", minval = 1, maxval = 20, inline = "sw", group = G_R)
+int    swR       = input.int(2, "rechts", minval = 1, maxval = 10, inline = "sw", group = G_R, tooltip = "Ein Swing-Tief ist bestätigt, wenn links/rechts davon so viele Kerzen höhere Tiefs haben.")
+int    bufTk     = input.int(0, "SL-Puffer (Ticks)", minval = 0, group = G_R)
+int    fbLen     = input.int(30, "Ersatz-SL: Extrem der letzten N Kerzen", minval = 3, group = G_R, tooltip = "Nur wenn kein bestätigter Swing unter/über dem Einstieg liegt.")
+
+string oppMode   = input.string("Bei Verlust drehen", "Gegensignal", options = ["Bei Verlust drehen", "Immer drehen", "Ignorieren"], group = G_G, tooltip = "Bei Verlust drehen: nur ein Trade im Minus wird geschlossen und gedreht, ein Trade im Plus läuft weiter.")
+bool   closeInv  = input.bool(true, "Verlust-Trade auch schließen, wenn Gegen-Trade ungültig", group = G_G, tooltip = "z. B. wenn der neue SL größer als Max. SL wäre: alter Trade wird trotzdem verlassen, aber nicht gedreht.")
+
+bool   useSess   = input.bool(false, "Nur in der Handelszeit einsteigen", group = G_Z)
+string sess      = input.session("0930-1600", "Handelszeit (New York)", group = G_Z)
+
+bool   showFVG   = input.bool(true, "FVG-Zonen", inline = "f", group = G_A)
+color  cBullFVG  = input.color(#4caf4f65, "", inline = "f", group = G_A)
+color  cBearFVG  = input.color(#ff525291, "", inline = "f", group = G_A)
+bool   showIFVG  = input.bool(true, "IFVG-Zonen", inline = "i", group = G_A)
+color  cBullIFVG = input.color(#4caf4f40, "", inline = "i", group = G_A)
+color  cBearIFVG = input.color(#ff525240, "", inline = "i", group = G_A)
+int    ifvgExt   = input.int(15, "IFVG-Box Länge (Kerzen)", minval = 1, group = G_A)
+bool   showTrd   = input.bool(true, "Trade-Boxen (SL/TP)", inline = "t", group = G_A)
+color  cTP       = input.color(color.new(#9e9e9e, 70), "", inline = "t", group = G_A)
+color  cSL       = input.color(color.new(#673ab7, 70), "", inline = "t", group = G_A)
+bool   showTbl   = input.bool(true, "Statistik-Tabelle", group = G_A)
+
+// ───────────────────────────── Basiswerte ─────────────────────────────
+float tick    = syminfo.mintick
+float atr     = ta.atr(14)
+float minSize = math.max(minFvgPts, minFvgATR * nz(atr))
+
+// ───────────────────────────── Swings ─────────────────────────────
+var array<float> swHi = array.new<float>()
+var array<float> swLo = array.new<float>()
+
+float ph = ta.pivothigh(high, swL, swR)
+float pl = ta.pivotlow(low, swL, swR)
+if not na(ph)
+    swHi.push(ph)
+    if swHi.size() > 50
+        swHi.shift()
+if not na(pl)
+    swLo.push(pl)
+    if swLo.size() > 50
+        swLo.shift()
+
+// Noch nicht bestätigte Extreme der letzten Kerzen (der Swing kann gerade erst entstehen)
+float recentLo = ta.lowest(low, swR + 1)
+float recentHi = ta.highest(high, swR + 1)
+float fbLo     = ta.lowest(low, fbLen)
+float fbHi     = ta.highest(high, fbLen)
+
+// Jüngstes Swing-Tief unter ref (Long) bzw. Swing-Hoch über ref (Short)
+f_lastSwing(array<float> arr, float ref, bool below) =>
+    float res = na
+    int n = arr.size()
+    if n > 0
+        for i = n - 1 to 0
+            float v = arr.get(i)
+            if below ? v < ref : v > ref
+                res := v
+                break
+    res
+
+float swingL = f_lastSwing(swLo, close, true)
+float swingS = f_lastSwing(swHi, close, false)
+float slL    = math.min(na(swingL) ? fbLo : swingL, recentLo) - bufTk * tick
+float slS    = math.max(na(swingS) ? fbHi : swingS, recentHi) + bufTk * tick
+
+// ───────────────────────────── FVG / IFVG ─────────────────────────────
+var array<float> fTop = array.new<float>()
+var array<float> fBot = array.new<float>()
+var array<int>   fDir = array.new<int>()
+var array<int>   fBar = array.new<int>()
+var array<box>   fBox = array.new<box>()
+
+bool  bullFVG  = bar_index >= 2 and low > high[2] and low - high[2] >= minSize
+bool  bearFVG  = bar_index >= 2 and high < low[2] and low[2] - high >= minSize
+bool  bullIFVG = false   // Schluss über bärischem FVG → Long
+bool  bearIFVG = false   // Schluss unter bullischem FVG → Short
+
+// Bestehende FVGs prüfen: invertiert oder abgelaufen?
+int nF = fTop.size()
+if nF > 0
+    for i = nF - 1 to 0
+        int   d   = fDir.get(i)
+        float t   = fTop.get(i)
+        float b   = fBot.get(i)
+        box   bx  = fBox.get(i)
+        bool  inv = d == 1 ? close < b : close > t
+        bool  old = bar_index - fBar.get(i) > fvgLife
+        if not na(bx)
+            bx.set_right(bar_index)
+        if inv or old
+            if inv
+                if d == 1
+                    bearIFVG := true
+                else
+                    bullIFVG := true
+                if showIFVG
+                    color c = d == 1 ? cBearIFVG : cBullIFVG
+                    box.new(bar_index, t, bar_index + ifvgExt, b, border_color = color.new(c, 30), border_style = line.style_dashed, bgcolor = c, text = "IFVG", text_color = color.new(c, 0), text_size = size.tiny, text_halign = text.align_right)
+            fTop.remove(i)
+            fBot.remove(i)
+            fDir.remove(i)
+            fBar.remove(i)
+            fBox.remove(i)
+
+// Neue FVGs merken
+if bullFVG or bearFVG
+    int   d = bullFVG ? 1 : -1
+    float t = bullFVG ? low : low[2]
+    float b = bullFVG ? high[2] : high
+    color c = bullFVG ? cBullFVG : cBearFVG
+    fTop.push(t)
+    fBot.push(b)
+    fDir.push(d)
+    fBar.push(bar_index)
+    fBox.push(showFVG ? box.new(bar_index - 2, t, bar_index, b, border_color = color.new(c, 100), bgcolor = c) : na)
+    if fTop.size() > 150
+        fTop.shift()
+        fBot.shift()
+        fDir.shift()
+        fBar.shift()
+        fBox.shift()
+
+// ───────────────────────────── Signale ─────────────────────────────
+bool sigL = allowL and ((useFVG and bullFVG) or (useIFVG and bullIFVG))
+bool sigS = allowS and ((useFVG and bearFVG) or (useIFVG and bearIFVG))
+if sigL and sigS        // widersprüchlich → auslassen
+    sigL := false
+    sigS := false
+string srcL = useIFVG and bullIFVG ? "IFVG" : "FVG"
+string srcS = useIFVG and bearIFVG ? "IFVG" : "FVG"
+
+bool inSess = not useSess or not na(time(timeframe.period, sess, "America/New_York"))
+
+// ───────────────────────────── Trade-Logik ─────────────────────────────
+var int   skipCnt = 0
+var int   flipCnt = 0
+var int   lossCnt = 0
+var box   bTP     = na
+var box   bSL     = na
+var int   drDir   = 0
+
+float pos = strategy.position_size
+
+// Trade-Box mitziehen, bis der Trade beendet ist
+if drDir != 0
+    bTP.set_right(bar_index)
+    bSL.set_right(bar_index)
+    if not ((drDir == 1 and pos > 0) or (drDir == -1 and pos < 0))
+        drDir := 0
+
+int   newDir  = 0
+bool  skipped = false
+bool  flipped = false
+float nSL     = na
+float nTP     = na
+
+if sigL or sigS
+    int   d    = sigL ? 1 : -1
+    float sl   = d == 1 ? slL : slS
+    float risk = d == 1 ? close - sl : sl - close
+    bool  ok   = inSess and risk <= maxSL and risk >= math.max(minSL, tick)
+    if pos == 0
+        if ok
+            newDir := d
+        else if inSess
+            skipped := true
+    else if math.sign(pos) != d
+        bool loss = pos > 0 ? close < strategy.position_avg_price : close > strategy.position_avg_price
+        bool act  = oppMode == "Immer drehen" or (oppMode == "Bei Verlust drehen" and loss)
+        if act
+            if ok
+                newDir  := d
+                flipped := true
+                flipCnt += 1
+            else
+                skipped := true
+                if closeInv
+                    strategy.close(pos > 0 ? "Long" : "Short", comment = "Gegen-FVG")
+                    lossCnt += 1
+    if skipped
+        skipCnt += 1
+    if newDir != 0
+        nSL := sl
+        nTP := close + d * risk * rr
+
+if newDir != 0
+    string eid = newDir == 1 ? "Long" : "Short"
+    string src = newDir == 1 ? srcL : srcS
+    strategy.entry(eid, newDir == 1 ? strategy.long : strategy.short, comment = src + (flipped ? " ↻" : ""))
+    strategy.exit(newDir == 1 ? "XL" : "XS", eid, stop = nSL, limit = nTP, comment_profit = "TP", comment_loss = "SL")
+    if showTrd
+        bTP := box.new(bar_index, nTP, bar_index + 1, close, border_color = color.new(cTP, 100), bgcolor = cTP)
+        bSL := box.new(bar_index, close, bar_index + 1, nSL, border_color = color.new(cSL, 100), bgcolor = cSL)
+        drDir := newDir
+    label.new(bar_index, newDir == 1 ? low : high, src + (flipped ? " ↻" : ""), style = newDir == 1 ? label.style_label_up : label.style_label_down,
+         color = newDir == 1 ? color.new(#4caf50, 20) : color.new(#ff5252, 20), textcolor = color.white, size = size.tiny)
+    alert((newDir == 1 ? "LONG " : "SHORT ") + src + (flipped ? " (gedreht)" : "") + " @ " + str.tostring(close, format.mintick) +
+         " | SL " + str.tostring(nSL, format.mintick) + " | TP " + str.tostring(nTP, format.mintick), alert.freq_once_per_bar_close)
+
+plotshape(skipped and sigL, "Long ausgelassen (SL zu groß)", shape.xcross, location.belowbar, color.new(color.gray, 20), size = size.tiny)
+plotshape(skipped and sigS, "Short ausgelassen (SL zu groß)", shape.xcross, location.abovebar, color.new(color.gray, 20), size = size.tiny)
+
+// ───────────────────────────── Tabelle ─────────────────────────────
+var table tbl = table.new(position.top_right, 2, 8, bgcolor = color.new(#131722, 10), frame_color = #434651, frame_width = 1, border_color = #434651, border_width = 1)
+
+f_row(int r, string k, string v, color vc) =>
+    tbl.cell(0, r, k, text_color = #b2b5be, text_size = size.small, text_halign = text.align_left)
+    tbl.cell(1, r, v, text_color = vc, text_size = size.small, text_halign = text.align_right)
+
+if showTbl and barstate.islast
+    int   tr  = strategy.closedtrades
+    float wr  = tr > 0 ? 100.0 * strategy.wintrades / tr : 0.0
+    float be  = 100.0 / (1 + rr)    // nötige Trefferquote ohne Gebühren
+    float pf  = strategy.grossloss > 0 ? strategy.grossprofit / strategy.grossloss : na
+    float net = strategy.netprofit
+    f_row(0, "FVG/IFVG  R:R", str.tostring(rr, "#.##"), color.white)
+    f_row(1, "Trades", str.tostring(tr), color.white)
+    f_row(2, "Trefferquote", str.tostring(wr, "#.0") + " %", wr >= be ? #4caf50 : #ff5252)
+    f_row(3, "Nötig (Break-even)", str.tostring(be, "#.0") + " %", color.white)
+    f_row(4, "Profit-Faktor", na(pf) ? "–" : str.tostring(pf, "#.00"), nz(pf) >= 1 ? #4caf50 : #ff5252)
+    f_row(5, "Netto", str.tostring(net, "#,##0") + " " + syminfo.currency, net >= 0 ? #4caf50 : #ff5252)
+    f_row(6, "Gedreht / Verlust-Exit", str.tostring(flipCnt) + " / " + str.tostring(lossCnt), color.white)
+    f_row(7, "Ausgelassen (SL > Max)", str.tostring(skipCnt), color.white)
