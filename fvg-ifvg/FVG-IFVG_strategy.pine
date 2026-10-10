@@ -1,9 +1,9 @@
 // This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 // FVG-/IFVG-Logik und Zeichnung: © TFlab ("FVG & IFVG ICT [TradingFinder]")
 //@version=5
-strategy("FVG & IFVG Strategie [TFlab-Basis]", shorttitle = "FVG-IFVG", overlay = true, pyramiding = 0,
+strategy("FVG & IFVG Strategie [TFlab-Basis]", shorttitle = "FVG-IFVG", overlay = true, pyramiding = 2,
      default_qty_type = strategy.fixed, default_qty_value = 1, slippage = 1,
-     commission_type = strategy.commission.cash_per_contract, commission_value = 0.5,
+     commission_type = strategy.commission.cash_per_contract, commission_value = 2.5,
      use_bar_magnifier = true, process_orders_on_close = true, max_bars_back = 5000,
      max_boxes_count = 500, max_lines_count = 500, max_labels_count = 500)
 
@@ -25,16 +25,12 @@ strategy("FVG & IFVG Strategie [TFlab-Basis]", shorttitle = "FVG-IFVG", overlay 
 //  TP  = SL-Abstand × R:R (ab 0.1 frei einstellbar)
 //  SL größer als "Max. SL" (z. B. 50 Pkt. NQ) → kein Trade.
 //
-//  POSITIONSGRÖSSE (Risiko in $):
-//   Normal  = Half Risk (0.5R, z. B. $100), nach einem Verlust-Trade = Full Risk
-//   (1R, z. B. $200). Kontrakte werden ABGERUNDET, Gebühren + 1 Tick Slippage je
-//   Füllung sind eingerechnet → Verlust am SL nie über dem eingestellten Betrag.
-//   Passt nicht mal 1 Kontrakt ins Risiko → kein Trade. Daher MNQ-Chart nutzen
-//   (NQ: $20/Pkt. → bei $100 nur SL bis ca. 4,5 Pkt. möglich).
-//
-//  GEGENSIGNAL im Trade (z. B. Short offen, bullisches FVG/IFVG kommt):
-//   Trade im Verlust → schließen und sofort Long mit SL am letzten Swing-Tief.
-//   Trade im Gewinn  → je nach Einstellung halten oder ebenfalls drehen.
+//  NEUES SIGNAL IM TRADE: jedes FVG/IFVG wird sofort geentert. Der laufende
+//  Trade wird geschlossen (egal ob Plus oder Minus, egal welche Richtung) und
+//  das neue Signal mit eigenem SL/TP eröffnet. Ist das neue Signal ungültig
+//  (SL > Max. SL), läuft der alte Trade weiter.
+//  (pyramiding = 2 nur, damit "gleiche Richtung neu entern" technisch geht –
+//   es ist nie mehr als ein Trade offen.)
 // ─────────────────────────────────────────────────────────────────────────────
 
 import TFlab/OrderBlockDrawing_TradingFinder/3 as Drawing
@@ -70,8 +66,6 @@ PFVGFilterType = input.string('Very Defensive', '', ['Very Aggressive', 'Aggress
 // ───────────────────────────── Inputs Strategie ─────────────────────────────
 G_E = "Strategie: Signale"
 G_R = "Strategie: Risiko"
-G_M = "Strategie: Positionsgröße"
-G_G = "Strategie: Gegensignal im Trade"
 G_Z = "Strategie: Handelszeit"
 G_A = "Strategie: Anzeige"
 
@@ -88,16 +82,6 @@ swR     = input.int(2, "rechts", minval = 1, maxval = 10, inline = "sw", group =
 bufTk   = input.int(0, "SL-Puffer (Ticks)", minval = 0, group = G_R)
 fbLen   = input.int(30, "Ersatz-SL: Extrem der letzten N Kerzen", minval = 3, group = G_R, tooltip = "Nur wenn kein bestätigter Swing unter/über dem Einstieg liegt.")
 
-sizeMode = input.string("Risiko in $", "Positionsgröße", options = ["Risiko in $", "Fixe Kontrakte"], group = G_M)
-fixQty   = input.int(1, "Fixe Kontrakte", minval = 1, group = G_M)
-fullUSD  = input.float(200, "Full Risk (1R) in $ – nie mehr", minval = 1, step = 10, group = G_M)
-baseF    = input.float(0.5, "Normal-Risiko (Anteil von 1R)", minval = 0.05, maxval = 1, step = 0.05, group = G_M, tooltip = "0.5 = Half Risk (bei $200 also $100 pro Trade).")
-dblLoss  = input.bool(true, "Nach Verlust-Trade Full Risk (1R)", group = G_M, tooltip = "War der letzte Trade ein Verlust, wird beim nächsten das volle Risiko genommen (doppelt so viel wie Half Risk). Danach wieder Half Risk, solange kein Verlust kommt.")
-feeSide  = input.float(0.5, "Gebühr pro Kontrakt & Seite ($)", minval = 0, step = 0.1, group = G_M, tooltip = "Wird ins Risiko eingerechnet (Ein- + Ausstieg), dazu 1 Tick Slippage je Füllung. Gleich einstellen wie 'Kommission' in den Eigenschaften (MNQ ca. 0.5, NQ ca. 2.5).")
-maxQty   = input.int(100, "Max. Kontrakte", minval = 1, group = G_M)
-
-oppMode  = input.string("Bei Verlust drehen", "Gegensignal", options = ["Bei Verlust drehen", "Immer drehen", "Ignorieren"], group = G_G, tooltip = "Bei Verlust drehen: nur ein Trade im Minus wird geschlossen und gedreht, ein Trade im Plus läuft weiter.")
-closeInv = input.bool(true, "Verlust-Trade auch schließen, wenn Gegen-Trade ungültig", group = G_G, tooltip = "z. B. wenn der neue SL größer als Max. SL wäre: alter Trade wird trotzdem verlassen, aber nicht gedreht.")
 
 useSess = input.bool(false, "Nur in der Handelszeit einsteigen", group = G_Z)
 sess    = input.session("0930-1600", "Handelszeit (New York)", group = G_Z)
@@ -220,18 +204,15 @@ string srcS = useIFVG and bearIFVG ? "IFVG" : "FVG"
 bool inSess = not useSess or not na(time(timeframe.period, sess, "America/New_York"))
 
 // ───────────────────────────── Trade-Logik ─────────────────────────────
-var int skipCnt = 0
-var int flipCnt = 0
-var int lossCnt = 0
-var int qtyCnt  = 0
-var box bTP     = na
-var box bSL     = na
-var int drDir   = 0
+var int    skipCnt = 0
+var int    repCnt  = 0
+var int    tradeNo = 0
+var string curId   = ""
+var box    bTP     = na
+var box    bSL     = na
+var int    drDir   = 0
 
 float pos = strategy.position_size
-float pv  = syminfo.pointvalue
-int   nCT = strategy.closedtrades
-bool  lastLoss = nCT > 0 and strategy.closedtrades.profit(nCT - 1) < 0
 
 // Trade-Box mitziehen, bis der Trade beendet ist
 if drDir != 0
@@ -245,71 +226,48 @@ bool  skipped = false
 bool  flipped = false
 float nSL     = na
 float nTP     = na
-int   nQty    = 0
-float nUSD    = na
-bool  nFull   = false
 
 if sigL or sigS
     int   d    = sigL ? 1 : -1
     float sl   = d == 1 ? slL : slS
     float risk = d == 1 ? close - sl : sl - close
-    bool  loss = pos > 0 ? close < strategy.position_avg_price : pos < 0 ? close > strategy.position_avg_price : false
-    // Beim Drehen wird der laufende Trade jetzt geschlossen → dessen Ergebnis zählt als "letzter Trade"
-    bool  prevLoss = pos != 0 and math.sign(pos) != d ? loss : lastLoss
-    bool  full = sizeMode == "Risiko in $" and (baseF >= 1 or (dblLoss and prevLoss))
-    float rUSD = fullUSD * (full ? 1.0 : baseF)
-    float perC = risk * pv + 2 * tick * pv + 2 * feeSide          // $-Verlust pro Kontrakt am SL
-    int   q    = sizeMode == "Fixe Kontrakte" ? fixQty : perC > 0 ? math.min(maxQty, math.floor(rUSD / perC)) : 0
-    bool  okSL = risk <= maxSL and risk >= math.max(minSL, tick)
-    bool  ok   = inSess and okSL and q >= 1
-    if pos == 0
-        if ok
-            newDir := d
-        else if inSess
-            skipped := true
-    else if math.sign(pos) != d
-        bool act  = oppMode == "Immer drehen" or (oppMode == "Bei Verlust drehen" and loss)
-        if act
-            if ok
-                newDir  := d
-                flipped := true
-                flipCnt += 1
-            else
-                skipped := true
-                if closeInv
-                    strategy.close(pos > 0 ? "Long" : "Short", comment = "Gegen-FVG")
-                    lossCnt += 1
-    if skipped and not okSL
+    bool  ok   = inSess and risk <= maxSL and risk >= math.max(minSL, tick)
+    if ok
+        newDir := d
+        nSL    := sl
+        nTP    := close + d * risk * rr
+        if pos != 0
+            flipped := true
+            repCnt  += 1
+            // Gleiche Richtung: alten Trade explizit schließen.
+            // Gegenrichtung: strategy.entry dreht automatisch (schließt den alten mit).
+            if math.sign(pos) == d
+                strategy.close(curId, comment = "Neues Signal")
+    else if inSess
+        skipped := true
         skipCnt += 1
-    if skipped and okSL and q < 1
-        qtyCnt += 1
-    if newDir != 0
-        nSL   := sl
-        nTP   := close + d * risk * rr
-        nQty  := q
-        nUSD  := q * perC
-        nFull := full
 
 if newDir != 0
-    string eid = newDir == 1 ? "Long" : "Short"
     string src = newDir == 1 ? srcL : srcS
-    strategy.entry(eid, newDir == 1 ? strategy.long : strategy.short, qty = nQty, comment = src + (flipped ? " ↻" : ""))
-    strategy.exit(newDir == 1 ? "XL" : "XS", eid, stop = nSL, limit = nTP, comment_profit = "TP", comment_loss = "SL")
+    tradeNo += 1
+    string eid = (newDir == 1 ? "Long " : "Short ") + str.tostring(tradeNo)
+    curId := eid
+    strategy.entry(eid, newDir == 1 ? strategy.long : strategy.short, comment = src + (flipped ? " ↻" : ""))
+    strategy.exit("X " + eid, eid, stop = nSL, limit = nTP, comment_profit = "TP", comment_loss = "SL")
     if showTrd
         bTP := box.new(bar_index, nTP, bar_index + 1, close, border_color = color.new(cTP, 100), bgcolor = cTP)
         bSL := box.new(bar_index, close, bar_index + 1, nSL, border_color = color.new(cSL, 100), bgcolor = cSL)
         drDir := newDir
-    string sz = str.tostring(nQty) + "x  -$" + str.tostring(nUSD, "#") + (sizeMode == "Risiko in $" ? (nFull ? " Full" : " Half") : "")
-    label.new(bar_index, newDir == 1 ? low : high, src + (flipped ? " ↻" : "") + "\n" + sz, style = newDir == 1 ? label.style_label_up : label.style_label_down,
+    label.new(bar_index, newDir == 1 ? low : high, src + (flipped ? " ↻" : ""), style = newDir == 1 ? label.style_label_up : label.style_label_down,
          color = newDir == 1 ? color.new(#4caf50, 20) : color.new(#ff5252, 20), textcolor = color.white, size = size.tiny)
-    alert((newDir == 1 ? "LONG " : "SHORT ") + src + (flipped ? " (gedreht)" : "") + " @ " + str.tostring(close, format.mintick) +
-         " | SL " + str.tostring(nSL, format.mintick) + " | TP " + str.tostring(nTP, format.mintick) + " | " + sz, alert.freq_once_per_bar_close)
+    alert((newDir == 1 ? "LONG " : "SHORT ") + src + (flipped ? " (alter Trade geschlossen)" : "") + " @ " + str.tostring(close, format.mintick) +
+         " | SL " + str.tostring(nSL, format.mintick) + " | TP " + str.tostring(nTP, format.mintick), alert.freq_once_per_bar_close)
 
-plotshape(skipped and sigL, "Long ausgelassen", shape.xcross, location.belowbar, color.new(color.gray, 20), size = size.tiny)
-plotshape(skipped and sigS, "Short ausgelassen", shape.xcross, location.abovebar, color.new(color.gray, 20), size = size.tiny)
+plotshape(skipped and sigL, "Long ausgelassen (SL zu groß)", shape.xcross, location.belowbar, color.new(color.gray, 20), size = size.tiny)
+plotshape(skipped and sigS, "Short ausgelassen (SL zu groß)", shape.xcross, location.abovebar, color.new(color.gray, 20), size = size.tiny)
 
 // ───────────────────────────── Tabelle ─────────────────────────────
-var table tbl = table.new(position.top_right, 2, 10, bgcolor = color.new(#131722, 10), frame_color = #434651, frame_width = 1, border_color = #434651, border_width = 1)
+var table tbl = table.new(position.top_right, 2, 8, bgcolor = color.new(#131722, 10), frame_color = #434651, frame_width = 1, border_color = #434651, border_width = 1)
 
 f_row(int r, string k, string v, color vc) =>
     table.cell(tbl, 0, r, k, text_color = #b2b5be, text_size = size.small, text_halign = text.align_left)
@@ -327,8 +285,5 @@ if showTbl and barstate.islast
     f_row(3, "Nötig (Break-even)", str.tostring(be, "#.0") + " %", color.white)
     f_row(4, "Profit-Faktor", na(pf) ? "–" : str.tostring(pf, "#.00"), nz(pf) >= 1 ? #4caf50 : #ff5252)
     f_row(5, "Netto", str.tostring(net, "#,##0") + " " + syminfo.currency, net >= 0 ? #4caf50 : #ff5252)
-    f_row(6, "Gedreht / Verlust-Exit", str.tostring(flipCnt) + " / " + str.tostring(lossCnt), color.white)
+    f_row(6, "Trade ersetzt (neues Signal)", str.tostring(repCnt), color.white)
     f_row(7, "Ausgelassen (SL > Max)", str.tostring(skipCnt), color.white)
-    f_row(8, "Ausgelassen (< 1 Kontrakt)", str.tostring(qtyCnt), color.white)
-    bool nxtFull = baseF >= 1 or (dblLoss and lastLoss)
-    f_row(9, "Nächster Trade", sizeMode == "Fixe Kontrakte" ? str.tostring(fixQty) + " Kontrakt(e)" : (nxtFull ? "Full $" : "Half $") + str.tostring(fullUSD * (nxtFull ? 1.0 : baseF), "#"), nxtFull ? #ff9800 : color.white)
