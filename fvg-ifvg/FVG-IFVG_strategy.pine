@@ -18,8 +18,8 @@ strategy("FVG & IFVG Strategie [TFlab-Basis]", shorttitle = "FVG-IFVG", overlay 
 //   • Bärisches FVG geprintet                                     → SHORT
 //   • Bärisches FVG, Kerze schließt über dem Distal = bull. IFVG  → LONG
 //   • Bullisches FVG, Kerze schließt unter dem Distal = bär. IFVG → SHORT
-//     (ein FVG, das vorher schon mitigiert wurde, ist weg und kann nicht mehr
-//      invertieren – wie im Indikator)
+//     (auch wenn das FVG vorher schon angetestet wurde – sonst würde z. B. der
+//      Ausbruch, der den SL eines FVG-Trades holt, kein IFVG auslösen)
 //
 //  SL  = letztes Swing-Tief (Long) / Swing-Hoch (Short) + Puffer
 //  TP  = SL-Abstand × R:R (ab 0.1 frei einstellbar)
@@ -71,6 +71,7 @@ G_A = "Strategie: Anzeige"
 
 useFVG  = input.bool(true, "Entry bei neuem FVG", group = G_E)
 useIFVG = input.bool(true, "Entry bei neuem IFVG", group = G_E)
+invMit  = input.bool(true, "IFVG auch nach Antesten des FVG", group = G_E, tooltip = "An: ein FVG kann invertieren, solange es gültig ist – auch wenn der Kurs vorher schon reingelaufen ist. Aus: ein angetestetes FVG (Mitigation Level) ist erledigt und kann kein IFVG mehr werden.")
 allowL  = input.bool(true, "Longs", inline = "d", group = G_E)
 allowS  = input.bool(true, "Shorts", inline = "d", group = G_E)
 
@@ -105,8 +106,9 @@ showTbl = input.bool(true, "Statistik-Tabelle", group = G_A)
 // ───────────────────────────── IFVG-Entstehung ─────────────────────────────
 // Die Drawing-Library meldet nur die Mitigation, nicht das Entstehen eines IFVG.
 // Daher werden die FVGs aus der Library hier mitgeführt:
-//   Demand-FVG: Schluss unter Distal → bärisches IFVG;  Tief erreicht Mitigation-Level → FVG erledigt
-//   Supply-FVG: Schluss über Distal  → bullisches IFVG; Hoch erreicht Mitigation-Level → FVG erledigt
+//   Demand-FVG: Schluss unter Distal → bärisches IFVG
+//   Supply-FVG: Schluss über Distal  → bullisches IFVG
+//   Antesten (Mitigation Level) beendet das FVG nur, wenn "IFVG auch nach Antesten" aus ist
 //   Älter als die Validity Period → erledigt
 var fDist = array.new_float()
 var fProx = array.new_float()
@@ -124,7 +126,7 @@ if nF > 0
         float prox = array.get(fProx, i)
         float lvl  = MLFVG == 'Proximal' ? prox : MLFVG == 'Distal' ? dist : (prox + dist) / 2
         bool  inv  = d == 1 ? close < dist : close > dist
-        bool  mit  = d == 1 ? low <= lvl : high >= lvl
+        bool  mit  = not invMit and (d == 1 ? low <= lvl : high >= lvl)
         bool  old  = bar_index - array.get(fBar, i) > FVGVaP
         if inv
             if d == 1
