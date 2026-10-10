@@ -14,4 +14,4 @@
 | `multi-10/` | 10 Standard-Setups 1:1 in einer Strategie mit Vergleichstabelle (Ergebnis: alle unter 50 %) |
 | `orderblocks/` | 1H-Orderblocks auf kleineren Charts |
 | `adamcapitals/` | Nutzer-Strategie aus der AdamCapitals-PDF: Failed Zone → Breaker → Inducement (LIQ) → Limit in unmitigated Zone, SL hinter Zone, TP 1:7, Teilgewinn 1:4 + BE, max. 2 Trades/Tag |
-| `fvg-ifvg/` | Strategie auf TFlab FVG/IFVG (v5, Libraries direkt importiert): Sofort-Entry bei neuem FVG/IFVG, SL am letzten Swing, R:R frei ab 0.1, max. SL 50 Pkt., Gegensignal im Verlust → drehen (aktuelles Projekt) |
+| `fvg-ifvg/` | Strategie auf TFlab FVG/IFVG (v5, Libraries direkt importiert): Sofort-Entry bei neuem FVG/IFVG, SL am letzten Swing, R:R frei ab 0.1, max. SL 50 Pkt., Risiko in $ (Half 0.5R, nach Verlust Full 1R = max. $200), Gegensignal im Verlust → drehen (aktuelles Projekt) |
