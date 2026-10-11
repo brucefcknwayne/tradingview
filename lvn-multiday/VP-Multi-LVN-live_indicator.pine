@@ -1,0 +1,469 @@
+// This Pine Script™ is subject to the terms of the Mozilla Public License 2.0
+// https://mozilla.org/MPL/2.0/
+// © Volume Profile Imbalances (Multi-Zone LVN)
+// Erweitert: Live-Berechnung der LVNs + Volume Profile rechts am Chart (Breite in % wie TradingView-VP)
+//@version=6
+indicator("Volume Profile Imbalances (Multi-Zone LVN) [DZOI] – Live", "VP Multi-LVN Live", overlay=true, max_boxes_count=500, max_labels_count=100, max_lines_count=50, max_polylines_count=10)
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── INPUTS ──────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+string TZ = "America/New_York"
+// Session Configuration
+i_ovn_start_h   = input.int(18, "Overnight Start Hour (ET)", 0, 23, group="Sessions")
+i_ovn_start_m   = input.int(0,  "Overnight Start Minute",    0, 59, group="Sessions")
+i_rth_start_h   = input.int(9,  "RTH Start Hour (ET)",       0, 23, group="Sessions")
+i_rth_start_m   = input.int(30, "RTH Start Minute",          0, 59, group="Sessions")
+i_rth_end_h     = input.int(16, "RTH End Hour (ET)",         0, 23, group="Sessions")
+i_rth_end_m     = input.int(0,  "RTH End Minute",            0, 59, group="Sessions")
+i_reveal_h      = input.int(9,  "Zone Reveal Hour (ET)",     0, 23, group="Sessions", tooltip="Nur relevant, wenn 'Live-Berechnung' aus ist (Original-Verhalten) oder für die Historie außerhalb des Live-Zeitraums.")
+i_reveal_m      = input.int(25, "Zone Reveal Minute",        0, 59, group="Sessions")
+// Live
+i_live          = input.bool(true, "Live-Berechnung", group="Live", tooltip="An: LVNs werden laufend neu berechnet und erscheinen sofort, sobald sie sich im Profil bilden. Verschwindet ein Tal wieder (Volumen aufgefüllt), wird die Zone entfernt. Berührte Zonen bleiben wie im Original stehen. Aus: Original-Verhalten (einmal um 09:25).")
+i_live_days     = input.int(3, "Live-Zeitraum Historie (Tage)", 1, 60, group="Live", tooltip="In diesem Zeitraum wird auch auf historischen Kerzen live gerechnet. Davor wird wie im Original einmal täglich zur Reveal-Zeit gerechnet (spart Rechenzeit).")
+i_live_step     = input.int(10, "Historisch neu berechnen alle X Bars", 1, 60, group="Live", tooltip="Auf historischen Kerzen im Live-Zeitraum wird alle X Bars neu berechnet. In Echtzeit bei jedem Tick.")
+// Settings
+i_max_ovn       = input.int(5,  "Max Overnight Zones per Day", 1, 50, group="Settings")
+i_max_md        = input.int(5,  "Max Multiday Zones per Day", 1, 50, group="Settings")
+i_bins          = input.int(100, "Volume Profile Bins (Precision)", 10, 100, group="Settings")
+i_hide_mit      = input.bool(false, "Delete Zones After Permanent Mitigation", group="Settings")
+i_prominence    = input.int(25, "Min LVN Prominence (%)", 0, 90, group="Settings", tooltip="An LVN must be at least this % lower than the nearest surrounding volume shoulder to qualify. Higher = fewer, stronger zones.")
+i_prom_window   = input.int(6,  "Prominence Search Window (bins)", 1, 20, group="Settings", tooltip="How many bins to search outward when finding the surrounding shoulders.")
+i_min_sep_ticks = input.int(20, "Min Zone Separation (ticks)", 1, 500, group="Settings", tooltip="Minimum real price distance between two zones, in ticks. Replaces the old fixed-bin-count separation.")
+i_smooth        = input.bool(true, "Smooth Volume Histogram", group="Settings", tooltip="Applies a light 3-bin average before searching for LVNs, to suppress single-bin noise.")
+// Visual Configuration
+i_ovn_color     = input.color(color.new(#E040FB, 0), "Overnight LVN Color", group="Colors")
+i_md_color      = input.color(color.new(#FF5252, 0), "Multiday LVN Color", group="Colors")
+i_opacity       = input.int(85, "Zone Fill Opacity (%)", 50, 100, group="Colors")
+// Volume Profile
+i_vp_show       = input.string("Multiday", "Volume Profile anzeigen", options=["Aus", "Multiday", "Overnight", "Beide"], group="Volume Profile", tooltip="Zeigt das Profil, aus dem die LVNs berechnet werden, rechts am Chart. Bei aktivierter Glättung wird das geglättete Profil gezeigt – genau das, worin die Täler gesucht werden.")
+i_vp_width      = input.int(30, "Breite (% vom Chart)", 5, 100, group="Volume Profile", tooltip="Wie beim TradingView-Volume-Profile: Anteil der sichtbaren Chartbreite, gemessen vom rechten Rand.")
+i_vp_md_color   = input.color(color.new(#787B86, 70), "Multiday-Profil Farbe", group="Volume Profile")
+i_vp_ovn_color  = input.color(color.new(#E040FB, 75), "Overnight-Profil Farbe", group="Volume Profile")
+i_show_poc      = input.bool(true, "POC anzeigen", group="Volume Profile", tooltip="Point of Control: Preis mit dem meisten Volumen im Profil.")
+i_poc_color     = input.color(#2962FF, "POC Farbe", group="Volume Profile")
+// Display Configuration
+i_show_table    = input.bool(true, "Show Info Table", group="Display")
+i_table_pos     = input.string("Top Right", "Table Position", options=["Top Left", "Top Right", "Bottom Left", "Bottom Right"], group="Display")
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── SESSION DETECTION ───────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+int curr_h = hour(time, TZ)
+int curr_m = minute(time, TZ)
+int curr_time_mins = curr_h * 60 + curr_m
+int ovn_start_mins = i_ovn_start_h * 60 + i_ovn_start_m
+int rth_start_mins = i_rth_start_h * 60 + i_rth_start_m
+int rth_end_mins   = i_rth_end_h * 60 + i_rth_end_m
+bool is_ovn = curr_time_mins >= ovn_start_mins or curr_time_mins < rth_start_mins
+bool is_rth = curr_time_mins >= rth_start_mins and curr_time_mins < rth_end_mins
+int prev_h = hour(time[1], TZ)
+int prev_m = minute(time[1], TZ)
+int prev_time_mins = prev_h * 60 + prev_m
+bool prev_was_ovn = prev_time_mins >= ovn_start_mins or prev_time_mins < rth_start_mins
+bool prev_was_rth = prev_time_mins >= rth_start_mins and prev_time_mins < rth_end_mins
+bool ovn_started = is_ovn and not prev_was_ovn
+bool rth_started = is_rth and not prev_was_rth
+// Zone reveal — both OVN and MD zones publish at this single clock time (default 09:25 ET)
+int reveal_mins = i_reveal_h * 60 + i_reveal_m
+bool reveal_now = curr_time_mins >= reveal_mins and prev_time_mins < reveal_mins
+float vol = math.max(volume, 1.0)
+float min_sep_price = i_min_sep_ticks * syminfo.mintick
+float prom_pct = i_prominence / 100.0
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── TIMEFRAME-ADAPTIVE SIZING ───────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// Overnight = 15.5 hours (18:00→09:30) = 55800 seconds
+// Multiday  = 5 full sessions (~115 hours) = 414000 seconds
+var int tf_secs      = timeframe.in_seconds()
+var int max_ovn_bars = math.min(2000, math.max(20, math.ceil(55800 / tf_secs)))
+var int max_md_bars  = math.min(8000, math.max(200, math.ceil(414000 / tf_secs)))
+var int min_ovn_bars = math.max(5, math.ceil(max_ovn_bars / 20))
+var int min_md_bars  = math.max(10, math.ceil(max_md_bars / 10))
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── VOLUME PROFILE ARRAYS ───────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+var array<float> hist_hi  = array.new<float>(max_md_bars, 0.0)
+var array<float> hist_lo  = array.new<float>(max_md_bars, 0.0)
+var array<float> hist_vol = array.new<float>(max_md_bars, 0.0)
+array.unshift(hist_hi, high)
+array.unshift(hist_lo, low)
+array.unshift(hist_vol, vol)
+array.pop(hist_hi)
+array.pop(hist_lo)
+array.pop(hist_vol)
+var array<float> ovn_hi  = array.new<float>(max_ovn_bars, 0.0)
+var array<float> ovn_lo  = array.new<float>(max_ovn_bars, 0.0)
+var array<float> ovn_vol = array.new<float>(max_ovn_bars, 0.0)
+var int ovn_bar_count = 0
+if ovn_started
+    ovn_bar_count := 0
+if is_ovn
+    if ovn_bar_count < max_ovn_bars
+        array.set(ovn_hi, ovn_bar_count, high)
+        array.set(ovn_lo, ovn_bar_count, low)
+        array.set(ovn_vol, ovn_bar_count, vol)
+    ovn_bar_count += 1
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── MULTI-LVN CALCULATION LOGIC ─────────────────────────────────────────────
+// Unverändert, gibt zusätzlich das Profil (Bins) für die Anzeige zurück.
+// ══════════════════════════════════════════════════════════════════════════════
+find_lvns(array<float> h_arr, array<float> l_arr, array<float> v_arr, int count, int bin_count, int max_zones, float min_sep, float prom_thresh, int prom_win, bool do_smooth) =>
+    float scan_hi = 0.0
+    float scan_lo = 1e12
+    for i = 0 to count - 1
+        float h = array.get(h_arr, i)
+        float l = array.get(l_arr, i)
+        if h > 0
+            scan_hi := math.max(scan_hi, h)
+            scan_lo := math.min(scan_lo, l)
+
+    float range_pts = scan_hi - scan_lo
+
+    array<float> out_his = array.new<float>(0)
+    array<float> out_los = array.new<float>(0)
+    array<float> prof    = array.new<float>(0)
+    float out_bin = na
+
+    if range_pts > 0
+        float bin_size = range_pts / bin_count
+        array<float> bin_vols = array.new<float>(bin_count, 0.0)
+
+        // Distribute each bar's volume across every bin its H-L range overlaps,
+        // weighted by how much of the bar's range falls inside each bin.
+        for i = 0 to count - 1
+            float h = array.get(h_arr, i)
+            float l = array.get(l_arr, i)
+            float v = array.get(v_arr, i)
+            if h > 0
+                int sB = int(math.max(0, math.min(bin_count - 1, math.floor((l - scan_lo) / bin_size))))
+                int eB = int(math.max(0, math.min(bin_count - 1, math.floor((h - scan_lo) / bin_size))))
+                if sB == eB
+                    array.set(bin_vols, sB, array.get(bin_vols, sB) + v)
+                else
+                    float bar_range = h - l
+                    for b = sB to eB
+                        float bin_lo = scan_lo + b * bin_size
+                        float bin_hi = bin_lo + bin_size
+                        float overlap = math.min(h, bin_hi) - math.max(l, bin_lo)
+                        if overlap > 0
+                            array.set(bin_vols, b, array.get(bin_vols, b) + v * (overlap / bar_range))
+
+        // Optional light 3-bin smoothing to suppress single-bin binning noise
+        array<float> work_vols = array.new<float>(bin_count, 0.0)
+        for b = 0 to bin_count - 1
+            if do_smooth
+                float sum = array.get(bin_vols, b)
+                int cnt = 1
+                if b > 0
+                    sum += array.get(bin_vols, b - 1)
+                    cnt += 1
+                if b < bin_count - 1
+                    sum += array.get(bin_vols, b + 1)
+                    cnt += 1
+                array.set(work_vols, b, sum / cnt)
+            else
+                array.set(work_vols, b, array.get(bin_vols, b))
+        prof    := work_vols
+        out_bin := bin_size
+
+        int start_bin = math.floor(bin_count * 0.15)
+        int end_bin   = math.floor(bin_count * 0.85)
+
+        array<int> loc_min_idx = array.new<int>(0)
+        array<float> loc_min_vol = array.new<float>(0)
+
+        for b = start_bin to end_bin
+            float bv = array.get(work_vols, b)
+            float prev_v = array.get(work_vols, math.max(0, b - 1))
+            float next_v = array.get(work_vols, math.min(bin_count - 1, b + 1))
+
+            if bv <= prev_v and bv <= next_v
+                // Prominence: must sit meaningfully below the nearest volume
+                // shoulders on both sides, not just be locally non-increasing.
+                float left_peak = bv
+                int lo_bound = math.max(0, b - prom_win)
+                for wb = lo_bound to b
+                    left_peak := math.max(left_peak, array.get(work_vols, wb))
+                float right_peak = bv
+                int hi_bound = math.min(bin_count - 1, b + prom_win)
+                for wb = b to hi_bound
+                    right_peak := math.max(right_peak, array.get(work_vols, wb))
+                float shoulder = math.min(left_peak, right_peak)
+                float prominence = shoulder > 0 ? (shoulder - bv) / shoulder : 0.0
+                if prominence >= prom_thresh
+                    array.push(loc_min_idx, b)
+                    array.push(loc_min_vol, bv)
+
+        int num_mins = array.size(loc_min_idx)
+        if num_mins > 1
+            for i = 0 to num_mins - 2
+                for j = i + 1 to num_mins - 1
+                    float vol_i = array.get(loc_min_vol, i)
+                    float vol_j = array.get(loc_min_vol, j)
+                    if vol_j < vol_i
+                        array.set(loc_min_vol, i, vol_j)
+                        array.set(loc_min_vol, j, vol_i)
+                        int idx_i = array.get(loc_min_idx, i)
+                        int idx_j = array.get(loc_min_idx, j)
+                        array.set(loc_min_idx, i, idx_j)
+                        array.set(loc_min_idx, j, idx_i)
+
+        int zones_added = 0
+        if num_mins > 0
+            for i = 0 to num_mins - 1
+                if zones_added >= max_zones
+                    break
+                int idx = array.get(loc_min_idx, i)
+                float cand_center = scan_lo + idx * bin_size + bin_size / 2.0
+
+                // De-dup by actual price distance, not bin count
+                bool valid = true
+                if zones_added > 0
+                    for z = 0 to zones_added - 1
+                        float z_center = (array.get(out_his, z) + array.get(out_los, z)) / 2.0
+                        if math.abs(cand_center - z_center) < min_sep
+                            valid := false
+                            break
+
+                if valid
+                    array.push(out_los, scan_lo + idx * bin_size)
+                    array.push(out_his, scan_lo + (idx + 1) * bin_size)
+                    zones_added += 1
+
+    [out_his, out_los, prof, scan_lo, out_bin]
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── ZONEN-SPEICHER ──────────────────────────────────────────────────────────
+// Eine gemeinsame Liste für alle Zonen.
+// kind: 0 = Overnight (lila), 1 = Multiday (rot), 2 = übernommene Overnight-Zone
+// (nach überlebter Session rot gefärbt, endet nur noch durch Berührung)
+// ══════════════════════════════════════════════════════════════════════════════
+var array<box>   z_box  = array.new<box>(0)
+var array<float> z_top  = array.new<float>(0)
+var array<float> z_bot  = array.new<float>(0)
+var array<int>   z_kind = array.new<int>(0)
+var array<bool>  z_mit  = array.new<bool>(0)
+
+remove_zone(int i) =>
+    array.remove(z_box, i)
+    array.remove(z_top, i)
+    array.remove(z_bot, i)
+    array.remove(z_kind, i)
+    array.remove(z_mit, i)
+    true
+
+overlaps_any(float top, float bot, array<float> his, array<float> los) =>
+    bool hit = false
+    int n = array.size(his)
+    if n > 0
+        for i = 0 to n - 1
+            if array.get(los, i) < top and array.get(his, i) > bot
+                hit := true
+                break
+    hit
+
+// Gibt es schon eine Zone derselben Art (auch berührte) an diesem Preis?
+blocked(float top, float bot, int kind) =>
+    bool hit = false
+    int n = array.size(z_box)
+    if n > 0
+        for i = 0 to n - 1
+            int k = array.get(z_kind, i)
+            bool same = k == kind or (kind == 1 and k == 2)
+            if same and array.get(z_bot, i) < top and array.get(z_top, i) > bot
+                hit := true
+                break
+    hit
+
+// Neue LVN-Liste anwenden.
+// sync = true (Live): unberührte Zonen dieser Art, die keine LVN mehr sind,
+// werden entfernt; neue LVNs nur gezeichnet, wenn dort noch keine Zone liegt.
+// sync = false: Original-Verhalten, einfach alle LVNs zeichnen.
+apply_lvns(int kind, array<float> his, array<float> los, bool sync) =>
+    color col = kind == 0 ? i_ovn_color : i_md_color
+    if sync
+        int n = array.size(z_box)
+        if n > 0
+            for i = n - 1 to 0
+                if array.get(z_kind, i) == kind and not array.get(z_mit, i)
+                    if not overlaps_any(array.get(z_top, i), array.get(z_bot, i), his, los)
+                        box.delete(array.get(z_box, i))
+                        remove_zone(i)
+    int m = array.size(his)
+    if m > 0
+        for j = 0 to m - 1
+            float nt = array.get(his, j)
+            float nb = array.get(los, j)
+            if not na(nt) and (not sync or not blocked(nt, nb, kind))
+                box b = box.new(left=bar_index, top=nt, bottom=nb, right=bar_index,
+                     border_color=color.new(col, 100), bgcolor=color.new(col, i_opacity),
+                     extend=extend.right)
+                array.push(z_box, b)
+                array.push(z_top, nt)
+                array.push(z_bot, nb)
+                array.push(z_kind, kind)
+                array.push(z_mit, false)
+    true
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── TAGESWECHSEL (wie Original) ─────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+if ovn_started
+    int n = array.size(z_box)
+    if n > 0
+        for i = n - 1 to 0
+            box b = array.get(z_box, i)
+            int k = array.get(z_kind, i)
+            if array.get(z_mit, i)
+                // Berührte Zonen (alle Arten) werden aus der Liste genommen
+                if i_hide_mit
+                    box.delete(b)
+                remove_zone(i)
+            else if k == 0
+                // Unberührte Overnight-Zone hat die Session überlebt → rot, bleibt bis Berührung
+                box.set_bgcolor(b, color.new(i_md_color, i_opacity))
+                box.set_border_color(b, color.new(i_md_color, 100))
+                array.set(z_kind, i, 2)
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── BERECHNUNG (live oder 09:25) ────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+bool in_live_window = time >= timenow - i_live_days * 86400000
+bool recalc_md  = i_live ? (barstate.isrealtime or barstate.islast or reveal_now or (in_live_window and bar_index % i_live_step == 0)) : reveal_now
+bool recalc_ovn = i_live ? (recalc_md and is_ovn) : reveal_now
+
+if recalc_ovn
+    int valid_ovn = math.min(max_ovn_bars, ovn_bar_count)
+    if valid_ovn > min_ovn_bars
+        [o_his, o_los, o_prof, o_lo, o_bin] = find_lvns(ovn_hi, ovn_lo, ovn_vol, valid_ovn, i_bins, i_max_ovn, min_sep_price, prom_pct, i_prom_window, i_smooth)
+        apply_lvns(0, o_his, o_los, i_live)
+
+if recalc_md
+    int valid_md = math.min(max_md_bars, bar_index)
+    if valid_md > min_md_bars
+        [m_his, m_los, m_prof, m_lo, m_bin] = find_lvns(hist_hi, hist_lo, hist_vol, valid_md, i_bins, i_max_md, min_sep_price, prom_pct, i_prom_window, i_smooth)
+        apply_lvns(1, m_his, m_los, i_live)
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── MITIGATION (wie Original) ───────────────────────────────────────────────
+// Berührt = Box hört auf zu verlängern; bleibt bis zum Tageswechsel stehen.
+// ══════════════════════════════════════════════════════════════════════════════
+int z_size = array.size(z_box)
+if z_size > 0
+    for i = 0 to z_size - 1
+        if not array.get(z_mit, i)
+            if low <= array.get(z_top, i) and high >= array.get(z_bot, i)
+                box b = array.get(z_box, i)
+                box.set_extend(b, extend.none)
+                box.set_right(b, bar_index)
+                array.set(z_mit, i, true)
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── VOLUME PROFILE RECHTS AM CHART ──────────────────────────────────────────
+// Wie TradingView-VP: am rechten Rand des sichtbaren Charts, Breite in %
+// der sichtbaren Chartbreite.
+// ══════════════════════════════════════════════════════════════════════════════
+make_vp(array<float> prof, float p_lo, float p_bin, int x_r, int w_ms, color col) =>
+    polyline pl = na
+    float poc_y = na
+    int nb = array.size(prof)
+    if nb > 0
+        float pmax = math.max(array.max(prof), 1e-9)
+        array<chart.point> pts = array.new<chart.point>()
+        array.push(pts, chart.point.from_time(x_r, p_lo))
+        int poc_i = 0
+        for b = 0 to nb - 1
+            float v = array.get(prof, b)
+            int xb = x_r - int(math.round(v / pmax * w_ms))
+            array.push(pts, chart.point.from_time(xb, p_lo + b * p_bin))
+            array.push(pts, chart.point.from_time(xb, p_lo + (b + 1) * p_bin))
+            if v >= pmax
+                poc_i := b
+        array.push(pts, chart.point.from_time(x_r, p_lo + nb * p_bin))
+        pl := polyline.new(pts, curved=false, closed=true, xloc=xloc.bar_time, line_color=color.new(col, 40), fill_color=col, line_width=1)
+        poc_y := p_lo + (poc_i + 0.5) * p_bin
+    [pl, poc_y]
+
+var polyline vp_md   = na
+var polyline vp_ovn  = na
+var line     poc_md  = na
+var line     poc_ovn = na
+var label    lb_md   = na
+var label    lb_ovn  = na
+
+if barstate.islast
+    polyline.delete(vp_md)
+    polyline.delete(vp_ovn)
+    line.delete(poc_md)
+    line.delete(poc_ovn)
+    label.delete(lb_md)
+    label.delete(lb_ovn)
+    if i_vp_show != "Aus"
+        int x_r  = chart.right_visible_bar_time
+        int w_ms = int((chart.right_visible_bar_time - chart.left_visible_bar_time) * i_vp_width / 100)
+        int x_l  = x_r - w_ms
+
+        if i_vp_show == "Multiday" or i_vp_show == "Beide"
+            int vmd = math.min(max_md_bars, bar_index)
+            if vmd > min_md_bars
+                [vh1, vl1, prof1, lo1, bin1] = find_lvns(hist_hi, hist_lo, hist_vol, vmd, i_bins, i_max_md, min_sep_price, prom_pct, i_prom_window, i_smooth)
+                if array.size(prof1) > 0
+                    [pl1, poc1] = make_vp(prof1, lo1, bin1, x_r, w_ms, i_vp_md_color)
+                    vp_md := pl1
+                    if i_show_poc
+                        poc_md := line.new(x_l, poc1, x_r, poc1, xloc=xloc.bar_time, color=i_poc_color, width=2)
+                    lb_md := label.new(x_l, lo1 + array.size(prof1) * bin1, "Multiday VP", xloc=xloc.bar_time, style=label.style_label_lower_left, color=color.new(color.black, 100), textcolor=color.gray, size=size.small)
+
+        if i_vp_show == "Overnight" or i_vp_show == "Beide"
+            int vovn = math.min(max_ovn_bars, ovn_bar_count)
+            if vovn > min_ovn_bars
+                [vh2, vl2, prof2, lo2, bin2] = find_lvns(ovn_hi, ovn_lo, ovn_vol, vovn, i_bins, i_max_ovn, min_sep_price, prom_pct, i_prom_window, i_smooth)
+                if array.size(prof2) > 0
+                    [pl2, poc2] = make_vp(prof2, lo2, bin2, x_r, w_ms, i_vp_ovn_color)
+                    vp_ovn := pl2
+                    if i_show_poc
+                        poc_ovn := line.new(x_l, poc2, x_r, poc2, xloc=xloc.bar_time, color=color.new(i_ovn_color, 0), width=2, style=line.style_dashed)
+                    lb_ovn := label.new(x_l, lo2, "Overnight VP", xloc=xloc.bar_time, style=label.style_label_upper_left, color=color.new(color.black, 100), textcolor=i_ovn_color, size=size.small)
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── MINIMAL BIAS & DRAW TABLE ───────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+table_pos = switch i_table_pos
+    "Top Left"     => position.top_left
+    "Top Right"    => position.top_right
+    "Bottom Left"  => position.bottom_left
+    => position.bottom_right
+var table info_table = table.new(table_pos, 2, 2, bgcolor=color.new(#111111, 20), border_color=color.new(#444444, 80), border_width=1)
+if i_show_table and barstate.islast
+    float min_dist = 99999999.0
+    float draw_price = na
+    string draw_name = "None"
+    color draw_color = color.white
+
+    // Nächste aktive (unberührte) Zone
+    int z_count = array.size(z_box)
+    if z_count > 0
+        for i = 0 to z_count - 1
+            if not array.get(z_mit, i)
+                float center = (array.get(z_top, i) + array.get(z_bot, i)) / 2.0
+                float dist = math.abs(close - center)
+                if dist < min_dist
+                    min_dist := dist
+                    draw_price := center
+                    bool is_o = array.get(z_kind, i) == 0
+                    draw_name := is_o ? "OVN Imb" : "MD Imb"
+                    draw_color := is_o ? i_ovn_color : i_md_color
+
+    // Determine Bias based on most efficient draw
+    string bias = "NEUTRAL"
+    color bias_col = color.gray
+    if not na(draw_price)
+        if draw_price > close
+            bias := "🟢 BULLISH"
+            bias_col := #4CAF50
+        else if draw_price < close
+            bias := "🔴 BEARISH"
+            bias_col := #F44336
+
+    // Populate Table
+    table.cell(info_table, 0, 0, "Current Bias:", text_color=color.gray, text_size=size.small, text_halign=text.align_left)
+    table.cell(info_table, 1, 0, bias, text_color=bias_col, text_size=size.small, text_halign=text.align_right)
+
+    table.cell(info_table, 0, 1, "Strongest Draw:", text_color=color.gray, text_size=size.small, text_halign=text.align_left)
+    if not na(draw_price)
+        table.cell(info_table, 1, 1, draw_name + " @ " + str.tostring(draw_price, "#.0"), text_color=draw_color, text_size=size.small, text_halign=text.align_right)
+    else
+        table.cell(info_table, 1, 1, "None Active", text_color=color.gray, text_size=size.small, text_halign=text.align_right)
