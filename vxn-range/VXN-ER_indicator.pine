@@ -1,0 +1,156 @@
+//@version=6
+indicator("NQ Expected Range + VXN-Ampel", shorttitle = "ER+VXN", overlay = true, max_lines_count = 50, max_labels_count = 50)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Expected Range für NQ/MNQ aus der impliziten Vola, plus VXN-Ampel.
+//
+//  Referenz:  NQ-Kurs um 16:00 ET (22:00 MESZ) – dann verfallen die QQQ-Optionen.
+//  1σ:        Ref × IV / 100 / √252   (Wahrscheinlichkeit ~68 %, Close-zu-Close)
+//  Gültig:    bis zum nächsten 16:00-ET-Close.
+//
+//  VXN-Ampel: VXN jetzt gegen VXN um 16:00 ET des Vortags.
+//    VXN tiefer → IV fällt → Vanna stützt, Ränder halten eher      (grün)
+//    VXN höher  → IV steigt → bullische Lesart weg, Ausbruch eher  (rot)
+//  Wertbar ab 15:45 MESZ (9:45 ET). Davor ist der VXN nicht live.
+//
+//  Rest-Range: aktueller Kurs ± Kurs × IV(geschätzt) / 100 / √252,
+//  IV(geschätzt) = Ref-IV + Faktor × VXN-Änderung (Annahme: ATM-IV läuft mit dem VXN).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const string G_R = "Expected Range"
+const string G_V = "VXN-Ampel"
+const string G_A = "Anzeige"
+const string TZ  = "America/New_York"
+
+string ivMode   = input.string("ATM-IV manuell", "IV-Quelle", options = ["ATM-IV manuell", "VXN um 16:00 ET"], group = G_R, tooltip = "ATM-IV manuell: Wert aus deinem Options-Tool, jeden Abend nach 22:00 MESZ aktualisieren. Gilt für ALLE Tage im Chart – ältere Tage sind dann nur grob. VXN: historisch korrekt, aber eher zu breit (30 Tage, mit Skew).")
+float  ivManual = input.float(16.3, "ATM-IV (%)", minval = 1, step = 0.1, group = G_R)
+bool   showHalf = input.bool(true, "±0,5σ zeigen", group = G_R)
+bool   show2    = input.bool(true, "±2σ zeigen", group = G_R)
+
+string vxnSym   = input.symbol("CBOE:VXN", "VXN-Symbol", group = G_V)
+float  ivBeta   = input.float(1.0, "ATM-IV-Änderung je VXN-Punkt", minval = 0, step = 0.1, group = G_V, tooltip = "Annahme 1:1. Ungeprüft – bei Bedarf anpassen.")
+bool   showRest = input.bool(true, "Rest-Range ab jetzt zeichnen", group = G_V, tooltip = "Gestrichelte Linien am rechten Rand, nur während der Cash-Session mit live VXN.")
+
+string tblPos   = input.string("Oben rechts", "Tabelle", options = ["Oben rechts", "Unten rechts", "Oben links", "Unten links"], group = G_A)
+color  colRef   = input.color(color.gray, "Referenz", inline = "c1", group = G_A)
+color  colS1    = input.color(#2962ff, "±1σ", inline = "c1", group = G_A)
+color  colS05   = input.color(color.new(#2962ff, 55), "±0,5σ", inline = "c2", group = G_A)
+color  colS2    = input.color(#f23645, "±2σ", inline = "c2", group = G_A)
+color  colRest  = input.color(#ff9800, "Rest-Range", inline = "c3", group = G_A)
+
+float SQRT252 = math.sqrt(252.0)
+
+if not timeframe.isintraday
+    runtime.error("ER+VXN braucht einen Intraday-Chart (z. B. 1m).")
+
+// ═══════════════════════════ DATEN ═══════════════════════════
+float vxn     = request.security(vxnSym, timeframe.period, close)
+int   vxnTime = request.security(vxnSym, timeframe.period, time)
+
+// Bar, der um 16:00 ET schließt (1m: der 15:59-Balken)
+bool isRefBar = hour(time_close, TZ) == 16 and minute(time_close, TZ) == 0
+
+var float refPx  = na
+var float refIV  = na
+var float refVxn = na
+var float sigma  = na
+
+if isRefBar
+    refPx  := close
+    refVxn := vxn
+    refIV  := ivMode == "ATM-IV manuell" ? ivManual : vxn
+    sigma  := refPx * refIV / 100 / SQRT252
+
+// ═══════════════════════════ RANGE-LINIEN ═══════════════════════════
+// Am Ref-Balken na → Linie bricht sauber zwischen den Tagen
+float r = isRefBar ? na : refPx
+float s = isRefBar ? na : sigma
+
+plot(r,                                "Ref 16:00 ET", color = colRef, style = plot.style_linebr)
+plot(r + s,                            "+1σ",   color = colS1,  width = 2, style = plot.style_linebr)
+plot(r - s,                            "−1σ",   color = colS1,  width = 2, style = plot.style_linebr)
+plot(showHalf ? r + s * 0.5 : na,      "+0,5σ", color = colS05, style = plot.style_linebr)
+plot(showHalf ? r - s * 0.5 : na,      "−0,5σ", color = colS05, style = plot.style_linebr)
+plot(show2 ? r + s * 2 : na,           "+2σ",   color = colS2,  style = plot.style_linebr)
+plot(show2 ? r - s * 2 : na,           "−2σ",   color = colS2,  style = plot.style_linebr)
+
+// ═══════════════════════════ VXN-AMPEL ═══════════════════════════
+int   nyMin   = hour(time, TZ) * 60 + minute(time, TZ)
+bool  inCash  = nyMin >= 570 and nyMin < 960                       // 9:30–16:00 ET
+bool  ready   = nyMin >= 585 and nyMin < 960                       // ab 9:45 ET = 15:45 MESZ
+int   tol     = math.max(20 * 60000, 2 * timeframe.in_seconds() * 1000)
+bool  vxnLive = not na(vxnTime) and time - vxnTime <= tol
+
+float vxnChg  = vxn - refVxn
+float ivNow   = refIV + ivBeta * vxnChg
+float restS   = close * ivNow / 100 / SQRT252
+float pxChg   = close - refPx
+
+string status = "VXN nicht live – ab 15:30 MESZ"
+color  stCol  = color.gray
+string fall   = "–"
+if vxnLive and not na(refVxn)
+    if not ready
+        status := "Früh – erst ab 15:45 MESZ werten"
+        stCol  := color.new(color.orange, 20)
+    else if vxnChg < 0
+        status := "IV fällt – Vanna stützt, Ränder halten eher"
+        stCol  := color.new(#089981, 0)
+    else if vxnChg > 0
+        status := "IV steigt – bullische Lesart weg, Ausbruch eher"
+        stCol  := color.new(#f23645, 0)
+    else
+        status := "IV unverändert"
+        stCol  := color.gray
+    fall := pxChg >= 0 and vxnChg <= 0 ? "A: Kurs ↑ IV ↓ – normal bullisch" :
+             pxChg < 0 and vxnChg > 0  ? "B: Kurs ↓ IV ↑ – normal bärisch" :
+             pxChg >= 0 and vxnChg > 0 ? "C: Kurs ↑ IV ↑ – Warnung, Anstieg fragil" :
+                                         "D: Kurs ↓ IV ↓ – Fallen ohne Angst"
+
+// Rest-Range als gestrichelte Linien am rechten Rand
+var line restUp = na
+var line restDn = na
+var label restUpL = na
+var label restDnL = na
+if barstate.islast
+    line.delete(restUp)
+    line.delete(restDn)
+    label.delete(restUpL)
+    label.delete(restDnL)
+    if showRest and inCash and vxnLive and not na(restS)
+        restUp  := line.new(bar_index, close + restS, bar_index + 30, close + restS, color = colRest, style = line.style_dashed, width = 2)
+        restDn  := line.new(bar_index, close - restS, bar_index + 30, close - restS, color = colRest, style = line.style_dashed, width = 2)
+        restUpL := label.new(bar_index + 30, close + restS, "Rest +1σ " + str.tostring(close + restS, "#"), style = label.style_label_left, color = color.new(colRest, 80), textcolor = colRest, size = size.small)
+        restDnL := label.new(bar_index + 30, close - restS, "Rest −1σ " + str.tostring(close - restS, "#"), style = label.style_label_left, color = color.new(colRest, 80), textcolor = colRest, size = size.small)
+
+// ═══════════════════════════ TABELLE ═══════════════════════════
+f_pos(string p) =>
+    p == "Oben rechts" ? position.top_right : p == "Unten rechts" ? position.bottom_right : p == "Oben links" ? position.top_left : position.bottom_left
+
+f_num(float v, string fmt) =>
+    na(v) ? "–" : str.tostring(v, fmt)
+
+f_row(table t, int row, string k, string v, color c) =>
+    table.cell(t, 0, row, k, text_color = color.gray, text_size = size.small, text_halign = text.align_left)
+    table.cell(t, 1, row, v, text_color = c, text_size = size.small, text_halign = text.align_right)
+
+var table tbl = table.new(f_pos(tblPos), 2, 12, bgcolor = color.new(color.black, 15), border_width = 1, frame_color = color.new(color.gray, 60), frame_width = 1)
+if barstate.isfirst
+    table.merge_cells(tbl, 0, 10, 1, 10)
+    table.merge_cells(tbl, 0, 11, 1, 11)
+
+if barstate.islast
+    color w = color.white
+    table.cell(tbl, 0, 0, "Expected Range NQ", text_color = w, text_size = size.normal, text_halign = text.align_left)
+    table.cell(tbl, 1, 0, ivMode == "ATM-IV manuell" ? "ATM-IV" : "VXN", text_color = color.gray, text_size = size.small, text_halign = text.align_right)
+    f_row(tbl, 1, "Ref 16:00 ET",  f_num(refPx, "#.##"), w)
+    f_row(tbl, 2, "IV Ref",        f_num(refIV, "#.0") + " %", w)
+    f_row(tbl, 3, "1σ",            "±" + f_num(sigma, "#"), colS1)
+    f_row(tbl, 4, "±1σ",           f_num(refPx - sigma, "#") + " – " + f_num(refPx + sigma, "#"), colS1)
+    f_row(tbl, 5, "VXN Ref",       f_num(refVxn, "#.00"), w)
+    f_row(tbl, 6, "VXN jetzt",     f_num(vxn, "#.00") + (vxnLive ? "" : " (alt)"), vxnLive ? w : color.gray)
+    f_row(tbl, 7, "Δ VXN",         (vxnChg > 0 ? "+" : "") + f_num(vxnChg, "#.00"), vxnChg > 0 ? #f23645 : vxnChg < 0 ? #089981 : w)
+    f_row(tbl, 8, "IV geschätzt",  f_num(ivNow, "#.0") + " %", w)
+    f_row(tbl, 9, "Rest-Range 1σ", "±" + f_num(restS, "#"), colRest)
+    table.cell(tbl, 0, 10, status, text_color = color.white, bgcolor = stCol, text_size = size.small, text_halign = text.align_left)
+    table.cell(tbl, 0, 11, fall, text_color = color.white, text_size = size.small, text_halign = text.align_left)
