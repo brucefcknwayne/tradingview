@@ -1,0 +1,314 @@
+// This Pine Script™ is subject to the terms of the Mozilla Public License 2.0
+// https://mozilla.org/MPL/2.0/
+// LVN-Logik übernommen aus "Volume Profile Imbalances (Multi-Zone LVN) [DZOI]",
+// erweitert auf ein frei einstellbares Mehrtages-Profil (z. B. 7 / 30 / 60 / 90 Tage).
+//@version=6
+indicator("Multi-Day LVN (einstellbare Tage)", "LVN xD", overlay=true, max_boxes_count=500)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── INPUTS ──────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+string TZ = "America/New_York"
+
+i_days          = input.int(30, "Anzahl Tage im Profil", 1, 365, group="Profil", tooltip="Wie viele abgeschlossene Handelstage (Session 18:00–18:00 ET) in das Volumenprofil eingehen, z. B. 7, 30, 60 oder 90.")
+i_incl_today    = input.bool(true, "Laufende Overnight einbeziehen", group="Profil", tooltip="Nimmt zusätzlich die laufende Session ab 18:00 bis zur Berechnungszeit mit ins Profil – wie im Original.")
+i_calc_h        = input.int(9,  "Berechnung Stunde (ET)", 0, 23, group="Profil")
+i_calc_m        = input.int(25, "Berechnung Minute",      0, 59, group="Profil", tooltip="Einmal pro Tag zu dieser Uhrzeit werden die Zonen neu berechnet (Standard 09:25 ET wie im Original).")
+i_row_ticks     = input.int(4,  "Raster (Ticks)", 1, 1000, group="Profil", tooltip="Feines Preisraster, in dem das Volumen gesammelt wird. NQ: 4 Ticks = 1 Punkt. Größer = weniger Speicher, aber gröber.")
+
+i_max_zones     = input.int(6,   "Max. Zonen", 1, 50, group="LVN")
+i_bins          = input.int(100, "Volume Profile Bins", 10, 300, group="LVN", tooltip="In so viele gleich große Fächer wird der Preisbereich des Profils aufgeteilt. Eine Zone ist genau ein Fach breit.")
+i_prominence    = input.int(25,  "Min. LVN-Prominenz (%)", 0, 90, group="LVN", tooltip="Eine LVN muss mindestens so viel % weniger Volumen haben als die niedrigere der beiden Volumen-Schultern links/rechts.")
+i_prom_window   = input.int(6,   "Prominenz-Suchfenster (Bins)", 1, 20, group="LVN")
+i_edge_pct      = input.int(15,  "Rand ignorieren (%)", 0, 40, group="LVN", tooltip="Oberste und unterste x % des Profils werden nicht nach LVNs durchsucht.")
+i_min_sep_ticks = input.int(20,  "Min. Abstand zwischen Zonen (Ticks)", 1, 5000, group="LVN")
+i_smooth        = input.bool(true, "Histogramm glätten (3 Bins)", group="LVN")
+
+i_keep_hist     = input.bool(false, "Alte Zonen behalten", group="Anzeige", tooltip="Aus: Bei jeder Neuberechnung werden die Zonen der letzten Berechnung gelöscht. An: Sie bleiben als Historie stehen.")
+i_color         = input.color(#FF9800, "Zonenfarbe", group="Anzeige")
+i_opacity       = input.int(80, "Transparenz (%)", 0, 100, group="Anzeige")
+i_show_text     = input.bool(true, "Zonen beschriften", group="Anzeige")
+i_show_table    = input.bool(true, "Info-Tabelle anzeigen", group="Anzeige")
+i_table_pos     = input.string("Top Right", "Tabellen-Position", options=["Top Left", "Top Right", "Bottom Left", "Bottom Right"], group="Anzeige")
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── GRUNDWERTE ──────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+float row           = i_row_ticks * syminfo.mintick
+float vol           = math.max(nz(volume), 1.0)
+float min_sep_price = i_min_sep_ticks * syminfo.mintick
+float prom_pct      = i_prominence / 100.0
+float edge          = i_edge_pct / 100.0
+
+// Neuer Handelstag = neue Tageskerze (bei CME-Futures 18:00 ET)
+bool new_day = timeframe.change("D")
+
+// Berechnungszeitpunkt (einmal täglich)
+int t_now   = hour(time, TZ) * 60 + minute(time, TZ)
+int t_prev  = hour(time[1], TZ) * 60 + minute(time[1], TZ)
+int t_calc  = i_calc_h * 60 + i_calc_m
+bool calc_now = t_now >= t_calc and (t_prev < t_calc or t_prev > t_now)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── TAGES-PROFILE (feines Preisraster) ──────────────────────────────────────
+// Jeder Tag wird als eigenes Profil gespeichert (Raster-Index → Volumen).
+// "grid" ist die Summe aller gespeicherten Tage. Fällt ein Tag aus dem
+// Fenster, wird sein Volumen wieder abgezogen – so bleibt das Profil
+// rollierend, ohne jeden Tag alle Kerzen neu durchzugehen.
+// ══════════════════════════════════════════════════════════════════════════════
+type DayProfile
+    map<int, float> vols
+
+var array<DayProfile> days    = array.new<DayProfile>()
+var map<int, float>   grid    = map.new<int, float>()
+var map<int, float>   today   = map.new<int, float>()
+var bool              started = false   // erster (angeschnittener) Tag wird verworfen
+
+add_to(map<int, float> m, int k, float v) =>
+    m.put(k, nz(m.get(k)) + v)
+
+// Tageswechsel: abgeschlossenen Tag speichern, ältesten Tag entfernen
+if new_day and bar_index > 0
+    if started and today.size() > 0
+        array.push(days, DayProfile.new(today))
+        for [k, v] in today
+            add_to(grid, k, v)
+    started := true
+    today := map.new<int, float>()
+    while array.size(days) > i_days
+        DayProfile old = array.shift(days)
+        for [k, v] in old.vols
+            float nv = nz(grid.get(k)) - v
+            if nv <= 1e-6
+                grid.remove(k)
+            else
+                grid.put(k, nv)
+    if grid.size() > 45000
+        runtime.error("Preisraster zu fein für diesen Zeitraum – 'Raster (Ticks)' erhöhen.")
+
+// Volumen der aktuellen Kerze anteilig auf ihre High-Low-Spanne verteilen
+int k_lo = math.floor(low / row)
+int k_hi = math.floor(high / row)
+if k_lo == k_hi
+    add_to(today, k_lo, vol)
+else if k_hi - k_lo <= 5000
+    float bar_rng = high - low
+    for k = k_lo to k_hi
+        float r_lo = k * row
+        float ov   = math.min(high, r_lo + row) - math.max(low, r_lo)
+        if ov > 0
+            add_to(today, k, vol * ov / bar_rng)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── LVN-BERECHNUNG (Logik wie im Original) ──────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// Volumen eines Preisbereichs anteilig auf die Profil-Bins verteilen
+spread(array<float> bins, float l, float h, float v, float scan_lo, float bin_size, int bin_count) =>
+    int sB = math.max(0, math.min(bin_count - 1, math.floor((l - scan_lo) / bin_size)))
+    int eB = math.max(0, math.min(bin_count - 1, math.floor((h - scan_lo) / bin_size)))
+    if sB == eB
+        array.set(bins, sB, array.get(bins, sB) + v)
+    else
+        float rng = h - l
+        for b = sB to eB
+            float b_lo = scan_lo + b * bin_size
+            float ov   = math.min(h, b_lo + bin_size) - math.max(l, b_lo)
+            if ov > 0
+                array.set(bins, b, array.get(bins, b) + v * ov / rng)
+    true
+
+find_lvns(map<int, float> g, map<int, float> td, bool use_td, float rw, int bin_count, int max_zones, float min_sep, float prom_thresh, int prom_win, bool do_smooth, float edg) =>
+    // Preisbereich des Profils
+    int k_min = 2147483647
+    int k_max = -2147483647
+    for k in g.keys()
+        k_min := math.min(k_min, k)
+        k_max := math.max(k_max, k)
+    if use_td
+        for k in td.keys()
+            k_min := math.min(k_min, k)
+            k_max := math.max(k_max, k)
+
+    array<float> out_his = array.new<float>(0)
+    array<float> out_los = array.new<float>(0)
+
+    if k_max >= k_min
+        float scan_lo  = k_min * rw
+        float scan_hi  = (k_max + 1) * rw
+        float bin_size = (scan_hi - scan_lo) / bin_count
+        array<float> bin_vols = array.new<float>(bin_count, 0.0)
+
+        for [k, v] in g
+            spread(bin_vols, k * rw, (k + 1) * rw, v, scan_lo, bin_size, bin_count)
+        if use_td
+            for [k, v] in td
+                spread(bin_vols, k * rw, (k + 1) * rw, v, scan_lo, bin_size, bin_count)
+
+        // Optionale 3-Bin-Glättung
+        array<float> work_vols = array.new<float>(bin_count, 0.0)
+        for b = 0 to bin_count - 1
+            if do_smooth
+                float sum = array.get(bin_vols, b)
+                int cnt = 1
+                if b > 0
+                    sum += array.get(bin_vols, b - 1)
+                    cnt += 1
+                if b < bin_count - 1
+                    sum += array.get(bin_vols, b + 1)
+                    cnt += 1
+                array.set(work_vols, b, sum / cnt)
+            else
+                array.set(work_vols, b, array.get(bin_vols, b))
+
+        int start_bin = math.max(0, math.floor(bin_count * edg))
+        int end_bin   = math.min(bin_count - 1, math.floor(bin_count * (1 - edg)))
+
+        // Lokale Minima mit Prominenz-Filter
+        array<int>   loc_min_idx = array.new<int>(0)
+        array<float> loc_min_vol = array.new<float>(0)
+        if end_bin >= start_bin
+            for b = start_bin to end_bin
+                float bv     = array.get(work_vols, b)
+                float prev_v = array.get(work_vols, math.max(0, b - 1))
+                float next_v = array.get(work_vols, math.min(bin_count - 1, b + 1))
+                if bv <= prev_v and bv <= next_v
+                    float left_peak = bv
+                    for wb = math.max(0, b - prom_win) to b
+                        left_peak := math.max(left_peak, array.get(work_vols, wb))
+                    float right_peak = bv
+                    for wb = b to math.min(bin_count - 1, b + prom_win)
+                        right_peak := math.max(right_peak, array.get(work_vols, wb))
+                    float shoulder   = math.min(left_peak, right_peak)
+                    float prominence = shoulder > 0 ? (shoulder - bv) / shoulder : 0.0
+                    if prominence >= prom_thresh
+                        array.push(loc_min_idx, b)
+                        array.push(loc_min_vol, bv)
+
+        // Nach Volumen aufsteigend sortieren (dünnstes Tal zuerst)
+        int num_mins = array.size(loc_min_idx)
+        if num_mins > 1
+            for i = 0 to num_mins - 2
+                for j = i + 1 to num_mins - 1
+                    float vol_i = array.get(loc_min_vol, i)
+                    float vol_j = array.get(loc_min_vol, j)
+                    if vol_j < vol_i
+                        array.set(loc_min_vol, i, vol_j)
+                        array.set(loc_min_vol, j, vol_i)
+                        int idx_i = array.get(loc_min_idx, i)
+                        int idx_j = array.get(loc_min_idx, j)
+                        array.set(loc_min_idx, i, idx_j)
+                        array.set(loc_min_idx, j, idx_i)
+
+        // Auswahl mit Mindestabstand in echten Preispunkten
+        int zones_added = 0
+        if num_mins > 0
+            for i = 0 to num_mins - 1
+                if zones_added >= max_zones
+                    break
+                int idx = array.get(loc_min_idx, i)
+                float cand_center = scan_lo + idx * bin_size + bin_size / 2.0
+                bool valid = true
+                if zones_added > 0
+                    for z = 0 to zones_added - 1
+                        float z_center = (array.get(out_his, z) + array.get(out_los, z)) / 2.0
+                        if math.abs(cand_center - z_center) < min_sep
+                            valid := false
+                            break
+                if valid
+                    array.push(out_los, scan_lo + idx * bin_size)
+                    array.push(out_his, scan_lo + (idx + 1) * bin_size)
+                    zones_added += 1
+
+    [out_his, out_los]
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── ZONEN ZEICHNEN ──────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+var array<box>  z_boxes   = array.new<box>(0)
+var array<bool> z_mit     = array.new<bool>(0)
+var int         days_used = 0
+
+if calc_now and array.size(days) > 0
+    // Zonen der letzten Berechnung löschen oder als Historie einfrieren
+    if array.size(z_boxes) > 0
+        for i = 0 to array.size(z_boxes) - 1
+            box ob = array.get(z_boxes, i)
+            if i_keep_hist
+                if not array.get(z_mit, i)
+                    box.set_extend(ob, extend.none)
+                    box.set_right(ob, bar_index)
+            else
+                box.delete(ob)
+    array.clear(z_boxes)
+    array.clear(z_mit)
+
+    [his, los] = find_lvns(grid, today, i_incl_today, row, i_bins, i_max_zones, min_sep_price, prom_pct, i_prom_window, i_smooth, edge)
+    days_used := array.size(days)
+    string lbl = i_show_text ? str.tostring(days_used) + "D LVN" : ""
+    int n = array.size(his)
+    if n > 0
+        for i = 0 to n - 1
+            box nb = box.new(left=bar_index, top=array.get(his, i), right=bar_index, bottom=array.get(los, i),
+                 border_color=color.new(i_color, 100), bgcolor=color.new(i_color, i_opacity), extend=extend.right,
+                 text=lbl, text_size=size.tiny, text_color=i_color, text_halign=text.align_right, text_valign=text.align_center)
+            array.push(z_boxes, nb)
+            array.push(z_mit, false)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── MITIGATION ──────────────────────────────────────────────────────────────
+// Berührt = Box hört auf zu verlängern (wie im Original).
+// ══════════════════════════════════════════════════════════════════════════════
+int z_size = array.size(z_boxes)
+if z_size > 0
+    for i = 0 to z_size - 1
+        if not array.get(z_mit, i)
+            box zb = array.get(z_boxes, i)
+            if low <= box.get_top(zb) and high >= box.get_bottom(zb)
+                box.set_extend(zb, extend.none)
+                box.set_right(zb, bar_index)
+                array.set(z_mit, i, true)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── INFO-TABELLE ────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+table_pos = switch i_table_pos
+    "Top Left"     => position.top_left
+    "Top Right"    => position.top_right
+    "Bottom Left"  => position.bottom_left
+    => position.bottom_right
+
+var table info = table.new(table_pos, 2, 5, bgcolor=color.new(#111111, 20), border_color=color.new(#444444, 80), border_width=1)
+
+if i_show_table and barstate.islast
+    float above_top = na
+    float above_bot = na
+    float below_top = na
+    float below_bot = na
+    int   active    = 0
+    if z_size > 0
+        for i = 0 to z_size - 1
+            if not array.get(z_mit, i)
+                box zb = array.get(z_boxes, i)
+                float zt = box.get_top(zb)
+                float zbt = box.get_bottom(zb)
+                active += 1
+                if zbt > close and (na(above_bot) or zbt < above_bot)
+                    above_bot := zbt
+                    above_top := zt
+                if zt < close and (na(below_top) or zt > below_top)
+                    below_top := zt
+                    below_bot := zbt
+
+    int loaded = array.size(days)
+    color load_col = loaded >= i_days ? color.white : color.orange
+
+    table.cell(info, 0, 0, "Profil:", text_color=color.gray, text_size=size.small, text_halign=text.align_left)
+    table.cell(info, 1, 0, timeframe.isdwm ? "Nur Intraday-Charts" : str.tostring(i_days) + " Tage", text_color=timeframe.isdwm ? color.orange : color.white, text_size=size.small, text_halign=text.align_right)
+    table.cell(info, 0, 1, "Geladen:", text_color=color.gray, text_size=size.small, text_halign=text.align_left)
+    table.cell(info, 1, 1, str.tostring(loaded) + " / " + str.tostring(i_days) + (loaded < i_days ? "  (zu wenig Historie)" : ""), text_color=load_col, text_size=size.small, text_halign=text.align_right)
+    table.cell(info, 0, 2, "Aktive Zonen:", text_color=color.gray, text_size=size.small, text_halign=text.align_left)
+    table.cell(info, 1, 2, str.tostring(active), text_color=color.white, text_size=size.small, text_halign=text.align_right)
+    table.cell(info, 0, 3, "Nächste ↑:", text_color=color.gray, text_size=size.small, text_halign=text.align_left)
+    table.cell(info, 1, 3, na(above_bot) ? "–" : str.tostring(above_bot, format.mintick) + " – " + str.tostring(above_top, format.mintick), text_color=i_color, text_size=size.small, text_halign=text.align_right)
+    table.cell(info, 0, 4, "Nächste ↓:", text_color=color.gray, text_size=size.small, text_halign=text.align_left)
+    table.cell(info, 1, 4, na(below_top) ? "–" : str.tostring(below_bot, format.mintick) + " – " + str.tostring(below_top, format.mintick), text_color=i_color, text_size=size.small, text_halign=text.align_right)
