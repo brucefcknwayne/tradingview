@@ -37,10 +37,10 @@ bool  showLbl = input.bool(true, "Preise beschriften", group = G_A)
 bool isRefBar = timeframe.isintraday and hour(time_close, TZ) == 16 and minute(time_close, TZ) == 0
 
 var float autoRef = na
-var int   refIdx  = na
+var int   refT    = na
 if isRefBar
     autoRef := close
-    refIdx  := bar_index + 1
+    refT    := time_close
 
 float ref = refMode == "Manuell" ? refMan : autoRef
 
@@ -48,10 +48,11 @@ float ref = refMode == "Manuell" ? refMan : autoRef
 var array<line>  lns = array.new<line>()
 var array<label> lbs = array.new<label>()
 
-f_level(float p, string txt, color c, int x1, int w) =>
+// Zeit- statt Bar-Koordinaten: keine Grenze, wie weit der Startpunkt zurückliegt
+f_level(float p, string txt, color c, int x1, int xl, int w) =>
     if showLbl
-        array.push(lbs, label.new(bar_index + 8, p, txt + "  " + str.tostring(p, format.mintick), style = label.style_label_left, color = color.new(c, 85), textcolor = c, size = size.small))
-    array.push(lns, line.new(x1, p, x1 + 1, p, color = c, width = w, extend = extend.right))
+        array.push(lbs, label.new(xl, p, txt + "  " + str.tostring(p, format.mintick), xloc = xloc.bar_time, style = label.style_label_left, color = color.new(c, 85), textcolor = c, size = size.small))
+    array.push(lns, line.new(x1, p, x1 + 60000, p, xloc = xloc.bar_time, color = c, width = w, extend = extend.right))
 
 if barstate.islast
     for l in lns
@@ -61,17 +62,19 @@ if barstate.islast
     array.clear(lns)
     array.clear(lbs)
     if not na(ref) and rng > 0
-        int x1 = na(refIdx) or refMode == "Manuell" ? math.max(0, bar_index - 100) : refIdx
-        f_level(ref, "Ref (1σ = " + str.tostring(rng, "#") + ")", colRef, x1, 1)
+        int barMs = timeframe.in_seconds() * 1000
+        int x1    = na(refT) or refMode == "Manuell" ? time - 100 * barMs : refT
+        int xl    = time_close + 8 * barMs
+        f_level(ref, "Ref (1σ = " + str.tostring(rng, "#") + ")", colRef, x1, xl, 1)
         if show05
-            f_level(ref + 0.5 * rng, "+0,5σ", col05, x1, 1)
-            f_level(ref - 0.5 * rng, "−0,5σ", col05, x1, 1)
+            f_level(ref + 0.5 * rng, "+0,5σ", col05, x1, xl, 1)
+            f_level(ref - 0.5 * rng, "−0,5σ", col05, x1, xl, 1)
         if show10
-            f_level(ref + rng, "+1σ", col10, x1, 2)
-            f_level(ref - rng, "−1σ", col10, x1, 2)
+            f_level(ref + rng, "+1σ", col10, x1, xl, 2)
+            f_level(ref - rng, "−1σ", col10, x1, xl, 2)
         if show15
-            f_level(ref + 1.5 * rng, "+1,5σ", col15, x1, 1)
-            f_level(ref - 1.5 * rng, "−1,5σ", col15, x1, 1)
+            f_level(ref + 1.5 * rng, "+1,5σ", col15, x1, xl, 1)
+            f_level(ref - 1.5 * rng, "−1,5σ", col15, x1, xl, 1)
         if show20
-            f_level(ref + 2 * rng, "+2σ", col20, x1, 2)
-            f_level(ref - 2 * rng, "−2σ", col20, x1, 2)
+            f_level(ref + 2 * rng, "+2σ", col20, x1, xl, 2)
+            f_level(ref - 2 * rng, "−2σ", col20, x1, xl, 2)
