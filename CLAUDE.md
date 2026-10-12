@@ -13,5 +13,5 @@
 | `pullback-1r/` | RSI(2)-Pullback 1:1 mit Training/Test-Tabelle (Ergebnis: ~51 %, kein Vorteil) |
 | `multi-10/` | 10 Standard-Setups 1:1 in einer Strategie mit Vergleichstabelle (Ergebnis: alle unter 50 %) |
 | `orderblocks/` | 1H-Orderblocks auf kleineren Charts |
-| `vxn-range/` | Expected Range für NQ (Ref = 16:00-ET-Close, 1σ = Ref × IV/√252) plus VXN-Ampel gegen den Vortag und Rest-Range ab jetzt |
+| `vxn-range/` | Expected Range für NQ (Ref = 16:00-ET-Close, 1σ = Ref × IV/√252) plus VXN-Ampel gegen den Vortag und Rest-Range ab jetzt; `ER-SD` = Range (1σ) eintippen → ±0,5/1/1,5/2σ-Linien |
 | `adamcapitals/` | Nutzer-Strategie aus der AdamCapitals-PDF: Failed Zone → Breaker → Inducement (LIQ) → Limit in unmitigated Zone, SL hinter Zone, TP 1:7, Teilgewinn 1:4 + BE, max. 2 Trades/Tag (aktuelles Projekt) |
