@@ -1,58 +1,50 @@
 //@version=6
-indicator("Expected Range – SD-Level", shorttitle = "ER-SD", overlay = true, max_lines_count = 50, max_labels_count = 50, max_bars_back = 5000)
+indicator("Expected Range by @Brucefcknwayne", shorttitle = "Expected Range", overlay = true, max_lines_count = 20, max_labels_count = 20, max_bars_back = 5000)
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Du tippst die Range (= 1σ in NQ-Punkten) ein, der Indikator zeichnet
-//  ±0,5σ · ±1σ · ±1,5σ · ±2σ um die Referenz.
+//  EXPECTED RANGE  ·  by @Brucefcknwayne
 //
-//  Referenz: automatisch der NQ-Kurs um 16:00 ET (22:00 MESZ) des Vortags
-//            oder manuell eingetippt.
+//  I post the expected range (1σ in NQ points) in the Discord every day.
+//  Type it into the "Range" field. The indicator draws ±0.5σ, ±1σ, ±1.5σ and
+//  ±2σ around the 16:00 ET close of the previous day. Fixed time, no settings.
 //
-//  1σ ausrechnen (TradingView-Optionskette QQQ, Verfall des Tages):
-//    (Call-Mitte + Put-Mitte) ÷ QQQ-Kurs × NQ-Close × 1,25
-//    oder  NQ-Close × IV × √(Kalendertage ÷ 365)
+//  How I calculate the range is explained in my second book, "The Secret Sauce"
+//  (students only: read the first book and pass the quiz with at least 80%).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const string G_E = "Eingabe"
-const string G_A = "Anzeige"
-const string TZ  = "America/New_York"
+const string TZ = "America/New_York"
 
-float  rng     = input.float(244.0, "Range = 1σ (NQ-Punkte)", minval = 0, step = 1, group = G_E, tooltip = "Das Endergebnis deiner Rechnung, z. B. 244.")
-string refMode = input.string("Auto: 16:00-ET-Close", "Referenz", options = ["Auto: 16:00-ET-Close", "Manuell"], group = G_E, tooltip = "Auto: Schlusskurs der 21:59-Kerze (MESZ) vom Vortag. Braucht einen Intraday-Chart.")
-float  refMan  = input.float(31112.25, "Referenz manuell", step = 0.25, group = G_E)
+float rng = input.float(244.0, "Range = 1σ (NQ points)", minval = 0, step = 1, group = "Input", tooltip = "The daily range I post in the Discord. Example: 244.")
 
-bool  show05  = input.bool(true, "±0,5σ", inline = "s", group = G_A)
-bool  show10  = input.bool(true, "±1σ",   inline = "s", group = G_A)
-bool  show15  = input.bool(true, "±1,5σ", inline = "s", group = G_A)
-bool  show20  = input.bool(true, "±2σ",   inline = "s", group = G_A)
-color colRef  = input.color(color.gray, "Referenz", inline = "c1", group = G_A)
-color col05   = input.color(color.new(#2962ff, 45), "0,5σ", inline = "c1", group = G_A)
-color col10   = input.color(#2962ff, "1σ",   inline = "c2", group = G_A)
-color col15   = input.color(#ff9800, "1,5σ", inline = "c2", group = G_A)
-color col20   = input.color(#f23645, "2σ",   inline = "c3", group = G_A)
-bool  showLbl = input.bool(true, "Preise beschriften", group = G_A)
+bool  show05 = input.bool(false, "±0.5σ",  inline = "s", group = "Display")
+bool  show10 = input.bool(true,  "±1σ",    inline = "s", group = "Display")
+bool  show15 = input.bool(true,  "±1.5σ",  inline = "s", group = "Display")
+bool  show20 = input.bool(true,  "±2σ",    inline = "s", group = "Display")
+bool  showLbl = input.bool(true, "Price labels", group = "Display")
 
-// ═══════════════════════════ REFERENZ ═══════════════════════════
-// Bar, der um 16:00 ET schließt (1m: der 15:59-ET- bzw. 21:59-MESZ-Balken)
+color col05 = input.color(#9e9e9e, "0.5σ", inline = "c1", group = "Colors")
+color col10 = input.color(#00bcd4, "1σ",   inline = "c1", group = "Colors")
+color col15 = input.color(#2196f3, "1.5σ", inline = "c2", group = "Colors")
+color col20 = input.color(#ff00c8, "2σ",   inline = "c2", group = "Colors")
+
+// ═══════════════════ REFERENCE (fixed: close of 16:00 ET) ═══════════════════
 bool isRefBar = timeframe.isintraday and hour(time_close, TZ) == 16 and minute(time_close, TZ) == 0
 
-var float autoRef = na
-var int   refT    = na
+var float ref  = na
+var int   refT = na
 if isRefBar
-    autoRef := close
-    refT    := time_close
+    ref  := close
+    refT := time_close
 
-float ref = refMode == "Manuell" ? refMan : autoRef
-
-// ═══════════════════════════ ZEICHNEN ═══════════════════════════
+// ═══════════════════════════════ DRAW ═══════════════════════════════
+// Time coordinates instead of bar_index: no history-buffer limit over weekends
 var array<line>  lns = array.new<line>()
 var array<label> lbs = array.new<label>()
 
-// Zeit- statt Bar-Koordinaten: keine Grenze, wie weit der Startpunkt zurückliegt
 f_level(float p, string txt, color c, int x1, int xl, int w) =>
     if showLbl
-        array.push(lbs, label.new(xl, p, txt + "  " + str.tostring(p, format.mintick), xloc = xloc.bar_time, style = label.style_label_left, color = color.new(c, 85), textcolor = c, size = size.small))
-    array.push(lns, line.new(x1, p, x1 + 60000, p, xloc = xloc.bar_time, color = c, width = w, extend = extend.right))
+        array.push(lbs, label.new(xl, p, txt + "  " + str.tostring(p, format.mintick), xloc = xloc.bar_time, style = label.style_label_down, color = color.new(c, 100), textcolor = c, size = size.small))
+    array.push(lns, line.new(x1, p, x1 + 60000, p, xloc = xloc.bar_time, color = c, width = w, style = line.style_dotted, extend = extend.right))
 
 if barstate.islast
     for l in lns
@@ -63,18 +55,17 @@ if barstate.islast
     array.clear(lbs)
     if not na(ref) and rng > 0
         int barMs = timeframe.in_seconds() * 1000
-        int x1    = na(refT) or refMode == "Manuell" ? time - 100 * barMs : refT
+        int x1    = na(refT) ? time - 100 * barMs : refT
         int xl    = time_close + 8 * barMs
-        f_level(ref, "Ref (1σ = " + str.tostring(rng, "#") + ")", colRef, x1, xl, 1)
         if show05
-            f_level(ref + 0.5 * rng, "+0,5σ", col05, x1, xl, 1)
-            f_level(ref - 0.5 * rng, "−0,5σ", col05, x1, xl, 1)
+            f_level(ref + 0.5 * rng, "+0.5σ", col05, x1, xl, 1)
+            f_level(ref - 0.5 * rng, "−0.5σ", col05, x1, xl, 1)
         if show10
             f_level(ref + rng, "+1σ", col10, x1, xl, 2)
             f_level(ref - rng, "−1σ", col10, x1, xl, 2)
         if show15
-            f_level(ref + 1.5 * rng, "+1,5σ", col15, x1, xl, 1)
-            f_level(ref - 1.5 * rng, "−1,5σ", col15, x1, xl, 1)
+            f_level(ref + 1.5 * rng, "+1.5σ", col15, x1, xl, 1)
+            f_level(ref - 1.5 * rng, "−1.5σ", col15, x1, xl, 1)
         if show20
             f_level(ref + 2 * rng, "+2σ", col20, x1, xl, 2)
             f_level(ref - 2 * rng, "−2σ", col20, x1, xl, 2)
