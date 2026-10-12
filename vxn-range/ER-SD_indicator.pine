@@ -1,5 +1,5 @@
 //@version=6
-indicator("Expected Range – SD-Level", shorttitle = "ER-SD", overlay = true, max_lines_count = 50, max_labels_count = 50)
+indicator("Expected Range – SD-Level", shorttitle = "ER-SD", overlay = true, max_lines_count = 50, max_labels_count = 50, max_bars_back = 5000)
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Du tippst die Range (= 1σ in NQ-Punkten) ein, der Indikator zeichnet
