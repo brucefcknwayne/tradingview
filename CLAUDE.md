@@ -14,3 +14,4 @@
 | `multi-10/` | 10 Standard-Setups 1:1 in einer Strategie mit Vergleichstabelle (Ergebnis: alle unter 50 %) |
 | `orderblocks/` | 1H-Orderblocks auf kleineren Charts |
 | `adamcapitals/` | Nutzer-Strategie aus der AdamCapitals-PDF: Failed Zone → Breaker → Inducement (LIQ) → Limit in unmitigated Zone, SL hinter Zone, TP 1:7, Teilgewinn 1:4 + BE, max. 2 Trades/Tag (aktuelles Projekt) |
+| `zera-heatmap/` | 1:1-Nachbau der MotiveWave-Study ZeraHeatmap (Z-Score OHLC4, Kerzenfarbe Neutral/Cyan/Magenta) + Dreieck bei Rückkehr zu Neutral |

@@ -1,0 +1,75 @@
+//@version=6
+indicator("Zera Heatmap", shorttitle = "ZeraHM", overlay = true)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  1:1-Nachbau der MotiveWave-Study "ZeraHeatmap" (aus der .jar zurückgelesen):
+//
+//   src = OHLC4
+//   z   = (src − SMA(src, Lookback)) / StdAbw(src, Lookback)   (Populations-StdAbw)
+//
+//   |z| <  T1          → Neutral   (RGB 51,51,51)
+//   |z| >= T2          → Magenta   (RGB 229,5,255)
+//   T1 <= |z| < T2     → Verlauf Cyan → Magenta, Anteil = (|z|−T1)/(T2−T1)
+//
+//   Achtung: Die Farbe hängt NUR vom Betrag ab, nicht von der Richtung.
+//   Cyan = leicht extrem, Magenta = stark extrem – an Hochs UND Tiefs.
+//   Die ersten "Lookback" Kerzen bleiben ungefärbt (wie im Original).
+//   Die Wick/Border-Einstellungen des Originals werden dort nie angewendet
+//   → hier weggelassen.
+//
+//  Zusatz: Dreieck unter der Kerze, sobald die Farbe von Cyan/Magenta
+//  wieder auf Neutral springt (erste neutrale Kerze nach einer Farbphase).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const string G_Z = "Z-Score"
+const string G_C = "Farben"
+const string G_S = "Signal"
+
+int   len   = input.int(50, "Lookback", minval = 2, maxval = 2000, group = G_Z)
+float t1    = input.float(2.0, "Threshold T1", minval = 0.1, maxval = 100, step = 0.1, group = G_Z, inline = "t")
+float t2    = input.float(3.0, "Threshold T2", minval = 0.1, maxval = 100, step = 0.1, group = G_Z, inline = "t")
+
+color cNeg  = input.color(color.rgb(45, 171, 173), "Cyan (T1)", group = G_C)
+color cPos  = input.color(color.rgb(229, 5, 255), "Magenta (T2)", group = G_C)
+color cNeu  = input.color(color.rgb(51, 51, 51), "Neutral", group = G_C)
+bool  paint = input.bool(true, "Kerzen einfärben", group = G_C)
+
+bool  showSig  = input.bool(true, "Dreieck bei Rückkehr zu Neutral", group = G_S)
+color sigCol   = input.color(color.yellow, "Dreieck-Farbe", group = G_S)
+bool  onClose  = input.bool(true, "Nur bei Kerzenschluss", group = G_S, tooltip = "Verhindert, dass das Dreieck in der laufenden Kerze auftaucht und wieder verschwindet.")
+
+// ── Z-Score ──────────────────────────────────────────────────────────────────
+float src  = (open + high + low + close) / 4.0
+float mean = ta.sma(src, len)
+float sd   = ta.stdev(src, len)                  // biased = Populations-StdAbw wie im Original
+float z    = bar_index < len ? na : sd != 0 ? (src - mean) / sd : 0.0
+
+// ── Farbe exakt wie MotiveWave (lineare RGB-Interpolation, gerundet) ────────
+mix(float a, float b, float f) =>
+    math.max(0, math.min(255, math.round(a + (b - a) * f)))
+
+heatColor(float zz) =>
+    float az = math.abs(zz)
+    color c = na
+    if not na(zz)
+        if az < t1
+            c := cNeu
+        else if az >= t2
+            c := cPos
+        else
+            float f = math.max(0.0, math.min(1.0, (az - t1) / (t2 - t1)))
+            c := color.rgb(mix(color.r(cNeg), color.r(cPos), f), mix(color.g(cNeg), color.g(cPos), f), mix(color.b(cNeg), color.b(cPos), f))
+    c
+
+color barCol = heatColor(z)
+barcolor(paint ? barCol : na, title = "Heatmap")
+
+// ── Signal: Cyan/Magenta → Neutral ───────────────────────────────────────────
+bool wasHot  = not na(z[1]) and math.abs(z[1]) >= t1
+bool isCold  = not na(z) and math.abs(z) < t1
+bool backNeu = wasHot and isCold and (not onClose or barstate.isconfirmed)
+
+plotshape(showSig and backNeu, "Zurück zu Neutral", shape.triangleup, location.belowbar, sigCol, size = size.tiny)
+plot(z, "Z-Score", display = display.data_window)
+
+alertcondition(backNeu, "Zera: zurück zu Neutral", "Zera Heatmap: Farbe wieder neutral – {{ticker}} {{close}}")
