@@ -2,22 +2,24 @@
 indicator("Zera Heatmap · Volumen-Kerzen", shorttitle = "ZeraHM 500V", overlay = true)
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  MotiveWave "ZeraHeatmap" auf 500-Volumen-Kerzen – nachgebaut in TradingView.
+//  MotiveWave "ZeraHeatmap" auf 500-Volumen-Kerzen – nachgebaut in TradingView,
+//  OHNE Abo (läuft auf dem normalen 1m-Chart).
 //
-//  TradingView hat keine Volumen-Kerzen. Deshalb baut das Skript sie selbst:
-//  Es holt die Sekunden-Daten (1S) jeder Chart-Kerze und schneidet daraus
-//  Kerzen mit je 500 Kontrakten (Überhang wandert in die nächste Kerze).
+//  TradingView hat keine Volumen-Kerzen. Das Skript baut sie selbst aus den
+//  1m-Kerzen: Innerhalb jeder Minute wird der Kursweg angenommen
+//      grüne Kerze:  Open → Low → High → Close
+//      rote Kerze:   Open → High → Low → Close
+//  und das Minuten-Volumen gleichmäßig auf diesen Weg verteilt. Alle 500
+//  Kontrakte wird eine Volumen-Kerze geschlossen (Preis an der Schnittstelle).
+//
 //  Auf diesen Volumen-Kerzen läuft exakt die Zera-Formel:
-//
 //   src = OHLC4,  z = (src − SMA(src, 50)) / StdAbw(src, 50)   (Populations-StdAbw)
 //   |z| <  T1  → Neutral,  |z| >= T2 → Magenta,  dazwischen Cyan → Magenta
 //   (Farbe hängt nur vom Betrag ab – Hochs und Tiefs gleich.)
 //
 //  Signal: Sobald eine fertige Volumen-Kerze wieder NEUTRAL ist und die davor
-//  Cyan/Magenta war → Dreieck unter der TradingView-Kerze, in der das passiert.
-//
-//  Empfehlung: NQ1! / MNQ1!, Chart 1m (oder Sekunden-Chart), Intrabar "1S".
-//  Sekunden-Daten brauchen ein TradingView-Abo mit Sekunden-Intervallen.
+//  Cyan/Magenta war → Dreieck unter der 1m-Kerze, in der das passiert.
+//  Berechnung nur bei Kerzenschluss → kein Repaint.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const string G_V = "Volumen-Kerzen"
@@ -25,18 +27,17 @@ const string G_Z = "Z-Score"
 const string G_C = "Farben"
 const string G_S = "Signal"
 
-int    volSize  = input.int(500, "Volumen pro Kerze", minval = 1, group = G_V)
-string ltf      = input.timeframe("1S", "Intrabar-Daten", group = G_V, tooltip = "Woraus die Volumen-Kerzen gebaut werden. 1S = so nah wie möglich an MotiveWave. Muss kleiner als der Chart-Timeframe sein.")
-bool   resetSes = input.bool(false, "Zählung bei Sessionstart neu beginnen", group = G_V, tooltip = "Verwirft die angefangene Volumen-Kerze beim Sessionstart.")
+int   volSize  = input.int(500, "Volumen pro Kerze", minval = 1, group = G_V)
+bool  resetSes = input.bool(false, "Zählung bei Sessionstart neu beginnen", group = G_V, tooltip = "Verwirft die angefangene Volumen-Kerze beim Sessionstart.")
 
 int   len  = input.int(50, "Lookback", minval = 2, maxval = 2000, group = G_Z)
 float t1   = input.float(2.0, "Threshold T1", minval = 0.1, maxval = 100, step = 0.1, group = G_Z, inline = "t")
 float t2   = input.float(3.0, "Threshold T2", minval = 0.1, maxval = 100, step = 0.1, group = G_Z, inline = "t")
 
-color cNeg   = input.color(color.rgb(45, 171, 173), "Cyan (T1)", group = G_C)
-color cPos   = input.color(color.rgb(229, 5, 255), "Magenta (T2)", group = G_C)
-color cNeu   = input.color(color.rgb(51, 51, 51), "Neutral", group = G_C)
-bool  paint  = input.bool(true, "Chart-Kerzen einfärben", group = G_C)
+color  cNeg  = input.color(color.rgb(45, 171, 173), "Cyan (T1)", group = G_C)
+color  cPos  = input.color(color.rgb(229, 5, 255), "Magenta (T2)", group = G_C)
+color  cNeu  = input.color(color.rgb(51, 51, 51), "Neutral", group = G_C)
+bool   paint = input.bool(true, "Chart-Kerzen einfärben", group = G_C)
 string pMode = input.string("Stärkste Volumen-Kerze", "Farbe der Chart-Kerze", options = ["Stärkste Volumen-Kerze", "Letzte Volumen-Kerze"], group = G_C, tooltip = "Eine 1m-Kerze kann mehrere 500V-Kerzen enthalten.")
 
 bool  showSig = input.bool(true, "Dreieck bei Rückkehr zu Neutral", group = G_S)
@@ -60,90 +61,124 @@ heatColor(float zz) =>
             c := color.rgb(mix(color.r(cNeg), color.r(cPos), f), mix(color.g(cNeg), color.g(cPos), f), mix(color.b(cNeg), color.b(cPos), f))
     c
 
-// ── Intrabar-Daten ───────────────────────────────────────────────────────────
-[aO, aH, aL, aC, aV] = request.security_lower_tf(syminfo.tickerid, ltf, [open, high, low, close, volume])
-
 // ── Zustand der Volumen-Kerzen ───────────────────────────────────────────────
-var array<float> hist = array.new_float()       // OHLC4 der letzten "len" fertigen Volumen-Kerzen
-var bool  vbOpen  = false
-var float vbO     = na
-var float vbH     = na
-var float vbL     = na
-var float vbC     = na
-var float vbV     = 0.0
-var int   vbCount = 0
-var bool  lastHot = false
-var float lastZ   = na
+type VBState
+    bool         isOpen  = false
+    float        o
+    float        h
+    float        l
+    float        c
+    float        v       = 0.0
+    int          count   = 0
+    bool         lastHot = false
+    float        lastZ
+    array<float> hist
+    float        zMax                   // stärkster z in der aktuellen 1m-Kerze
+    float        zEnd                   // letzter z in der aktuellen 1m-Kerze
+    int          sig     = 0            // Rückkehr-zu-Neutral in der aktuellen 1m-Kerze
 
-if resetSes and session.isfirstbar
-    vbOpen := false
-    vbV    := 0.0
+// Volumen-Kerze abschließen + Zera-Z-Score berechnen
+complete(VBState s) =>
+    float x = (s.o + s.h + s.l + s.c) / 4.0
+    s.hist.push(x)
+    if s.hist.size() > len
+        s.hist.shift()
+    s.count := s.count + 1
+    if s.count > len                                // wie MotiveWave: erst ab Index >= Lookback
+        float m  = s.hist.avg()
+        float sd = s.hist.stdev()                   // biased = Populations-StdAbw
+        float z  = sd != 0 ? (x - m) / sd : 0.0
+        bool hot = math.abs(z) >= t1
+        if s.lastHot and not hot
+            s.sig := s.sig + 1
+        s.lastHot := hot
+        s.lastZ   := z
+        s.zEnd    := z
+        if na(s.zMax) or math.abs(z) > math.abs(s.zMax)
+            s.zMax := z
+    // nächste Volumen-Kerze startet am Schnittpreis
+    s.v := 0.0
+    s.o := s.c
+    s.h := s.c
+    s.l := s.c
+    s.isOpen := true
 
-float zMax = na          // stärkster |z| in dieser Chart-Kerze
-float zEnd = na          // letzter z in dieser Chart-Kerze
-int   sigN = 0           // Anzahl Rückkehr-zu-Neutral in dieser Chart-Kerze
-
-int n = aC.size()
-if n > 0
-    for i = 0 to n - 1
-        float v = nz(aV.get(i))
-        if v <= 0
-            continue
-        if not vbOpen
-            vbO    := aO.get(i)
-            vbH    := aH.get(i)
-            vbL    := aL.get(i)
-            vbOpen := true
+// Ein gerades Wegstück a → b mit segVol Kontrakten abarbeiten
+walk(VBState s, float a, float b, float segVol) =>
+    if not s.isOpen
+        s.o := a
+        s.h := a
+        s.l := a
+        s.c := a
+        s.isOpen := true
+    float pos = a
+    float rem = segVol
+    while rem > 0
+        float need = volSize - s.v
+        if rem >= need
+            float p = pos + (b - pos) * (need / rem)
+            s.h := math.max(s.h, math.max(pos, p))
+            s.l := math.min(s.l, math.min(pos, p))
+            s.c := p
+            complete(s)
+            pos := p
+            rem := rem - need
         else
-            vbH := math.max(vbH, aH.get(i))
-            vbL := math.min(vbL, aL.get(i))
-        vbC := aC.get(i)
-        vbV += v
-        // Volumen-Kerze(n) abschließen
-        while vbV >= volSize
-            float x = (vbO + vbH + vbL + vbC) / 4.0
-            hist.push(x)
-            if hist.size() > len
-                hist.shift()
-            vbCount += 1
-            if vbCount > len                        // wie MotiveWave: erst ab Index >= Lookback
-                float m  = hist.avg()
-                float sd = hist.stdev()             // biased = Populations-StdAbw
-                float z  = sd != 0 ? (x - m) / sd : 0.0
-                bool hot = math.abs(z) >= t1
-                if lastHot and not hot
-                    sigN += 1
-                lastHot := hot
-                lastZ   := z
-                zEnd    := z
-                if na(zMax) or math.abs(z) > math.abs(zMax)
-                    zMax := z
-            vbV -= volSize
-            if vbV > 0                              // Überhang startet die nächste Kerze
-                vbO := vbC
-                vbH := vbC
-                vbL := vbC
-            else
-                vbOpen := false
+            s.h := math.max(s.h, math.max(pos, b))
+            s.l := math.min(s.l, math.min(pos, b))
+            s.c := b
+            s.v := s.v + rem
+            rem := 0.0
+    true
+
+// Eine 1m-Kerze in Volumen-Kerzen zerlegen
+feed(VBState s, float o, float h, float l, float c, float v) =>
+    if v > 0 and not na(c)
+        bool  up = c >= o
+        float p1 = up ? l : h
+        float p2 = up ? h : l
+        float d1 = math.abs(p1 - o)
+        float d2 = math.abs(p2 - p1)
+        float d3 = math.abs(c - p2)
+        float dd = d1 + d2 + d3
+        if dd == 0
+            walk(s, o, o, v)
+        else
+            walk(s, o, p1, v * d1 / dd)
+            walk(s, p1, p2, v * d2 / dd)
+            walk(s, p2, c, v * d3 / dd)
+    true
+
+var VBState st = VBState.new(hist = array.new_float())
+
+if barstate.isconfirmed
+    st.zMax := na
+    st.zEnd := na
+    st.sig  := 0
+    if resetSes and session.isfirstbar
+        st.isOpen := false
+        st.v      := 0.0
+    feed(st, open, high, low, close, nz(volume))
 
 // ── Anzeige ──────────────────────────────────────────────────────────────────
-float zShow = pMode == "Stärkste Volumen-Kerze" ? zMax : zEnd
-if na(zShow)
-    zShow := lastZ                                  // keine Volumen-Kerze fertig → Farbe halten
+float zShow = na
+if barstate.isconfirmed
+    zShow := pMode == "Stärkste Volumen-Kerze" ? st.zMax : st.zEnd
+    if na(zShow)
+        zShow := st.lastZ                           // keine Volumen-Kerze fertig → Farbe halten
 barcolor(paint ? heatColor(zShow) : na, title = "Heatmap")
 
-bool backNeu = sigN > 0
+bool backNeu = barstate.isconfirmed and st.sig > 0
 plotshape(showSig and backNeu, "Zurück zu Neutral", shape.triangleup, location.belowbar, sigCol, size = size.tiny)
-plot(lastZ, "Z-Score (letzte Volumen-Kerze)", display = display.data_window)
+plot(st.lastZ, "Z-Score (letzte Volumen-Kerze)", display = display.data_window)
 
 alertcondition(backNeu, "Zera: zurück zu Neutral", "Zera Heatmap 500V: Farbe wieder neutral – {{ticker}} {{close}}")
 
 var table tbl = table.new(position.top_right, 2, 3, bgcolor = color.new(color.black, 20), border_width = 1)
 if showTbl and barstate.islast
-    string st = n == 0 and vbCount == 0 ? "keine " + ltf + "-Daten" : str.tostring(vbCount)
     table.cell(tbl, 0, 0, "Volumen-Kerzen", text_color = color.gray, text_size = size.small)
-    table.cell(tbl, 1, 0, st, text_color = color.white, text_size = size.small)
+    table.cell(tbl, 1, 0, str.tostring(st.count), text_color = color.white, text_size = size.small)
     table.cell(tbl, 0, 1, "Z letzte", text_color = color.gray, text_size = size.small)
-    table.cell(tbl, 1, 1, na(lastZ) ? "–" : str.tostring(lastZ, "#.##"), text_color = color.white, bgcolor = heatColor(lastZ), text_size = size.small)
+    table.cell(tbl, 1, 1, na(st.lastZ) ? "–" : str.tostring(st.lastZ, "#.##"), text_color = color.white, bgcolor = heatColor(st.lastZ), text_size = size.small)
     table.cell(tbl, 0, 2, "laufend", text_color = color.gray, text_size = size.small)
-    table.cell(tbl, 1, 2, str.tostring(vbV, "#") + " / " + str.tostring(volSize), text_color = color.white, text_size = size.small)
+    table.cell(tbl, 1, 2, str.tostring(st.v, "#") + " / " + str.tostring(volSize), text_color = color.white, text_size = size.small)
