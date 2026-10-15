@@ -1,71 +1,121 @@
 //@version=6
-indicator("LVN 9:25 + Tagesprofil", shorttitle = "LVN 925", overlay = true, max_lines_count = 500, max_labels_count = 500, max_boxes_count = 500, max_polylines_count = 100)
+indicator("LVN 9:25 – Tag & Woche + Tagesprofil", shorttitle = "LVN 925", overlay = true, max_lines_count = 500, max_labels_count = 500, max_boxes_count = 500, max_polylines_count = 100)
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Markiert um 9:25 (New York) die LVNs (Low Volume Nodes) des Tagesprofils
-//  und zeichnet das Volume Profile ab Tagesstart live mit.
+//  Jeden Tag um 9:25 (New York) werden neu markiert:
+//    • Tages-LVNs   – Profil von Tagesstart (18:00) bis 9:25          (rote Boxen)
+//    • Wochen-LVNs  – Profil der letzten 5 Handelstage + heute bis 9:25 (lila Boxen)
+//  Die Boxen laufen nach rechts, bis um 9:25 am nächsten Tag die neuen kommen.
 //
-//  HQ-Daten:  Das Volumen kommt aus Intrabars (Standard 1 Sekunde) und wird
-//             je Intrabar gleichmäßig auf jeden Tick zwischen Hoch und Tief
-//             verteilt. Zeilengröße = 1 Tick (NQ/MNQ: 0,25 Punkte).
-//             Ohne Intrabar-Daten (ältere Historie) → Fallback auf die Chartkerze.
+//  Volume Profile (nur Tag) im Stil des TradingView-SVP: graue Session-Box,
+//  1 Zeile pro Tick, Value Area hell, Rest grau, POC-Linie, Breite 35 %.
+//  Das Wochenprofil wird NICHT gezeichnet – nur seine LVNs.
 //
-//  Snapshot:  Es zählt nur Volumen, das VOR 9:25:00 gehandelt wurde – auf jedem
-//             Timeframe exakt, weil die Intrabars einzeln geprüft werden.
+//  Ohne TV-Abo: Volumen aus 1-Minuten-Intrabars (auf 1m-Chart = Chartkerzen),
+//  je Kerze gleichmäßig auf jeden Tick zwischen Hoch und Tief verteilt.
+//  Snapshot zählt nur Volumen VOR 9:25:00.
 //
-//  LVN:       Profil wird leicht geglättet, dann gesucht: lokales Tief im
-//             Tal-Fenster, mit klar höheren Peaks links UND rechts
-//             (Tiefe = Tal / kleinerer Peak ≤ Max. Tiefe). Die tiefsten Täler
-//             zuerst, mit Mindestabstand zueinander.
+//  LVN: Profil leicht geglättet → lokales Tief mit klar höheren Peaks links
+//  UND rechts (Tal ≤ Max. Tiefe % des kleineren Peaks). Tiefste Täler zuerst.
 //
-//  Wichtig:   Chart mit Extended Hours (ETH) verwenden, sonst fehlt die Nacht.
+//  Wichtig: Chart mit Extended Hours (ETH). Für das Wochenprofil müssen
+//  6 Handelstage geladen sein (siehe Info-Tabelle).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const string TZ       = "America/New_York"
 const string G_D      = "Daten / Auflösung"
 const string G_T      = "Zeiten (New York)"
-const string G_L      = "LVN-Erkennung"
-const string G_A      = "LVN-Anzeige"
-const string G_P      = "Volume Profile"
-const int    MAX_ROWS = 4900   // Polyline: max. 10.000 Punkte → 2 Punkte je Zeile
+const string G_L      = "LVN Tag"
+const string G_W      = "LVN Woche"
+const string G_A      = "LVN-Boxen"
+const string G_P      = "Volume Profile (Tag)"
+const int    MAX_ROWS = 4900
+const int    CHUNK    = 3000   // Zeilen je Polyline (3 Punkte je Zeile, max. 10.000)
 
-string ltf      = input.timeframe("1S", "Intrabar-Timeframe", group = G_D, tooltip = "Je kleiner, desto genauer die Volumenverteilung. 1S braucht ein Abo mit Sekunden-Charts – sonst 1 (Minute) wählen. Ältere Historie ohne Intrabars nutzt automatisch die Chartkerze.")
+string ltf      = input.timeframe("1", "Intrabar-Timeframe", group = G_D, tooltip = "1 = 1 Minute, geht ohne Abo. Auf dem 1m-Chart werden die Chartkerzen selbst benutzt.")
 int    rowTicks = input.int(1, "Zeilengröße (Ticks)", minval = 1, maxval = 100, group = G_D, tooltip = "1 = kleinstmögliche Zeile (NQ/MNQ: 0,25 Punkte).")
 
 int dsH = input.int(18, "Tagesstart", minval = 0, maxval = 23, inline = "ds", group = G_T)
-int dsM = input.int(0,  ":",          minval = 0, maxval = 59, inline = "ds", group = G_T, tooltip = "18:00 = Start des Globex-Handelstags (NQ). 0:00 = Kalendertag.")
+int dsM = input.int(0,  ":",          minval = 0, maxval = 59, inline = "ds", group = G_T, tooltip = "18:00 = Start des Globex-Handelstags (NQ).")
 int trH = input.int(9,  "LVN-Zeit",   minval = 0, maxval = 23, inline = "tr", group = G_T)
 int trM = input.int(25, ":",          minval = 0, maxval = 59, inline = "tr", group = G_T)
-int enH = input.int(16, "Linien bis", minval = 0, maxval = 23, inline = "en", group = G_T)
-int enM = input.int(0,  ":",          minval = 0, maxval = 59, inline = "en", group = G_T)
 
-int   smoothT  = input.int(4,     "Glättung ± Ticks",       minval = 0, maxval = 200,  group = G_L, tooltip = "Gegen Tick-Rauschen. 0 = Rohprofil.")
-int   winT     = input.int(12,    "Tal-Fenster ± Ticks",    minval = 1, maxval = 400,  group = G_L, tooltip = "Das LVN muss in diesem Bereich die niedrigste Stelle sein.")
-int   peakT    = input.int(80,    "Peak-Suche ± Ticks",     minval = 2, maxval = 2000, group = G_L, tooltip = "In diesem Bereich links und rechts wird der höchste Peak gesucht.")
-float depthMax = input.float(50,  "Max. Tiefe %",           minval = 1, maxval = 100, step = 5, group = G_L, tooltip = "Volumen im Tal ≤ X % des kleineren Nachbar-Peaks. Kleiner = nur sehr ausgeprägte LVNs.")
-float minPeak  = input.float(15,  "Min. Peak % vom POC",    minval = 0, maxval = 100, step = 5, group = G_L, tooltip = "Filtert Täler in den dünnen Rändern des Profils.")
-int   minDistT = input.int(16,    "Min. Abstand Ticks",     minval = 1, maxval = 2000, group = G_L)
-int   maxLvn   = input.int(6,     "Max. LVNs",              minval = 1, maxval = 20,   group = G_L)
+bool  dOn     = input.bool(true, "Tages-LVNs", group = G_L)
+int   dSmooth = input.int(4,    "Glättung ± Ticks",    minval = 0, maxval = 400,  group = G_L, tooltip = "Gegen Tick-Rauschen. 0 = Rohprofil.")
+int   dWin    = input.int(12,   "Tal-Fenster ± Ticks", minval = 1, maxval = 1000, group = G_L, tooltip = "Das LVN muss in diesem Bereich die niedrigste Stelle sein.")
+int   dPeak   = input.int(80,   "Peak-Suche ± Ticks",  minval = 2, maxval = 4000, group = G_L, tooltip = "In diesem Bereich links und rechts wird der höchste Peak gesucht.")
+float dDepth  = input.float(50, "Max. Tiefe %",        minval = 1, maxval = 100, step = 5, group = G_L, tooltip = "Volumen im Tal ≤ X % des kleineren Nachbar-Peaks. Kleiner = nur sehr ausgeprägte LVNs.")
+float dMinPk  = input.float(15, "Min. Peak % vom POC", minval = 0, maxval = 100, step = 5, group = G_L, tooltip = "Filtert Täler in den dünnen Rändern des Profils.")
+int   dDist   = input.int(16,   "Min. Abstand Ticks",  minval = 1, maxval = 4000, group = G_L)
+int   dMax    = input.int(6,    "Max. LVNs",           minval = 1, maxval = 15,   group = G_L)
+color dCol    = input.color(color.new(#f23645, 80), "Box", inline = "dc", group = G_L)
+color dColB   = input.color(color.new(#f23645, 45), "Rand", inline = "dc", group = G_L)
 
-bool   showZone   = input.bool(true, "LVN-Zone", inline = "z", group = G_A)
-float  zoneEdge   = input.float(25, "Rand %", minval = 1, maxval = 100, step = 5, inline = "z", group = G_A, tooltip = "Zone = Bereich um das LVN, in dem das Volumen unter Tal + X % des Abstands zum Peak bleibt.")
-int    keepDays   = input.int(3, "Tage anzeigen", minval = 1, maxval = 20, group = G_A)
-bool   extRight   = input.bool(false, "Linien nach rechts verlängern", group = G_A)
-color  colLvn     = input.color(color.new(#ff9800, 0),  "Linie", inline = "c", group = G_A)
-color  colZone    = input.color(color.new(#ff9800, 85), "Zone",  inline = "c", group = G_A)
-int    lnWidth    = input.int(1, "Breite", minval = 1, maxval = 4, inline = "c", group = G_A)
-string lnStyleStr = input.string("Durchgezogen", "Stil", options = ["Durchgezogen", "Gestrichelt", "Gepunktet"], group = G_A)
-bool   showLbl    = input.bool(true, "Preis-Label", group = G_A)
+bool  wOn     = input.bool(true, "Wochen-LVNs", group = G_W)
+int   wDays   = input.int(5,    "Vergangene Handelstage", minval = 1, maxval = 10, group = G_W, tooltip = "Wochenprofil = diese Anzahl abgeschlossener Tage + heute bis 9:25.")
+int   wSmooth = input.int(12,   "Glättung ± Ticks",    minval = 0, maxval = 400,  group = G_W)
+int   wWin    = input.int(40,   "Tal-Fenster ± Ticks", minval = 1, maxval = 1000, group = G_W)
+int   wPeak   = input.int(240,  "Peak-Suche ± Ticks",  minval = 2, maxval = 4000, group = G_W)
+float wDepth  = input.float(50, "Max. Tiefe %",        minval = 1, maxval = 100, step = 5, group = G_W)
+float wMinPk  = input.float(10, "Min. Peak % vom POC", minval = 0, maxval = 100, step = 5, group = G_W)
+int   wDist   = input.int(48,   "Min. Abstand Ticks",  minval = 1, maxval = 4000, group = G_W)
+int   wMax    = input.int(6,    "Max. LVNs",           minval = 1, maxval = 15,   group = G_W)
+color wCol    = input.color(color.new(#9c27b0, 75), "Box", inline = "wc", group = G_W)
+color wColB   = input.color(color.new(#9c27b0, 40), "Rand", inline = "wc", group = G_W)
 
-bool  showVP    = input.bool(true, "Volume Profile anzeigen", group = G_P)
-float vpWidth   = input.float(35, "Breite %", minval = 1, maxval = 100, group = G_P, tooltip = "Längste Zeile = X % der Strecke von Tagesstart bis zur aktuellen Kerze.")
-color colVP     = input.color(color.new(#5d606b, 70), "Fläche", inline = "v", group = G_P)
-color colVPLine = input.color(color.new(#5d606b, 30), "Kontur", inline = "v", group = G_P)
-bool  showPOC   = input.bool(true, "POC", inline = "p", group = G_P)
-color colPOC    = input.color(color.new(#f23645, 0), "", inline = "p", group = G_P)
-bool  showInfo  = input.bool(true, "Info-Tabelle (Datenqualität)", group = G_P)
+float zoneEdge = input.float(25, "Box-Höhe (Rand %)", minval = 1, maxval = 100, step = 5, group = G_A, tooltip = "Box = Bereich um das LVN, in dem das Volumen unter Tal + X % des Abstands zum Peak bleibt. Größer = dickere Boxen.")
+int    keepDays = input.int(2, "Tage anzeigen", minval = 1, maxval = 10, group = G_A, tooltip = "1 = nur die aktuellen Boxen. 2 = zusätzlich die von gestern (enden um 9:25 heute).")
+bool   showLbl  = input.bool(false, "Preis-Label", group = G_A)
 
-string lnStyle = lnStyleStr == "Gestrichelt" ? line.style_dashed : lnStyleStr == "Gepunktet" ? line.style_dotted : line.style_solid
+bool  showVP   = input.bool(true, "Volume Profile anzeigen", group = G_P)
+float vpWidth  = input.float(35, "Breite %", minval = 1, maxval = 100, group = G_P, tooltip = "Längste Zeile = X % der Box-Breite (Tagesstart bis aktuelle Kerze).")
+int   vaPct    = input.int(68, "Value Area %", minval = 1, maxval = 100, group = G_P)
+color colVA    = input.color(color.new(#d1d4dc, 10), "Value Area", inline = "v", group = G_P)
+color colOut   = input.color(color.new(#787b86, 35), "Rest", inline = "v", group = G_P)
+color colBg    = input.color(color.new(#787b86, 88), "Box", inline = "v", group = G_P)
+bool  showPOC  = input.bool(true, "POC", inline = "p", group = G_P)
+color colPOC   = input.color(color.new(#f23645, 0), "", inline = "p", group = G_P)
+int   pocW     = input.int(2, "Breite", minval = 1, maxval = 4, inline = "p", group = G_P)
+bool  showVAL  = input.bool(false, "VAH / VAL", inline = "va", group = G_P)
+color colVAL   = input.color(color.new(#2962ff, 0), "", inline = "va", group = G_P)
+int   keepProf = input.int(1, "Profile vergangener Tage", minval = 0, maxval = 10, group = G_P)
+bool  showInfo = input.bool(true, "Info-Tabelle", group = G_P)
+
+// ═══════════════════════════ TYPEN ═══════════════════════════
+type DayVol
+    map<int, float> m
+    bool            full
+
+type Prof
+    array<polyline> polys
+    box             bg
+    line            poc
+    line            vah
+    line            val
+
+type LvnSet
+    array<box>   boxes
+    array<label> lbls
+
+method del(Prof p) =>
+    for pl in p.polys
+        pl.delete()
+    p.bg.delete()
+    p.poc.delete()
+    p.vah.delete()
+    p.val.delete()
+
+method del(LvnSet s) =>
+    for b in s.boxes
+        b.delete()
+    for l in s.lbls
+        l.delete()
+
+// Boxen eines alten Satzes enden, wenn die neuen kommen
+method freeze(LvnSet s, int x2) =>
+    for b in s.boxes
+        b.set_right(x2)
+        b.set_extend(extend.none)
 
 // ═══════════════════════════ ZEIT ═══════════════════════════
 int startMin = dsH * 60 + dsM
@@ -95,11 +145,11 @@ f_rows(map<int, float> m, int rt) =>
     array<int> ks = m.keys()
     int kLo  = int(ks.min())
     int kHi  = int(ks.max())
-    int base = int(math.floor(kLo / rt)) * rt
-    int n    = int(math.floor((kHi - base) / rt)) + 1
+    int base = int(math.floor(kLo / float(rt))) * rt
+    int n    = int(math.floor((kHi - base) / float(rt))) + 1
     array<float> raw = array.new<float>(n, 0.0)
     for k in ks
-        int r = int(math.floor((k - base) / rt))
+        int r = int(math.floor((k - base) / float(rt)))
         raw.set(r, raw.get(r) + m.get(k))
     [raw, base]
 
@@ -107,14 +157,77 @@ f_rowMid(int base, int rt, int r) => (base + r * rt + (rt - 1) / 2.0) * syminfo.
 f_rowBot(int base, int rt, int r) => (base + r * rt - 0.5) * syminfo.mintick
 f_rowTop(int base, int rt, int r) => (base + r * rt + rt - 0.5) * syminfo.mintick
 
+// Value Area: ab POC jeweils die stärkere Nachbarzeile dazunehmen
+f_va(array<float> raw, int poc, float pct) =>
+    int   n      = raw.size()
+    float target = raw.sum() * pct / 100
+    float acc    = raw.get(poc)
+    int lo = poc
+    int hi = poc
+    while acc < target and (lo > 0 or hi < n - 1)
+        float up = hi < n - 1 ? raw.get(hi + 1) : -1.0
+        float dn = lo > 0 ? raw.get(lo - 1) : -1.0
+        if up >= dn
+            hi += 1
+            acc += up
+        else
+            lo -= 1
+            acc += dn
+    [lo, hi]
+
+// Zeilen a..b als Kamm (eine waagerechte Linie je Zeile) zeichnen
+f_comb(array<polyline> out, array<float> raw, int base, int rt, int a, int b, int x0, float wMs, float mx, color col) =>
+    if b >= a
+        int i0 = a
+        while i0 <= b
+            int i1 = math.min(b, i0 + CHUNK - 1)
+            array<chart.point> pts = array.new<chart.point>()
+            for i = i0 to i1
+                float y = f_rowMid(base, rt, i)
+                int   x = x0 + int(math.round(raw.get(i) / mx * wMs))
+                pts.push(chart.point.from_time(x0, y))
+                pts.push(chart.point.from_time(x, y))
+                pts.push(chart.point.from_time(x0, y))
+            out.push(polyline.new(pts, curved = false, closed = false, xloc = xloc.bar_time, line_color = col, line_width = 1))
+            i0 := i1 + 1
+
+// Komplettes Tagesprofil im SVP-Stil
+f_drawProf(map<int, float> m, int t0, int t1) =>
+    Prof p = Prof.new(array.new<polyline>(), na, na, na, na)
+    if m.size() > 0
+        array<int> ks = m.keys()
+        int span = int(ks.max()) - int(ks.min()) + 1
+        int rt   = rowTicks * math.max(1, int(math.ceil(span / (rowTicks * MAX_ROWS * 1.0))))   // nur bei Riesen-Range zusammenfassen
+        [raw, base] = f_rows(m, rt)
+        int   n  = raw.size()
+        float mx = raw.max()
+        int   x1 = math.max(t1, t0 + 60000)
+        p.bg := box.new(t0, f_rowTop(base, rt, n - 1), x1, f_rowBot(base, rt, 0), border_color = color(na), border_width = 0, xloc = xloc.bar_time, bgcolor = colBg)
+        if mx > 0
+            int poc = raw.indexof(mx)
+            [vaLo, vaHi] = f_va(raw, poc, vaPct)
+            float wMs = (x1 - t0) * vpWidth / 100
+            f_comb(p.polys, raw, base, rt, 0, vaLo - 1, t0, wMs, mx, colOut)
+            f_comb(p.polys, raw, base, rt, vaLo, vaHi, t0, wMs, mx, colVA)
+            f_comb(p.polys, raw, base, rt, vaHi + 1, n - 1, t0, wMs, mx, colOut)
+            if showPOC
+                float py = f_rowMid(base, rt, poc)
+                p.poc := line.new(t0, py, x1, py, xloc = xloc.bar_time, color = colPOC, width = pocW)
+            if showVAL
+                float yh = f_rowTop(base, rt, vaHi)
+                float yl = f_rowBot(base, rt, vaLo)
+                p.vah := line.new(t0, yh, x1, yh, xloc = xloc.bar_time, color = colVAL, width = 1)
+                p.val := line.new(t0, yl, x1, yl, xloc = xloc.bar_time, color = colVAL, width = 1)
+    p
+
 // ═══════════════════════════ LVN-ERKENNUNG ═══════════════════════════
-f_lvn(map<int, float> m) =>
+f_lvn(map<int, float> m, int smT, int winT, int pkT, float depthMax, float minPeak, int distT, int maxN) =>
     [raw, base] = f_rows(m, rowTicks)
     int n  = raw.size()
-    int sR = math.round(smoothT / float(rowTicks))
+    int sR = math.round(smT / float(rowTicks))
     int wR = math.max(1, math.round(winT / float(rowTicks)))
-    int pR = math.max(wR + 1, math.round(peakT / float(rowTicks)))
-    int dR = math.max(1, math.round(minDistT / float(rowTicks)))
+    int pR = math.max(wR + 1, math.round(pkT / float(rowTicks)))
+    int dR = math.max(1, math.round(distT / float(rowTicks)))
 
     // Glättung (gleitender Mittelwert über Präfixsummen)
     array<float> ps = array.new<float>(n + 1, 0.0)
@@ -130,7 +243,7 @@ f_lvn(map<int, float> m) =>
     // Kandidaten: lokales Tief mit höheren Peaks auf beiden Seiten
     array<int>   cIdx = array.new<int>()
     array<float> cDep = array.new<float>()
-    array<float> cRef = array.new<float>()
+    array<float> cPk  = array.new<float>()
     if n > 2 * wR + 2
         for i = wR to n - 1 - wR
             float v = s.get(i)
@@ -151,31 +264,31 @@ f_lvn(map<int, float> m) =>
                 if pk > 0 and pk >= sMax * minPeak / 100 and v / pk <= depthMax / 100
                     cIdx.push(i)
                     cDep.push(v / pk)
-                    cRef.push(pk)
+                    cPk.push(pk)
 
     // Auswahl: tiefste Täler zuerst, Mindestabstand einhalten
-    array<int>   sel    = array.new<int>()
-    array<float> selRef = array.new<float>()
+    array<int>   sel   = array.new<int>()
+    array<float> selPk = array.new<float>()
     if cIdx.size() > 0
         array<int> ord = cDep.sort_indices(order.ascending)
         for o in ord
             int  i  = cIdx.get(o)
-            bool ok = sel.size() < maxLvn
-            for p in sel
-                if math.abs(p - i) < dR
+            bool ok = sel.size() < maxN
+            for q in sel
+                if math.abs(q - i) < dR
                     ok := false
                     break
             if ok
                 sel.push(i)
-                selRef.push(cRef.get(o))
+                selPk.push(cPk.get(o))
 
-    // Preis + Zone je LVN
+    // Preis + Box-Grenzen je LVN
     array<float> pMid = array.new<float>()
     array<float> pLo  = array.new<float>()
     array<float> pHi  = array.new<float>()
     for [k, i] in sel
         float v    = s.get(i)
-        float edge = v + (selRef.get(k) - v) * zoneEdge / 100
+        float edge = v + (selPk.get(k) - v) * zoneEdge / 100
         int lo = i
         while lo > 0 and s.get(lo - 1) <= edge
             lo -= 1
@@ -187,6 +300,24 @@ f_lvn(map<int, float> m) =>
         pHi.push(f_rowTop(base, rowTicks, hi))
     [pMid, pLo, pHi]
 
+// LVN-Boxen ab x1 nach rechts
+f_makeSet(array<float> pMid, array<float> pLo, array<float> pHi, int x1, color cBg, color cBd, string tag) =>
+    LvnSet s = LvnSet.new(array.new<box>(), array.new<label>())
+    for [k, p] in pMid
+        s.boxes.push(box.new(x1, pHi.get(k), x1, pLo.get(k), border_color = cBd, border_width = 1, extend = extend.right, xloc = xloc.bar_time, bgcolor = cBg))
+        if showLbl
+            s.lbls.push(label.new(x1, p, tag + " " + str.tostring(p, format.mintick), xloc = xloc.bar_time, style = label.style_label_lower_left, color = color(na), textcolor = cBd, size = size.small))
+    s
+
+// Anzahl vollständiger Tage unter den letzten nd
+f_fullDays(array<DayVol> h, int nd) =>
+    int c = 0
+    if h.size() > 0
+        for j = math.max(0, h.size() - nd) to h.size() - 1
+            if h.get(j).full
+                c += 1
+    c
+
 // ═══════════════════════════ DATEN ═══════════════════════════
 [ibT, ibH, ibL, ibV] = request.security_lower_tf(syminfo.tickerid, ltf, [time, high, low, volume], ignore_invalid_timeframe = true)
 bool useLtf = timeframe.in_seconds(ltf) < timeframe.in_seconds(timeframe.period)
@@ -195,25 +326,36 @@ bool hasIb  = useLtf and not na(ibT) and ibT.size() > 0
 int  dayKey = f_dayKey(time)
 bool newDay = bar_index == 0 or dayKey != dayKey[1]
 
-var map<int, float> vol = map.new<int, float>()
-var bool done     = false
-var bool validDay = false
-var int  dayBar   = na
-var int  cntIb    = 0
-var int  cntFb    = 0
-
-var array<line>  lvnLines  = array.new<line>()
-var array<label> lvnLabels = array.new<label>()
-var array<box>   lvnBoxes  = array.new<box>()
-var array<int>   perDay    = array.new<int>()
+var map<int, float> vol      = map.new<int, float>()
+var array<DayVol>   hist     = array.new<DayVol>()
+var array<Prof>     profs    = array.new<Prof>()
+var array<LvnSet>   dSets    = array.new<LvnSet>()
+var array<LvnSet>   wSets    = array.new<LvnSet>()
+var bool            done     = false
+var bool            validDay = false
+var int             dayT0    = na
+var int             lastTc   = na
+var int             cntIb    = 0
+var int             cntFb    = 0
 
 if newDay
-    vol.clear()
+    if bar_index > 0
+        // abgeschlossenen Tag speichern (Wochenprofil) und sein Profil zeichnen
+        hist.push(DayVol.new(vol, validDay))
+        while hist.size() > wDays
+            hist.shift()
+        if showVP and keepProf > 0
+            profs.push(f_drawProf(vol, dayT0, lastTc))
+            while profs.size() > keepProf
+                profs.shift().del()
+    vol      := map.new<int, float>()
     done     := false
     validDay := bar_index > 0   // erster Chart-Tag ist meist unvollständig
-    dayBar   := bar_index
+    dayT0    := time
     cntIb    := 0
     cntFb    := 0
+
+lastTc := time_close
 
 if hasIb
     cntIb += 1
@@ -231,59 +373,42 @@ for i = 0 to nIb - 1
     if validDay and not done and f_tdMin(t) >= trigTd
         done := true
         if vol.size() > 0
-            [pMid, pLo, pHi] = f_lvn(vol)
             int x1 = time
-            int x2 = timestamp(TZ, year(t, TZ), month(t, TZ), dayofmonth(t, TZ), enH, enM)
-            if x2 <= x1
-                x2 += 86400000
-            string ext = extRight ? extend.right : extend.none
-            for [k, p] in pMid
-                lvnLines.push(line.new(x1, p, x2, p, xloc = xloc.bar_time, extend = ext, color = colLvn, style = lnStyle, width = lnWidth))
-                lvnBoxes.push(showZone ? box.new(x1, pHi.get(k), x2, pLo.get(k), border_color = color(na), border_width = 0, extend = ext, xloc = xloc.bar_time, bgcolor = colZone) : na)
-                lvnLabels.push(showLbl ? label.new(x1, p, "LVN " + str.tostring(p, format.mintick), xloc = xloc.bar_time, style = label.style_label_lower_left, color = color(na), textcolor = colLvn, size = size.small) : na)
-            perDay.push(pMid.size())
-            // alte Tage entfernen
-            while perDay.size() > keepDays
-                int c = perDay.shift()
-                if c > 0
-                    for _j = 1 to c
-                        lvnLines.shift().delete()
-                        lvnBoxes.shift().delete()
-                        lvnLabels.shift().delete()
+
+            if dOn
+                [dM, dL, dH] = f_lvn(vol, dSmooth, dWin, dPeak, dDepth, dMinPk, dDist, dMax)
+                if dSets.size() > 0
+                    dSets.last().freeze(x1)
+                dSets.push(f_makeSet(dM, dL, dH, x1, dCol, dColB, "D-LVN"))
+                while dSets.size() > keepDays
+                    dSets.shift().del()
+
+            if wOn and f_fullDays(hist, wDays) >= wDays
+                map<int, float> wk = vol.copy()
+                for j = hist.size() - wDays to hist.size() - 1
+                    for [k, x] in hist.get(j).m
+                        wk.put(k, nz(wk.get(k)) + x)
+                [wM, wL, wH] = f_lvn(wk, wSmooth, wWin, wPeak, wDepth, wMinPk, wDist, wMax)
+                if wSets.size() > 0
+                    wSets.last().freeze(x1)
+                wSets.push(f_makeSet(wM, wL, wH, x1, wCol, wColB, "W-LVN"))
+                while wSets.size() > keepDays
+                    wSets.shift().del()
 
     f_add(vol, h, l, v)
 
-// ═══════════════════════════ VOLUME PROFILE (live, ab Tagesstart) ═══════════════════════════
-var polyline vpPoly  = na
-var line     pocLine = na
-
-if barstate.islast and showVP and vol.size() > 0
-    vpPoly.delete()
-    pocLine.delete()
-    array<int> ks = vol.keys()
-    int span = int(ks.max()) - int(ks.min()) + 1
-    int rt   = rowTicks * math.max(1, int(math.ceil(span / (rowTicks * MAX_ROWS * 1.0))))   // nur bei Riesen-Range zusammenfassen
-    [raw, base] = f_rows(vol, rt)
-    int   n  = raw.size()
-    float mx = raw.max()
-    if mx > 0
-        float wBars = math.max(1, bar_index - dayBar) * vpWidth / 100
-        array<chart.point> pts = array.new<chart.point>()
-        pts.push(chart.point.from_index(dayBar, f_rowBot(base, rt, 0)))
-        for i = 0 to n - 1
-            int x = dayBar + int(math.round(raw.get(i) / mx * wBars))
-            pts.push(chart.point.from_index(x, f_rowBot(base, rt, i)))
-            pts.push(chart.point.from_index(x, f_rowTop(base, rt, i)))
-        pts.push(chart.point.from_index(dayBar, f_rowTop(base, rt, n - 1)))
-        vpPoly := polyline.new(pts, curved = false, closed = true, xloc = xloc.bar_index, line_color = colVPLine, fill_color = colVP, line_width = 1)
-        if showPOC
-            float pp = f_rowMid(base, rt, raw.indexof(mx))
-            pocLine := line.new(dayBar, pp, bar_index, pp, color = colPOC, width = 1)
+// ═══════════════════════════ VOLUME PROFILE HEUTE (live) ═══════════════════════════
+var Prof cur = na
+if barstate.islast and showVP
+    if not na(cur)
+        cur.del()
+    cur := f_drawProf(vol, dayT0, time_close)
 
 // ═══════════════════════════ INFO ═══════════════════════════
 var table info = table.new(position.top_right, 1, 1)
 if barstate.islast and showInfo
-    int   tot = cntIb + cntFb
-    float pct = tot > 0 ? 100.0 * cntIb / tot : 0.0
-    string src = useLtf ? "Intrabars " + ltf + ": " + str.tostring(pct, "#") + " %" : "Chartkerzen (Intrabar-TF ≥ Chart-TF)"
-    info.cell(0, 0, "LVN 925 · " + src + " · Zeile " + str.tostring(rowTicks * syminfo.mintick) + " Pkt", text_color = chart.fg_color, text_size = size.small, bgcolor = color.new(chart.bg_color, 20))
+    int    tot = cntIb + cntFb
+    float  pct = tot > 0 ? 100.0 * cntIb / tot : 0.0
+    string src = useLtf ? "Intrabars " + ltf + ": " + str.tostring(pct, "#") + " %" : "Chartkerzen"
+    string wk  = "Woche " + str.tostring(f_fullDays(hist, wDays)) + "/" + str.tostring(wDays) + " Tage"
+    info.cell(0, 0, "LVN 925 · " + src + " · Zeile " + str.tostring(rowTicks * syminfo.mintick) + " Pkt · " + wk, text_color = chart.fg_color, text_size = size.small, bgcolor = color.new(chart.bg_color, 20))

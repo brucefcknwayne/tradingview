@@ -13,5 +13,5 @@
 | `pullback-1r/` | RSI(2)-Pullback 1:1 mit Training/Test-Tabelle (Ergebnis: ~51 %, kein Vorteil) |
 | `multi-10/` | 10 Standard-Setups 1:1 in einer Strategie mit Vergleichstabelle (Ergebnis: alle unter 50 %) |
 | `orderblocks/` | 1H-Orderblocks auf kleineren Charts |
-| `lvn-925/` | LVNs des Tagesprofils (ab 18:00) um 9:25 markiert, 1-Tick-Zeilen aus 1s-Intrabars, live Volume Profile mit 35 % Breite |
+| `lvn-925/` | LVN-Boxen um 9:25: Tag (rot) + Woche (lila, 5 Tage + heute, ohne Profil-Zeichnung), 1-Tick-Zeilen aus 1m-Intrabars (ohne Abo), Tages-Volume-Profile im SVP-Stil mit 35 % Breite |
 | `adamcapitals/` | Nutzer-Strategie aus der AdamCapitals-PDF: Failed Zone → Breaker → Inducement (LIQ) → Limit in unmitigated Zone, SL hinter Zone, TP 1:7, Teilgewinn 1:4 + BE, max. 2 Trades/Tag (aktuelles Projekt) |
