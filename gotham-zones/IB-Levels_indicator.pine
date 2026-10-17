@@ -64,38 +64,62 @@ color  cNeu    = input.color(#9598a1, "Neutral", inline = "c", group = G_A)
 string root = syminfo.root
 string mk = root == "NQ" or root == "MNQ" ? "NQ" : root == "ES" or root == "MES" ? "ES" : root == "RTY" or root == "M2K" ? "RTY" : root == "GC" or root == "MGC" ? "GC" : ""
 
-f_data(string key) =>
-    switch key
-        "NQ_1Ja"  => D_NQ_1Ja
-        "NQ_1Jb"  => D_NQ_1Jb
-        "NQ_3Ja"  => D_NQ_3Ja
-        "NQ_3Jb"  => D_NQ_3Jb
-        "NQ_5Ja"  => D_NQ_5Ja
-        "NQ_5Jb"  => D_NQ_5Jb
-        "ES_1Ja"  => D_ES_1Ja
-        "ES_1Jb"  => D_ES_1Jb
-        "ES_3Ja"  => D_ES_3Ja
-        "ES_3Jb"  => D_ES_3Jb
-        "ES_5Ja"  => D_ES_5Ja
-        "ES_5Jb"  => D_ES_5Jb
-        "RTY_1Ja" => D_RTY_1Ja
-        "RTY_1Jb" => D_RTY_1Jb
-        "RTY_3Ja" => D_RTY_3Ja
-        "RTY_3Jb" => D_RTY_3Jb
-        "RTY_5Ja" => D_RTY_5Ja
-        "RTY_5Jb" => D_RTY_5Jb
-        "GC_1Ja"  => D_GC_1Ja
-        "GC_1Jb"  => D_GC_1Jb
-        "GC_3Ja"  => D_GC_3Ja
-        "GC_3Jb"  => D_GC_3Jb
-        "GC_5Ja"  => D_GC_5Ja
-        "GC_5Jb"  => D_GC_5Jb
-        => ""
+// Je Daten-String eine eigene Abfrage (ein einziger switch wäre für TradingView zu lang)
+string dkey = mk + "_" + perIn + (lenIn <= 30 ? "a" : "b")
+var string DATA = ""
+if barstate.isfirst and dkey == "NQ_1Ja"
+    DATA := D_NQ_1Ja
+if barstate.isfirst and dkey == "NQ_1Jb"
+    DATA := D_NQ_1Jb
+if barstate.isfirst and dkey == "NQ_3Ja"
+    DATA := D_NQ_3Ja
+if barstate.isfirst and dkey == "NQ_3Jb"
+    DATA := D_NQ_3Jb
+if barstate.isfirst and dkey == "NQ_5Ja"
+    DATA := D_NQ_5Ja
+if barstate.isfirst and dkey == "NQ_5Jb"
+    DATA := D_NQ_5Jb
+if barstate.isfirst and dkey == "ES_1Ja"
+    DATA := D_ES_1Ja
+if barstate.isfirst and dkey == "ES_1Jb"
+    DATA := D_ES_1Jb
+if barstate.isfirst and dkey == "ES_3Ja"
+    DATA := D_ES_3Ja
+if barstate.isfirst and dkey == "ES_3Jb"
+    DATA := D_ES_3Jb
+if barstate.isfirst and dkey == "ES_5Ja"
+    DATA := D_ES_5Ja
+if barstate.isfirst and dkey == "ES_5Jb"
+    DATA := D_ES_5Jb
+if barstate.isfirst and dkey == "RTY_1Ja"
+    DATA := D_RTY_1Ja
+if barstate.isfirst and dkey == "RTY_1Jb"
+    DATA := D_RTY_1Jb
+if barstate.isfirst and dkey == "RTY_3Ja"
+    DATA := D_RTY_3Ja
+if barstate.isfirst and dkey == "RTY_3Jb"
+    DATA := D_RTY_3Jb
+if barstate.isfirst and dkey == "RTY_5Ja"
+    DATA := D_RTY_5Ja
+if barstate.isfirst and dkey == "RTY_5Jb"
+    DATA := D_RTY_5Jb
+if barstate.isfirst and dkey == "GC_1Ja"
+    DATA := D_GC_1Ja
+if barstate.isfirst and dkey == "GC_1Jb"
+    DATA := D_GC_1Jb
+if barstate.isfirst and dkey == "GC_3Ja"
+    DATA := D_GC_3Ja
+if barstate.isfirst and dkey == "GC_3Jb"
+    DATA := D_GC_3Jb
+if barstate.isfirst and dkey == "GC_5Ja"
+    DATA := D_GC_5Ja
+if barstate.isfirst and dkey == "GC_5Jb"
+    DATA := D_GC_5Jb
 
 var array<int> S = array.new<int>()
 if barstate.isfirst
     string key = str.replace(startIn, ":", "") + "-" + str.tostring(lenIn) + ":"
-    for e in str.split(f_data(mk + "_" + perIn + (lenIn <= 30 ? "a" : "b")), ";")
+    for e in str.split(DATA, ";")
         if str.startswith(e, key)
             for p in str.split(str.substring(e, str.length(key)), ",")
                 array.push(S, int(str.tonumber(p)))
