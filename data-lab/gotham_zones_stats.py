@@ -44,7 +44,7 @@ def load_iv(name):
     return df.set_index("DATE")["CLOSE"].astype(float).rename(name)
 
 
-iv = pd.concat([load_iv(n) for n in ["VIX", "VXN", "VIX9D", "VIX1D"]], axis=1).sort_index()
+iv = pd.concat([load_iv(n) for n in ["VIX", "VXN", "VIX9D", "VIX1D"]], axis=1, sort=True)
 scale = iv["VXN"] / iv["VIX"]
 iv_mode = pd.DataFrame({
     "1D": iv["VIX1D"] * scale,
