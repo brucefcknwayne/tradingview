@@ -1,8 +1,9 @@
 """
-Zählwerte für das Opening-Range-Dashboard (edgeful-Stil), je Markt x Fenster x Wochentag x Jahr.
+Zählwerte für das Opening-Range-Dashboard (edgeful-Stil), je Markt x Fenster x Wochentag x Zeitraum.
+Zeitraum b: Kalenderjahr ("2026") oder rückwärts ab letztem Datentag ("3M", "6M", "1J", "2J", "3J", "5J", "ALL").
 
 Fenster = Startzeit (NY) + Länge. Das Fenster ist gleichzeitig "Opening Candle" und "Initial Balance" (IB).
-Tag endet um 17:00 (Session-Ende) für Fenster ab 18:00/20:00/02:00/03:00, sonst um 16:00.
+Tag endet um 17:00 (Session-Ende) für Fenster, die vor 09:30 beginnen, sonst um 16:00.
 
 Felder (Anzahl Tage):
   n                          gültige Tage
@@ -28,11 +29,12 @@ import numpy as np
 import pandas as pd
 
 HERE = Path(__file__).parent
-OUT = HERE / "results/ib_stats.csv"
+OUT = HERE / "results/ib_stats_{}.csv"
 MARKETS = ["NQ", "ES", "RTY", "GC"]
-STARTS = ["18:00", "20:00", "02:00", "03:00", "08:00", "08:30", "09:30", "10:00", "10:30", "11:00", "13:00", "14:00"]
+STARTS = [f"{(18 + i) % 24:02d}:00" for i in range(22)] + ["08:30", "09:30", "10:30"]
 LENGTHS = [5, 15, 30, 45, 60, 90]
-ETH_STARTS = {"18:00", "20:00", "02:00", "03:00"}
+ETH_STARTS = {st for st in STARTS if (int(st[:2]) * 60 + int(st[3:]) - 1080) % 1440 < (570 - 1080) % 1440}
+PERIODS = {"3M": 3, "6M": 6, "1J": 12, "2J": 24, "3J": 36, "5J": 60}
 LEVELS = [(25, 0.25), (50, 0.5), (100, 1.0), (200, 2.0)]
 NCOL = 1380  # 18:00 … 16:59
 
@@ -47,8 +49,8 @@ def first_true(mask):
     return np.where(mask.any(axis=1), idx, 10**9)
 
 
-rows = []
 for root in MARKETS:
+    rows = []
     df = pd.concat(pd.read_parquet(f) for f in sorted(glob.glob(str(HERE / f"data/{root.lower()}_1m/*.parquet"))))
     m = ((df["ts_et"].dt.hour * 60 + df["ts_et"].dt.minute).to_numpy() - 1080) % 1440
     keep = m < NCOL
@@ -62,6 +64,7 @@ for root in MARKETS:
     cff = pd.DataFrame(G["close"]).ffill(axis=1).to_numpy()
     fin = np.isfinite(G["close"])
     dts = pd.to_datetime(days)
+    end = dts.max()
     wd, yr = dts.weekday.to_numpy(), dts.year.to_numpy()
     clock = (np.arange(NCOL) + 1080) % 1440
     is5 = (clock + 1) % 5 == 0  # Bar schließt eine 5-Min-Kerze
@@ -124,17 +127,20 @@ for root in MARKETS:
                 f[f"db_up_{tag}"] = bu & bd & (up >= lv)
                 f[f"db_dn_{tag}"] = bu & bd & (dn >= lv)
             F = pd.DataFrame({k: x.astype(int) for k, x in f.items()})
-            F["wd"], F["y"] = wd[v] + 1, yr[v]
-            g = F.groupby(["wd", "y"]).sum().reset_index()
+            F["wd"] = wd[v] + 1
+            dv = dts[v]
+            parts = [F.assign(b=yr[v].astype(str))]
+            for name, months in PERIODS.items():
+                sel = dv > end - pd.DateOffset(months=months)
+                parts.append(F[sel].assign(b=name))
+            parts.append(F.assign(b="ALL"))
+            g = pd.concat(parts).groupby(["wd", "b"]).sum().reset_index()
             g.insert(0, "w", f"{st.replace(':', '')}-{L}")
             g.insert(0, "m", root)
             rows.append(g)
-    print(root, "fertig")
+    out = pd.concat(rows, ignore_index=True)
+    dst = Path(str(OUT).format(root))
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(dst, index=False)
+    print(root, len(out), "Zeilen,", round(dst.stat().st_size / 1e6, 2), "MB, bis", end.date())
 
-out = pd.concat(rows, ignore_index=True)
-OUT.parent.mkdir(parents=True, exist_ok=True)
-out.to_csv(OUT, index=False)
-print(len(out), "Zeilen,", round(OUT.stat().st_size / 1e6, 2), "MB")
-# Kontrolle: NQ 09:30-15, alle Jahre
-c = out[(out.m == "NQ") & (out.w == "0930-15")].sum(numeric_only=True)
-print({k: int(c[k]) for k in ["n", "gc", "gg", "rc", "rr", "hf", "hf_bh", "hf_bl", "lf", "lf_bh", "lf_bl", "t_up", "t_dn", "t_db", "t_no"]})
