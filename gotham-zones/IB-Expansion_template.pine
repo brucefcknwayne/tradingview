@@ -15,6 +15,8 @@ indicator("IB Expansion · TP & geschützte Level", shorttitle = "IB-Exp", overl
 //  „geschützt“ nur zu 6–17 % (data-lab/results/ib_ext_stats.md).
 //  TP-Level      = Wahrscheinlichkeit erreicht ≥ Schwelle (Standard 70 %)
 //  Geschützt     = Wahrscheinlichkeit NICHT erreicht ≥ Schwelle → Stop dahinter
+//  Alles unter der Schwelle wird nicht gezeigt. Jede Linie läuft mit, bis das Level
+//  gebrochen ist oder der Tag endet, und bleibt dann stehen.
 //  "gültig bis"  = ab dieser Uhrzeit fällt das TP-Level unter die Schwelle, falls bis dahin nichts passiert
 //  Tagesende: 17:00 NY für IBs vor 09:30, sonst 16:00.
 //
@@ -41,7 +43,7 @@ bool   useWd   = input.bool(true, "Wochentag berücksichtigen", group = G_I, too
 int    thrTP   = input.int(70, "TP-Level ab (% erreicht)", minval = 50, maxval = 95, group = G_S)
 int    thrSL   = input.int(70, "Geschützt ab (% nicht erreicht)", minval = 50, maxval = 95, group = G_S)
 string lblMode = input.string("Grenzen", "Beschriftung", options = ["Grenzen", "Alle Levels"], group = G_A, tooltip = "Grenzen: weitestes TP-Level und erstes geschütztes Level je Seite.")
-bool   showNeu = input.bool(true, "Neutrale Levels zeigen", group = G_A)
+bool   showIB  = input.bool(true, "IB-Hoch/-Tief immer zeigen", group = G_A, tooltip = "Als dünne Orientierung, auch wenn sie unter der Schwelle liegen.")
 bool   showTab = input.bool(true, "Info-Tabelle", group = G_A)
 color  cTP     = input.color(#2962ff, "TP", inline = "c", group = G_A)
 color  cSL     = input.color(#ff9800, "Geschützt", inline = "c", group = G_A)
@@ -161,10 +163,12 @@ if not done and not na(ibH) and R > 0 and relNow >= relE and relNow < relEnd and
     wdDay := useWd ? math.max(0, math.min(5, dayofweek(time_tradingday) - 1)) : 0
     ffDay := tH < tL ? 1 : tL < tH ? 2 : 0
     for k = 0 to 15
-        array.push(LU, line.new(time, f_price(0, k), tEnd, f_price(0, k), xloc = xloc.bar_time, color = cNeu))
-        array.push(LD, line.new(time, f_price(1, k), tEnd, f_price(1, k), xloc = xloc.bar_time, color = cNeu))
+        array.push(LU, line.new(time, f_price(0, k), time, f_price(0, k), xloc = xloc.bar_time, color = color.new(cNeu, 100)))
+        array.push(LD, line.new(time, f_price(1, k), time, f_price(1, k), xloc = xloc.bar_time, color = color.new(cNeu, 100)))
 
-// erreichte Levels
+// erreichte Levels (Stand vor diesem Bar merken: was jetzt bricht, endet auf diesem Bar)
+int upPrev = upMax
+int dnPrev = dnMax
 if done and relNow < relEnd
     while upMax < 15 and (upMax < 0 ? high > ibH : high >= f_price(0, upMax + 1))
         upMax += 1
@@ -214,7 +218,8 @@ if done and relNow < relEnd
         array.clear(LB)
     int xLbl = time + 3 * timeframe.in_seconds() * 1000
     for side = 0 to 1
-        int   reached = side == 0 ? upMax : dnMax
+        int   reached = side == 0 ? upPrev : dnPrev
+        int   nowMax  = side == 0 ? upMax : dnMax
         int   bestTP  = -1
         int   firstSL = -1
         float pTP     = na
@@ -222,25 +227,24 @@ if done and relNow < relEnd
         for k = 0 to 15
             line ln = side == 0 ? array.get(LU, k) : array.get(LD, k)
             bool isIB = k == 0
-            if k <= reached
-                line.set_color(ln, color.new(isIB ? cIB : cNeu, 70))
-                line.set_style(ln, line.style_dotted)
-                line.set_width(ln, 1)
-            else
+            if k > reached
+                // läuft mit, bis gebrochen (dieser Bar ist dann der letzte) oder Tagesende
+                line.set_x2(ln, time)
+            if k > nowMax
                 float p = f_prob(side, k)
                 bool tp = not na(p) and p >= thrTP / 100.0
                 bool sl = not na(p) and p <= 1 - thrSL / 100.0
-                color c = tp ? cTP : sl ? cSL : isIB ? cIB : cNeu
-                line.set_color(ln, tp or sl or isIB ? c : color.new(c, showNeu ? 70 : 100))
+                color c = tp ? cTP : sl ? cSL : cIB
+                line.set_color(ln, tp or sl ? c : isIB and showIB ? color.new(cIB, 40) : color.new(c, 100))
                 line.set_style(ln, sl ? line.style_dashed : line.style_solid)
-                line.set_width(ln, isIB ? 2 : 1)
+                line.set_width(ln, isIB and (tp or sl) ? 2 : 1)
                 if tp
                     bestTP := k
                     pTP    := p
                 if sl and firstSL < 0
                     firstSL := k
                     pSL     := p
-                if drawLbl and lblMode == "Alle Levels" and not na(p)
+                if drawLbl and lblMode == "Alle Levels" and (tp or sl)
                     string nm = (side == 0 ? "+" : "−") + f_fmt(k)
                     array.push(LB, label.new(xLbl, f_price(side, k), nm + " · " + f_pct(p), xloc = xloc.bar_time, style = label.style_label_left, color = color.new(c, 100), textcolor = c, size = size.tiny))
         if drawLbl and lblMode == "Grenzen"
