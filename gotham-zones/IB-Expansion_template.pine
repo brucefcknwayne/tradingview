@@ -8,7 +8,7 @@ indicator("IB Expansion · TP & geschützte Level", shorttitle = "IB-Exp", overl
 //  08:30/09:30/10:30, Länge 15/30/45/60 Min). Jedes Level bekommt die Wahrscheinlichkeit,
 //  bis Tagesende erreicht zu werden – live aktualisiert:
 //    · bei IB-Ende: je Wochentag und ob IB-Hoch oder IB-Tief zuerst gebildet wurde
-//    · danach: gemessen aus den Daten, wie oft ein Level noch erreicht wird, wenn es
+//    · danach: gemessen aus den Daten (letzte 3 Jahre), wie oft ein Level noch erreicht wird, wenn es
 //      d IB-Ranges vom aktuellen Kurs entfernt ist und noch so viel Zeit übrig ist
 //      (Bruch einer Seite, Rücklauf, späte Uhrzeit – alles steckt in Abstand + Zeit)
 //  Getestet auf dem letzten Jahr (ungesehen): „TP ≥ 70 %“ wurde zu 71–82 % erreicht,
@@ -22,7 +22,7 @@ indicator("IB Expansion · TP & geschützte Level", shorttitle = "IB-Exp", overl
 //
 //  DATEN kommen aus vier Libraries (IBX_NQ, IBX_ES, IBX_RTY, IBX_GC), die du einmal selbst
 //  veröffentlichen musst (privat reicht). Steht dein TradingView-Name anders als unten,
-//  die vier import-Zeilen anpassen. Statistik: Databento CME 1m, letzte 5 Jahre.
+//  die vier import-Zeilen anpassen. Statistik: Databento CME 1m, letzte 3 Jahre.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Brucefcknwayne/IBX_NQ/1 as dNQ
@@ -263,7 +263,7 @@ if showTab and barstate.islast
     table.cell(tb, 0, 0, "IB", text_color = color.gray, text_size = size.small)
     table.cell(tb, 1, 0, mk == "" ? "nur NQ/ES/RTY/GC" : mk + " · " + startIn + " · " + str.tostring(lenIn) + " Min", text_color = color.white, text_size = size.small)
     table.cell(tb, 0, 1, "Statistik", text_color = color.gray, text_size = size.small)
-    table.cell(tb, 1, 1, hasData ? str.tostring(NDAYS) + " Tage · 5 J · " + wdTxt : "keine Daten für dieses Fenster", text_color = color.white, text_size = size.small)
+    table.cell(tb, 1, 1, hasData ? str.tostring(NDAYS) + " Tage · 3 J · " + wdTxt : "keine Daten für dieses Fenster", text_color = color.white, text_size = size.small)
     table.cell(tb, 0, 2, "Zuerst", text_color = color.gray, text_size = size.small)
     table.cell(tb, 1, 2, not done ? "IB läuft" : ffDay == 1 ? "IB-Hoch" : ffDay == 2 ? "IB-Tief" : "gleich", text_color = color.white, text_size = size.small)
     table.cell(tb, 0, 3, "Erreicht", text_color = color.gray, text_size = size.small)

@@ -14,8 +14,8 @@ Tabellen je Fenster (Start, Länge):
 Live (wie im Indikator): bis zum ersten erreichten Level T1, danach G mit linearer Interpolation in d und q
 (nach 100 % der Restzeit = 0).
 
-1. Kalibrierung: Tabellen aus den 5 Jahren vor dem letzten Jahr, Test auf dem letzten Jahr (ungesehen).
-2. Endgültige Tabellen aus den letzten 5 Jahren → Pine-Libraries gotham-zones/IBX_<Markt>_library.pine
+1. Kalibrierung: Tabellen aus den 3 Jahren vor dem letzten Jahr, Test auf dem letzten Jahr (ungesehen).
+2. Endgültige Tabellen aus den letzten 3 Jahren → Pine-Libraries gotham-zones/IBX_<Markt>_library.pine
    + Indikator gotham-zones/IB-Expansion_indicator.pine (importiert die Libraries)
 
 Aufruf: python data-lab/ib_ext_stats.py
@@ -36,6 +36,7 @@ K = 16                      # Level 0 … 15  (0,0 … 1,5 IB)
 NQ_ = 10                    # Zeitstufen q = 0, 0,1 … 0,9
 ND = 31                     # Abstandsstufen d = 0,0–0,1 … 2,9–3,0, > 3,0
 MIN_T1, MIN_C = 30, 20
+YEARS = 3                   # Statistik-Zeitraum (Jahre bis zum letzten Datentag)
 ALPHA = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"  # 62 Zeichen → 0 … 61
 NA = "~"
 
@@ -185,9 +186,9 @@ for root in MARKETS:
             v, ff, tu, td, npost, H, Lo, R, Cp = window_days(G, fin, wd_all, s, L, e, eth)
             dv = dts[v]
             wd = wd_all[v] + 1
-            final = np.asarray(dv > end - pd.DateOffset(years=5))
+            final = np.asarray(dv > end - pd.DateOffset(years=YEARS))
             test = np.asarray(dv > end - pd.DateOffset(years=1))
-            train = np.asarray(dv > end - pd.DateOffset(years=6)) & ~test
+            train = np.asarray(dv > end - pd.DateOffset(years=YEARS + 1)) & ~test
             key = f"{st.replace(':', '')}-{L}"
 
             # 1) Kalibrierung: Tabellen aus train, Vorhersage auf test (q = 0 mit T1 und mit G, danach G)
@@ -208,7 +209,7 @@ for root in MARKETS:
                         f = np.isfinite(p1)
                         calib.append(pd.DataFrame({"m": root, "w": key, "q": 0.0, "quelle": "T1", "p": p1[f], "hit": hit[f]}))
 
-            # 2) endgültige Tabellen (letzte 5 Jahre)
+            # 2) endgültige Tabellen (letzte YEARS Jahre)
             fT1 = build_t1(tu[final], td[final], wd[final], ff[final])
             fG = build_g(tu[final], td[final], H[final], Lo[final], R[final], Cp[final], npost)
             data[root][key] = (encode(fT1, fG), int(final.sum()))
@@ -228,11 +229,11 @@ cal_dec = C[C.quelle == "G"].groupby("dez").agg(n=("hit", "size"), vorhergesagt=
 E = pd.DataFrame(ext830)
 
 md = ["# IB-Expansion – Kalibrierung und Kennzahlen", "",
-      "Test: letztes Jahr (ungesehen), Tabellen aus den 5 Jahren davor. Vorhersage zu IB-Ende (q = 0) und nach 20/50/70 % der Restzeit,",
+      f"Test: letztes Jahr (ungesehen), Tabellen aus den {YEARS} Jahren davor. Vorhersage zu IB-Ende (q = 0) und nach 20/50/70 % der Restzeit,",
       "für jedes noch nicht erreichte Level ±0,0 … ±1,5 IB. 'erreicht' = tatsächlicher Anteil.", "",
       "## Je Markt", "", cal.to_markdown(), "", "## Je Zeitpunkt (alle Märkte)", "", cal_q.to_markdown(), "",
       "## Kalibrierung in 10-%-Schritten (alle Märkte)", "", cal_dec.to_markdown(), "",
-      "## Erreichen bis Tagesende bei IB-Ende, 08:30 und 09:30 (letzte 5 Jahre, alle Tage, in %)", "", E.to_markdown(index=False), ""]
+      f"## Erreichen bis Tagesende bei IB-Ende, 08:30 und 09:30 (letzte {YEARS} Jahre, alle Tage, in %)", "", E.to_markdown(index=False), ""]
 (HERE / "results/ib_ext_stats.md").write_text("\n".join(md))
 print("\n".join(md))
 
@@ -241,7 +242,7 @@ for root in MARKETS:
     funcs = [f'// @function IB {w[:2]}:{w[2:4]} · {w.split("-")[1]} Min ({n} Tage)\n'
              f'// @returns Anzahl Tage und kodierte Tabellen\n'
              f'export w{w.replace("-", "_")}() => "{n}|{d}"' for w, (d, n) in data[root].items()]
-    lib = (f'//@version=6\n// @description IB-Expansion-Statistik {root} (Databento CME 1m, letzte 5 Jahre bis {end.date()}), '
+    lib = (f'//@version=6\n// @description IB-Expansion-Statistik {root} (Databento CME 1m, letzte {YEARS} Jahre bis {end.date()}), '
            f'erzeugt von data-lab/ib_ext_stats.py. Nur Daten, keine Logik.\nlibrary("IBX_{root}")\n\n' + "\n\n".join(funcs) + "\n")
     (ROOT / f"gotham-zones/IBX_{root}_library.pine").write_text(lib)
     print(root, "Library", len(lib), "Zeichen,", len(funcs), "Fenster")
