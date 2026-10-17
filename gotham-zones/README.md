@@ -9,6 +9,10 @@ Gotham Zones (±0.5/1/1.5/2σ um das Daily Open, σ aus VIX1D/VIX9D/VXN) – Aus
   Checkpoints alle 30 Min 10:00–15:30, Exit unter max(Grenze, VWAP), flat 16:00.
   NQ Test 2021–26 Sharpe 1.02 (t 2.4), Train Sharpe 0.74 (t 2.4). Auf ES/RTY/GC kein Edge.
 
+- `IB-Levels_indicator.pine` – IB-Hoch/-Tief für jede Startzeit (jede volle Stunde + 08:30/09:30/10:30,
+  15/30/45/60 Min), Linien als „geschützt“ / „bricht“ mit Wahrscheinlichkeit (NQ, ES, RTY, GC, 1J/3J/5J).
+  Wird von `data-lab/ib_levels_stats.py` aus `IB-Levels_template.pine` gebaut – nicht von Hand ändern, sondern das Template.
+
 Ergebnisse (Python, `data-lab/`):
 - Zonen pauschal (Fade oder Breakout) haben keinen Vorteil, Reaktion im Median 20–30 Pkt
   (`data-lab/results/gotham_zones_reaction.md`, `gotham_zones_trades.md`).

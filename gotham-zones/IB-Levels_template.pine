@@ -1,0 +1,213 @@
+//@version=6
+indicator("IB Levels · geschützt / bricht", shorttitle = "IB-Lvls", overlay = true, max_lines_count = 500, max_labels_count = 500)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  🦇  IB LEVELS  ·  by @Brucefcknwayne
+//
+//  Zeichnet Hoch und Tief der Initial Balance (jede volle Stunde + 08:30/09:30/10:30, 15/30/45/60 Min)
+//  und bewertet jede Linie mit Statistik aus 1m-Daten (NQ, ES, RTY, GC):
+//    · bevor etwas bricht: P(Linie wird bis Tagesende per Docht gebrochen),
+//      je nachdem ob das IB-Hoch oder das IB-Tief zuerst gebildet wurde
+//    · nach dem ersten Bruch: P(auch die Gegenseite bricht)
+//    · ±1 IB-Ziel: P(Ziel erreicht, nachdem die Seite gebrochen ist)
+//  geschützt = niedrige Bruch-Wahrscheinlichkeit, bricht = hohe.
+//  Tagesende: 17:00 NY für IBs vor 09:30, sonst 16:00 (wie in der Statistik).
+//  Daten: Databento CME 1m, Front-Month, Stand 16.10.2026 (data-lab/ib_levels_stats.py).
+//  Am besten auf 1m–5m-Charts.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ═══════════════════════════════ STATISTIK ═══════════════════════════════
+// Je Eintrag "HHMM-Länge:n,hH,hL,lH,lL,uL,dH,u5,u10,d5,d10" in %, -1 = zu wenig Fälle
+{{DATA}}
+
+const string TZ = "America/New_York"
+const string G_I = "Initial Balance"
+const string G_S = "Bewertung"
+const string G_A = "Anzeige"
+
+// ═══════════════════════════════ INPUTS ═══════════════════════════════
+string startIn = input.string("09:30", "IB-Start (NY)", options = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "12:00", "13:00", "14:00", "15:00"], group = G_I)
+int    lenIn   = input.int(45, "IB-Länge (Min)", options = [15, 30, 45, 60], group = G_I)
+string perIn   = input.string("5J", "Statistik-Zeitraum", options = ["1J", "3J", "5J"], group = G_S, tooltip = "Letztes Jahr, letzte 3 oder 5 Jahre (bis 16.10.2026).")
+int    thrBrk  = input.int(60, "„bricht“ ab Bruch-%", minval = 50, maxval = 95, group = G_S)
+int    thrPro  = input.int(40, "„geschützt“ bis Bruch-%", minval = 5, maxval = 50, group = G_S)
+bool   showExt = input.bool(true, "±1 IB-Ziele zeigen", group = G_A)
+bool   showTab = input.bool(true, "Info-Tabelle", group = G_A)
+color  cPro    = input.color(#26a69a, "Geschützt", inline = "c", group = G_A)
+color  cBrk    = input.color(#ef5350, "Bricht", inline = "c", group = G_A)
+color  cNeu    = input.color(#9598a1, "Neutral", inline = "c", group = G_A)
+
+// ═══════════════════════════════ DATEN LADEN ═══════════════════════════════
+string root = syminfo.root
+string mk = root == "NQ" or root == "MNQ" ? "NQ" : root == "ES" or root == "MES" ? "ES" : root == "RTY" or root == "M2K" ? "RTY" : root == "GC" or root == "MGC" ? "GC" : ""
+
+f_data(string key) =>
+    switch key
+        "NQ_1Ja"  => D_NQ_1Ja
+        "NQ_1Jb"  => D_NQ_1Jb
+        "NQ_3Ja"  => D_NQ_3Ja
+        "NQ_3Jb"  => D_NQ_3Jb
+        "NQ_5Ja"  => D_NQ_5Ja
+        "NQ_5Jb"  => D_NQ_5Jb
+        "ES_1Ja"  => D_ES_1Ja
+        "ES_1Jb"  => D_ES_1Jb
+        "ES_3Ja"  => D_ES_3Ja
+        "ES_3Jb"  => D_ES_3Jb
+        "ES_5Ja"  => D_ES_5Ja
+        "ES_5Jb"  => D_ES_5Jb
+        "RTY_1Ja" => D_RTY_1Ja
+        "RTY_1Jb" => D_RTY_1Jb
+        "RTY_3Ja" => D_RTY_3Ja
+        "RTY_3Jb" => D_RTY_3Jb
+        "RTY_5Ja" => D_RTY_5Ja
+        "RTY_5Jb" => D_RTY_5Jb
+        "GC_1Ja"  => D_GC_1Ja
+        "GC_1Jb"  => D_GC_1Jb
+        "GC_3Ja"  => D_GC_3Ja
+        "GC_3Jb"  => D_GC_3Jb
+        "GC_5Ja"  => D_GC_5Ja
+        "GC_5Jb"  => D_GC_5Jb
+        => ""
+
+var array<int> S = array.new<int>()
+if barstate.isfirst
+    string key = str.replace(startIn, ":", "") + "-" + str.tostring(lenIn) + ":"
+    for e in str.split(f_data(mk + "_" + perIn + (lenIn <= 30 ? "a" : "b")), ";")
+        if str.startswith(e, key)
+            for p in str.split(str.substring(e, str.length(key)), ",")
+                array.push(S, int(str.tonumber(p)))
+
+f_s(int i) =>
+    array.size(S) > i ? array.get(S, i) : -1
+
+// ═══════════════════════════════ ZEIT ═══════════════════════════════
+// Minuten seit 18:00 NY (Handelstag 0 … 1379)
+f_rel(int t) =>
+    (hour(t, TZ) * 60 + minute(t, TZ) - 1080 + 1440) % 1440
+
+int relS   = (int(str.tonumber(str.substring(startIn, 0, 2))) * 60 + int(str.tonumber(str.substring(startIn, 3, 5))) - 1080 + 1440) % 1440
+int relE   = relS + lenIn
+int relEnd = relS < 930 ? 1380 : 1320
+int relNow = f_rel(time)
+
+// ═══════════════════════════════ TAGES-STATUS ═══════════════════════════════
+var float ibH    = na
+var float ibL    = na
+var int   tH     = na
+var int   tL     = na
+var bool  done   = false
+var bool  brokeH = false
+var bool  brokeL = false
+var int   firstDir  = 0
+var line  lnH    = na
+var line  lnL    = na
+var line  lnU    = na
+var line  lnD    = na
+var label lbH    = na
+var label lbL    = na
+var label lbU    = na
+var label lbD    = na
+
+if timeframe.isintraday and timeframe.change("D")
+    ibH    := na
+    ibL    := na
+    tH     := na
+    tL     := na
+    done   := false
+    brokeH := false
+    brokeL := false
+    firstDir  := 0
+
+// IB aufbauen (erstes Auftreten von Hoch/Tief zählt)
+if relNow >= relS and relNow < relE
+    if na(ibH) or high > ibH
+        ibH := high
+        tH  := time
+    if na(ibL) or low < ibL
+        ibL := low
+        tL  := time
+
+bool hf = not na(tH) and not na(tL) and tH < tL
+bool lf = not na(tH) and not na(tL) and tL < tH
+
+// IB fertig → Linien setzen
+if not done and not na(ibH) and ibH > ibL and relNow >= relE and relNow < relEnd and mk != ""
+    done := true
+    int   tEnd = time + (relEnd - relNow) * 60000
+    float R    = ibH - ibL
+    lnH := line.new(time, ibH, tEnd, ibH, xloc = xloc.bar_time, color = cNeu, width = 2)
+    lnL := line.new(time, ibL, tEnd, ibL, xloc = xloc.bar_time, color = cNeu, width = 2)
+    lbH := label.new(time, ibH, "", xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cNeu, 85), textcolor = cNeu, size = size.small)
+    lbL := label.new(time, ibL, "", xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cNeu, 85), textcolor = cNeu, size = size.small)
+    if showExt
+        lnU := line.new(time, ibH + R, tEnd, ibH + R, xloc = xloc.bar_time, color = color.new(cNeu, 40), style = line.style_dashed)
+        lnD := line.new(time, ibL - R, tEnd, ibL - R, xloc = xloc.bar_time, color = color.new(cNeu, 40), style = line.style_dashed)
+        lbU := label.new(time, ibH + R, "", xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cNeu, 100), textcolor = cNeu, size = size.tiny)
+        lbD := label.new(time, ibL - R, "", xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cNeu, 100), textcolor = cNeu, size = size.tiny)
+
+// Brüche bis Tagesende
+if done and relNow < relEnd
+    bool newH = not brokeH and high > ibH
+    bool newL = not brokeL and low < ibL
+    if firstDir == 0 and newH and not newL
+        firstDir := 1
+    if firstDir == 0 and newL and not newH
+        firstDir := -1
+    if newH
+        brokeH := true
+    if newL
+        brokeL := true
+
+// ═══════════════════════════════ BEWERTUNG ═══════════════════════════════
+f_avg(int a, int b) =>
+    a < 0 or b < 0 ? -1 : int(math.round((a + b) / 2))
+
+int pH = -1
+int pL = -1
+if not brokeH and not brokeL
+    pH := hf ? f_s(1) : lf ? f_s(3) : f_avg(f_s(1), f_s(3))
+    pL := hf ? f_s(2) : lf ? f_s(4) : f_avg(f_s(2), f_s(4))
+else if brokeH and not brokeL
+    pL := f_s(5)
+else if brokeL and not brokeH
+    pH := f_s(6)
+
+f_col(int p, bool broken) =>
+    broken ? cNeu : p < 0 ? cNeu : p >= thrBrk ? cBrk : p <= thrPro ? cPro : cNeu
+
+f_txt(string name, int p, bool broken) =>
+    broken ? name + " · gebrochen" : p < 0 ? name + " · zu wenig Daten" : p >= thrBrk ? name + " · bricht " + str.tostring(p) + " %" : p <= thrPro ? name + " · geschützt " + str.tostring(100 - p) + " %" : name + " · Bruch " + str.tostring(p) + " %"
+
+f_ext(string name, int p) =>
+    p < 0 ? name : name + " · " + str.tostring(p) + " % nach Bruch"
+
+if done and relNow < relEnd
+    color ch = f_col(pH, brokeH)
+    color cl = f_col(pL, brokeL)
+    line.set_color(lnH, ch)
+    line.set_color(lnL, cl)
+    label.set_text(lbH, f_txt("IB-Hoch", pH, brokeH))
+    label.set_text(lbL, f_txt("IB-Tief", pL, brokeL))
+    label.set_textcolor(lbH, ch)
+    label.set_textcolor(lbL, cl)
+    label.set_color(lbH, color.new(ch, 85))
+    label.set_color(lbL, color.new(cl, 85))
+    if showExt
+        label.set_text(lbU, f_ext("+1 IB", f_s(8)))
+        label.set_text(lbD, f_ext("−1 IB", f_s(10)))
+
+// ═══════════════════════════════ INFO ═══════════════════════════════
+var table tb = table.new(position.top_right, 2, 4, bgcolor = color.new(color.black, 80), border_width = 0)
+if showTab and barstate.islast
+    string formed = hf ? "Hoch zuerst" : lf ? "Tief zuerst" : "–"
+    table.cell(tb, 0, 0, "IB", text_color = color.gray, text_size = size.small)
+    table.cell(tb, 1, 0, mk == "" ? "nur NQ/ES/RTY/GC" : mk + " · " + startIn + " · " + str.tostring(lenIn) + " Min", text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 1, "Statistik", text_color = color.gray, text_size = size.small)
+    table.cell(tb, 1, 1, perIn + " · " + (f_s(0) < 0 ? "–" : str.tostring(f_s(0)) + " Tage"), text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 2, "Heute", text_color = color.gray, text_size = size.small)
+    table.cell(tb, 1, 2, done ? formed : "IB läuft / noch nicht", text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 3, "Erster Bruch", text_color = color.gray, text_size = size.small)
+    table.cell(tb, 1, 3, firstDir == 1 ? "oben" : firstDir == -1 ? "unten" : brokeH and brokeL ? "beide" : "noch keiner", text_color = color.white, text_size = size.small)
+
+plot(done and relNow < relEnd ? ibH : na, "IB-Hoch", display = display.none)
+plot(done and relNow < relEnd ? ibL : na, "IB-Tief", display = display.none)
