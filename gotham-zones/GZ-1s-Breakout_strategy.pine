@@ -1,0 +1,133 @@
+//@version=6
+strategy("Gotham +1σ Breakout · Strategie", shorttitle = "GZ-1σ-BO", overlay = true, pyramiding = 0,
+     default_qty_type = strategy.fixed, default_qty_value = 1, slippage = 1,
+     commission_type = strategy.commission.cash_per_contract, commission_value = 0.5,
+     use_bar_magnifier = true, process_orders_on_close = false)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  🦇  GOTHAM +1σ BREAKOUT  ·  by @Brucefcknwayne
+//
+//  Zonen wie Gotham Zones: Daily Open (18:00 ET) ± 1σ, σ aus VIX1D / VIX9D / VXN,
+//  Zonenhöhe ± 5 % von σ. Gehandelt wird NUR die obere +1σ-Zone, nur Long:
+//
+//    1. Der ERSTE Touch der +1σ-Zone am Tag muss zwischen 09:30 und 11:00 NY passieren
+//       (Touch in der Nacht / London → kein Trade an diesem Tag).
+//    2. Einstieg: Stop-Order 1 Tick über der Zonen-Oberkante (Docht reicht), bis 16:00.
+//    3. SL = 1.5 × Zonenhöhe unter dem Einstieg, TP = 2R. Flat um 16:00 NY.
+//    4. Max. 1 Trade pro Tag.
+//
+//  Backtest Python, NQ 1m 2010–2026, 1 Pkt Kosten (data-lab/zones_breakout_check.py):
+//    30D: Train 2010–20 +0.30R/Trade · Test 2021–26 +0.37R/Trade (t 2.4)
+//    9D : Train +0.38R · Test +0.14R      1D: nur Test (ab 2022) +0.02R
+//    ca. 16–20 Trades pro Jahr, Trefferquote 45–50 %.
+//    Schwach 2024–2025 → klein handeln und erst forward-testen.
+//
+//  Gebaut für 1m-Charts auf NQ/MNQ (Kosten-Defaults passen zu MNQ).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const string S_1D  = "1D"
+const string S_9D  = "9D"
+const string S_30D = "30D"
+const float  YEAR_DAYS = 252.0
+const string TZ = "America/New_York"
+const string G_Z = "Zone"
+const string G_T = "Trade"
+
+// ═══════════════════════════════ INPUTS ═══════════════════════════════
+string srcMode  = input.string(S_30D, "Mode", options = [S_1D, S_9D, S_30D], group = G_Z, tooltip = "30D war im Test am stärksten, 1D am schwächsten.")
+float  zonePct  = input.float(5.0, "Zonenhöhe (± % von 1σ)", minval = 0.5, step = 0.5, group = G_Z)
+bool   showZone = input.bool(true, "+1σ-Zone zeigen", group = G_Z)
+color  C_UP     = input.color(#e535f5, "Farbe", group = G_Z)
+
+float  riskZ    = input.float(1.5, "Stop (× Zonenhöhe)", minval = 0.25, step = 0.25, group = G_T)
+float  rr       = input.float(2.0, "Ziel (R)", minval = 0.5, step = 0.25, group = G_T)
+int    winFrom  = input.int(930,  "Touch-Fenster von (HHMM NY)", group = G_T)
+int    winTo    = input.int(1100, "Touch-Fenster bis (HHMM NY)", group = G_T)
+int    exitAt   = input.int(1600, "Flat um (HHMM NY)", group = G_T)
+
+// ═══════════════════════════════ IV (wie Gotham Zones) ═══════════════════════════════
+string ivTF = timeframe.in_seconds() < 900 ? "15" : timeframe.period
+
+f_iv(string s) =>
+    request.security(s, ivTF, close, ignore_invalid_symbol = true)
+
+float v1d = f_iv("CBOE:VIX1D")
+float v9d = f_iv("CBOE:VIX9D")
+float vix = f_iv("CBOE:VIX")
+float vxn = f_iv("CBOE:VXN")
+
+bool  isNQ    = syminfo.root == "NQ" or syminfo.root == "MNQ"
+float nqScale = not na(vxn) and not na(vix) and vix > 0 ? vxn / vix : na
+
+float ivNow = na
+if srcMode == S_30D
+    ivNow := isNQ ? vxn : vix
+else
+    float base = srcMode == S_1D ? v1d : v9d
+    ivNow := na(base) ? (isNQ ? vxn : vix) : (isNQ ? base * nqScale : base)
+
+// ═══════════════════════════════ ZEIT ═══════════════════════════════
+// Minuten seit 18:00 NY → ETH vor RTH, ein Handelstag = 0 … 1439
+f_rel(int t) =>
+    int m = hour(t, TZ) * 60 + minute(t, TZ)
+    (m - 1080 + 1440) % 1440
+
+f_hhmm(int x) =>
+    int m = int(x / 100) * 60 + x % 100
+    (m - 1080 + 1440) % 1440
+
+int relFrom = f_hhmm(winFrom)
+int relTo   = f_hhmm(winTo)
+int relExit = f_hhmm(exitAt)
+int relNow  = f_rel(time)
+int relEnd  = f_rel(time_close)
+
+// ═══════════════════════════════ TAGES-STATUS ═══════════════════════════════
+var float ref      = na
+var float sig      = na
+var bool  touched  = false
+var bool  winTouch = false
+var bool  traded   = false
+
+bool anchor = timeframe.isintraday and timeframe.change("D")
+if anchor
+    ref      := open
+    sig      := not na(ivNow) and ivNow > 0 ? ref * (ivNow / 100) / math.sqrt(YEAR_DAYS) : na
+    touched  := false
+    winTouch := false
+    traded   := false
+    strategy.cancel("L")
+
+float hh      = sig * zonePct / 100
+float zLo     = ref + sig - hh
+float zHi     = ref + sig + hh
+float Z       = 2 * hh
+float entryPx = zHi + syminfo.mintick
+
+// Erster Touch des Tages (bis Flat-Zeit): liegt er im Fenster?
+if not na(sig) and not touched and high >= zLo and relNow < relExit
+    touched  := true
+    winTouch := relNow >= relFrom and relNow < relTo
+
+if strategy.position_size > 0
+    traded := true
+
+// ═══════════════════════════════ ORDERS ═══════════════════════════════
+// Order gilt ab der nächsten Kerze: scharf, solange noch kein Touch war und die nächste
+// Kerze im Fenster liegt, oder der erste Touch im Fenster war (dann bis Flat-Zeit).
+bool nextInWin  = relEnd >= relFrom and relEnd < relTo
+bool beforeExit = relEnd < relExit
+bool armed = not na(sig) and not traded and strategy.position_size == 0 and beforeExit and ((not touched and nextInWin) or (touched and winTouch))
+
+if armed
+    strategy.entry("L", strategy.long, stop = entryPx)
+    strategy.exit("L-X", "L", stop = entryPx - riskZ * Z, limit = entryPx + rr * riskZ * Z)
+else
+    strategy.cancel("L")
+
+if strategy.position_size != 0 and relEnd >= relExit
+    strategy.close_all(comment = "Flat")
+
+// ═══════════════════════════════ ANZEIGE ═══════════════════════════════
+plot(showZone and not anchor ? zHi : na, "+1σ Oberkante", color = C_UP, style = plot.style_linebr)
+plot(showZone and not anchor ? zLo : na, "+1σ Unterkante", color = color.new(C_UP, 50), style = plot.style_linebr)
