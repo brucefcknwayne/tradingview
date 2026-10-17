@@ -20,13 +20,15 @@ Rohdaten für eigene Strategie-Forschung (Python), Quelle Databento (CME Globex 
 - Minuten ohne Trade fehlen (Databento schreibt nur Bars mit Umsatz).
 - Rohpreise für Intraday-Level, `+ adj` für alles über mehrere Tage (MAs, Swings über Roll).
 
+Weitere Märkte im gleichen Format: `data/es_1m/`, `data/gc_1m/` (RTH 08:20–13:30), `data/rty_1m/` (ab 2017-07).
+
 ## Neu bauen
 
 Rohdatei (`*.dbn.zst`, nicht im Repo) nach `data/raw/` legen, dann:
 
 ```
 pip install databento pandas pyarrow
-python data-lab/build_continuous.py
+python data-lab/build_continuous.py data-lab/data/raw/<datei>.dbn.zst [ROOT ...]
 ```
 
 ## Laden

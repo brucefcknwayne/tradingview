@@ -1,0 +1,112 @@
+//@version=6
+strategy("Gotham IV-Noise Momentum · Strategie", shorttitle = "GZ-IVN", overlay = true, pyramiding = 0,
+     default_qty_type = strategy.fixed, default_qty_value = 1, slippage = 1,
+     commission_type = strategy.commission.cash_per_contract, commission_value = 1.0,
+     process_orders_on_close = true)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  🦇  GOTHAM IV-NOISE MOMENTUM  ·  by @Brucefcknwayne
+//
+//  Idee (Noise-Area-Momentum, Zarattini/Aziz/Barbon 2024), Grenzen aus der IV statt Historie:
+//    Obere Grenze = max(RTH-Open, Vortages-Close) + m · σ · √(Minuten seit 09:30 / 390)
+//    Untere Grenze = min(RTH-Open, Vortages-Close) − m · σ · √(…)
+//    σ = RTH-Open · VXN(Vortag) / 100 / √252,  m = 0.75
+//
+//  Nur an Checkpoints (alle 30 Min, 10:00 … 15:30 NY), Fill zum Kerzen-Close:
+//    · Long, wenn Close über oberer Grenze. Raus, wenn Close unter max(obere Grenze, VWAP).
+//    · Short, wenn Close unter unterer Grenze. Raus, wenn Close über min(untere Grenze, VWAP).
+//    · Flat um 16:00 NY. Kein Stop dazwischen – Exit nur an Checkpoints.
+//
+//  Backtest Python, NQ 1m, 1 Kontrakt, 0.75 Pkt Kosten (data-lab/intraday_scan.py):
+//    Train 2010–20: Sharpe 0.74 (t 2.4) · Test 2021–26: Sharpe 1.02 (t 2.4)
+//    ca. 0.8 Trades/Tag, Trefferquote ~41 %, Profit-Faktor ~1.25
+//    jedes Jahr 2018–2026 positiv, Long UND Short tragen bei.
+//    ACHTUNG: auf ES, RTY, GC funktioniert es NICHT – nur NQ verwenden.
+//
+//  1m-Chart NQ/MNQ, RTH. Kosten-Default passt zu MNQ (für NQ Kommission ~2.5 einstellen).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const string TZ = "America/New_York"
+const string G_S = "Signal"
+const string G_A = "Anzeige"
+
+float  mult     = input.float(0.75, "Grenze (× σ am Tagesende)", minval = 0.1, step = 0.05, group = G_S, tooltip = "0.75 = getesteter Wert.")
+int    step     = input.int(30, "Checkpoint alle … Min", options = [15, 30, 60], group = G_S, tooltip = "30 = getestet. 15 = mehr Trades, im Test schwächer.")
+string ivSym    = input.symbol("CBOE:VXN", "IV-Index", group = G_S, tooltip = "VXN für NQ.")
+bool   showBand = input.bool(true, "Grenzen & VWAP zeigen", group = G_A)
+color  C_UP     = input.color(#e535f5, "Obere Grenze", inline = "c", group = G_A)
+color  C_DN     = input.color(#6ff3f5, "Untere Grenze", inline = "c", group = G_A)
+
+// IV vom Vortag (kein Repaint)
+float ivPrev = request.security(ivSym, "D", close[1], lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+
+// ═══════════════════════════════ ZEIT ═══════════════════════════════
+f_min(int t) =>
+    hour(t, TZ) * 60 + minute(t, TZ)
+
+const int RTH_START = 570   // 09:30
+const int RTH_LEN   = 390   // bis 16:00
+
+int mNow = f_min(time)
+int mEnd = f_min(time_close)
+bool inRth = mNow >= RTH_START and mNow < RTH_START + RTH_LEN
+
+// ═══════════════════════════════ TAGES-STATUS ═══════════════════════════════
+var float op        = na
+var float pc        = na
+var float sig       = na
+var float lastClose = na
+var float cumPV     = 0.0
+var float cumV      = 0.0
+var bool  rthOn     = false
+
+if mNow == RTH_START
+    op    := open
+    pc    := lastClose
+    sig   := not na(ivPrev) and ivPrev > 0 ? op * ivPrev / 100 / math.sqrt(252) : na
+    cumPV := 0.0
+    cumV  := 0.0
+    rthOn := true
+
+if rthOn and inRth
+    cumPV += hlc3 * volume
+    cumV  += volume
+
+float vw = cumV > 0 ? cumPV / cumV : na
+int   t  = mEnd - RTH_START
+float rt = math.sqrt(math.max(t, 0) / float(RTH_LEN))
+float ub = math.max(op, pc) + mult * sig * rt
+float lb = math.min(op, pc) - mult * sig * rt
+
+// ═══════════════════════════════ CHECKPOINTS ═══════════════════════════════
+bool isCP = rthOn and t >= 30 and t < RTH_LEN and t % step == 0 and not na(sig) and not na(pc) and not na(vw)
+
+if isCP
+    int cur  = strategy.position_size > 0 ? 1 : strategy.position_size < 0 ? -1 : 0
+    int want = cur
+    if cur == 1 and close < math.max(ub, vw)
+        want := 0
+    if cur == -1 and close > math.min(lb, vw)
+        want := 0
+    if want == 0
+        want := close > ub ? 1 : close < lb ? -1 : 0
+    if want != cur
+        if want == 1
+            strategy.entry("L", strategy.long)
+        else if want == -1
+            strategy.entry("S", strategy.short)
+        else
+            strategy.close_all(comment = "Exit")
+
+// Flat zum RTH-Ende (auch bei verkürzten Handelstagen)
+if rthOn and (t >= RTH_LEN or session.islastbar or not inRth)
+    if strategy.position_size != 0
+        strategy.close_all(comment = "16:00")
+    lastClose := close
+    rthOn := false
+
+// ═══════════════════════════════ ANZEIGE ═══════════════════════════════
+bool showNow = showBand and rthOn and inRth and not na(sig) and not na(pc)
+plot(showNow ? ub : na, "Obere Grenze", color = C_UP, style = plot.style_linebr)
+plot(showNow ? lb : na, "Untere Grenze", color = C_DN, style = plot.style_linebr)
+plot(showNow ? vw : na, "VWAP (RTH)", color = color.new(color.gray, 30), style = plot.style_linebr)
