@@ -13,6 +13,12 @@ Gotham Zones (±0.5/1/1.5/2σ um das Daily Open, σ aus VIX1D/VIX9D/VXN) – Aus
   15/30/45/60 Min), Linien als „geschützt“ / „bricht“ mit Wahrscheinlichkeit (NQ, ES, RTY, GC, 1J/3J/5J).
   Wird von `data-lab/ib_levels_stats.py` aus `IB-Levels_template.pine` gebaut – nicht von Hand ändern, sondern das Template.
 
+- `IB-Expansion_indicator.pine` + `IBX_<Markt>_library.pine` – Levels ±0,1 … ±1,5 IB-Range mit
+  Wahrscheinlichkeit „wird bis Tagesende erreicht“: TP-Level (≥ 70 %) und geschützte Level (≥ 70 % nicht erreicht),
+  live nach Abstand zum Kurs und Restzeit, mit „gültig bis“. Daten in vier Libraries (einmal privat veröffentlichen),
+  Indikator importiert sie. Beides wird von `data-lab/ib_ext_stats.py` aus `IB-Expansion_template.pine` gebaut.
+  Kalibrierung auf dem ungesehenen letzten Jahr: `data-lab/results/ib_ext_stats.md`.
+
 Ergebnisse (Python, `data-lab/`):
 - Zonen pauschal (Fade oder Breakout) haben keinen Vorteil, Reaktion im Median 20–30 Pkt
   (`data-lab/results/gotham_zones_reaction.md`, `gotham_zones_trades.md`).

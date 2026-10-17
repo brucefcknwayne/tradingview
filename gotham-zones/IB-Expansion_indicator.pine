@@ -1,0 +1,1051 @@
+//@version=6
+indicator("IB Expansion · TP & geschützte Level", shorttitle = "IB-Exp", overlay = true, max_lines_count = 500, max_labels_count = 500)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  🦇  IB EXPANSION  ·  by @Brucefcknwayne
+//
+//  Levels ±0,1 … ±1,5 IB-Range über/unter der Initial Balance (jede volle Stunde +
+//  08:30/09:30/10:30, Länge 15/30/45/60 Min). Jedes Level bekommt die Wahrscheinlichkeit,
+//  bis Tagesende erreicht zu werden – live aktualisiert:
+//    · bei IB-Ende: je Wochentag und ob IB-Hoch oder IB-Tief zuerst gebildet wurde
+//    · danach: gemessen aus den Daten, wie oft ein Level noch erreicht wird, wenn es
+//      d IB-Ranges vom aktuellen Kurs entfernt ist und noch so viel Zeit übrig ist
+//      (Bruch einer Seite, Rücklauf, späte Uhrzeit – alles steckt in Abstand + Zeit)
+//  Getestet auf dem letzten Jahr (ungesehen): „TP ≥ 70 %“ wurde zu 71–82 % erreicht,
+//  „geschützt“ nur zu 6–17 % (data-lab/results/ib_ext_stats.md).
+//  TP-Level      = Wahrscheinlichkeit erreicht ≥ Schwelle (Standard 70 %)
+//  Geschützt     = Wahrscheinlichkeit NICHT erreicht ≥ Schwelle → Stop dahinter
+//  "gültig bis"  = ab dieser Uhrzeit fällt das TP-Level unter die Schwelle, falls bis dahin nichts passiert
+//  Tagesende: 17:00 NY für IBs vor 09:30, sonst 16:00.
+//
+//  DATEN kommen aus vier Libraries (IBX_NQ, IBX_ES, IBX_RTY, IBX_GC), die du einmal selbst
+//  veröffentlichen musst (privat reicht). Steht dein TradingView-Name anders als unten,
+//  die vier import-Zeilen anpassen. Statistik: Databento CME 1m, letzte 5 Jahre.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import Brucefcknwayne/IBX_NQ/1 as dNQ
+import Brucefcknwayne/IBX_ES/1 as dES
+import Brucefcknwayne/IBX_RTY/1 as dRTY
+import Brucefcknwayne/IBX_GC/1 as dGC
+
+const string TZ    = "America/New_York"
+const string ALPHA = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+const string G_I   = "Initial Balance"
+const string G_S   = "Schwellen"
+const string G_A   = "Anzeige"
+
+// ═══════════════════════════════ INPUTS ═══════════════════════════════
+string startIn = input.string("09:30", "IB-Start (NY)", options = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "12:00", "13:00", "14:00", "15:00"], group = G_I)
+int    lenIn   = input.int(30, "IB-Länge (Min)", options = [15, 30, 45, 60], group = G_I)
+bool   useWd   = input.bool(true, "Wochentag berücksichtigen", group = G_I, tooltip = "Bei IB-Ende die Statistik des heutigen Wochentags nutzen (sonst alle Tage).")
+int    thrTP   = input.int(70, "TP-Level ab (% erreicht)", minval = 50, maxval = 95, group = G_S)
+int    thrSL   = input.int(70, "Geschützt ab (% nicht erreicht)", minval = 50, maxval = 95, group = G_S)
+string lblMode = input.string("Grenzen", "Beschriftung", options = ["Grenzen", "Alle Levels"], group = G_A, tooltip = "Grenzen: weitestes TP-Level und erstes geschütztes Level je Seite.")
+bool   showNeu = input.bool(true, "Neutrale Levels zeigen", group = G_A)
+bool   showTab = input.bool(true, "Info-Tabelle", group = G_A)
+color  cTP     = input.color(#2962ff, "TP", inline = "c", group = G_A)
+color  cSL     = input.color(#ff9800, "Geschützt", inline = "c", group = G_A)
+color  cIB     = input.color(#e535f5, "IB", inline = "c", group = G_A)
+color  cNeu    = input.color(#787b86, "Neutral", inline = "c", group = G_A)
+
+// ═══════════════════════════════ DATEN ═══════════════════════════════
+string root = syminfo.root
+string mk   = root == "NQ" or root == "MNQ" ? "NQ" : root == "ES" or root == "MES" ? "ES" : root == "RTY" or root == "M2K" ? "RTY" : root == "GC" or root == "MGC" ? "GC" : ""
+string wkey = str.replace(startIn, ":", "") + "-" + str.tostring(lenIn)
+
+var string DATA = ""
+if barstate.isfirst and mk == "NQ" and wkey == "1800-15"
+    DATA := dNQ.w1800_15()
+if barstate.isfirst and mk == "NQ" and wkey == "1800-30"
+    DATA := dNQ.w1800_30()
+if barstate.isfirst and mk == "NQ" and wkey == "1800-45"
+    DATA := dNQ.w1800_45()
+if barstate.isfirst and mk == "NQ" and wkey == "1800-60"
+    DATA := dNQ.w1800_60()
+if barstate.isfirst and mk == "NQ" and wkey == "1900-15"
+    DATA := dNQ.w1900_15()
+if barstate.isfirst and mk == "NQ" and wkey == "1900-30"
+    DATA := dNQ.w1900_30()
+if barstate.isfirst and mk == "NQ" and wkey == "1900-45"
+    DATA := dNQ.w1900_45()
+if barstate.isfirst and mk == "NQ" and wkey == "1900-60"
+    DATA := dNQ.w1900_60()
+if barstate.isfirst and mk == "NQ" and wkey == "2000-15"
+    DATA := dNQ.w2000_15()
+if barstate.isfirst and mk == "NQ" and wkey == "2000-30"
+    DATA := dNQ.w2000_30()
+if barstate.isfirst and mk == "NQ" and wkey == "2000-45"
+    DATA := dNQ.w2000_45()
+if barstate.isfirst and mk == "NQ" and wkey == "2000-60"
+    DATA := dNQ.w2000_60()
+if barstate.isfirst and mk == "NQ" and wkey == "2100-15"
+    DATA := dNQ.w2100_15()
+if barstate.isfirst and mk == "NQ" and wkey == "2100-30"
+    DATA := dNQ.w2100_30()
+if barstate.isfirst and mk == "NQ" and wkey == "2100-45"
+    DATA := dNQ.w2100_45()
+if barstate.isfirst and mk == "NQ" and wkey == "2100-60"
+    DATA := dNQ.w2100_60()
+if barstate.isfirst and mk == "NQ" and wkey == "2200-15"
+    DATA := dNQ.w2200_15()
+if barstate.isfirst and mk == "NQ" and wkey == "2200-30"
+    DATA := dNQ.w2200_30()
+if barstate.isfirst and mk == "NQ" and wkey == "2200-45"
+    DATA := dNQ.w2200_45()
+if barstate.isfirst and mk == "NQ" and wkey == "2200-60"
+    DATA := dNQ.w2200_60()
+if barstate.isfirst and mk == "NQ" and wkey == "2300-15"
+    DATA := dNQ.w2300_15()
+if barstate.isfirst and mk == "NQ" and wkey == "2300-30"
+    DATA := dNQ.w2300_30()
+if barstate.isfirst and mk == "NQ" and wkey == "2300-45"
+    DATA := dNQ.w2300_45()
+if barstate.isfirst and mk == "NQ" and wkey == "2300-60"
+    DATA := dNQ.w2300_60()
+if barstate.isfirst and mk == "NQ" and wkey == "0000-15"
+    DATA := dNQ.w0000_15()
+if barstate.isfirst and mk == "NQ" and wkey == "0000-30"
+    DATA := dNQ.w0000_30()
+if barstate.isfirst and mk == "NQ" and wkey == "0000-45"
+    DATA := dNQ.w0000_45()
+if barstate.isfirst and mk == "NQ" and wkey == "0000-60"
+    DATA := dNQ.w0000_60()
+if barstate.isfirst and mk == "NQ" and wkey == "0100-15"
+    DATA := dNQ.w0100_15()
+if barstate.isfirst and mk == "NQ" and wkey == "0100-30"
+    DATA := dNQ.w0100_30()
+if barstate.isfirst and mk == "NQ" and wkey == "0100-45"
+    DATA := dNQ.w0100_45()
+if barstate.isfirst and mk == "NQ" and wkey == "0100-60"
+    DATA := dNQ.w0100_60()
+if barstate.isfirst and mk == "NQ" and wkey == "0200-15"
+    DATA := dNQ.w0200_15()
+if barstate.isfirst and mk == "NQ" and wkey == "0200-30"
+    DATA := dNQ.w0200_30()
+if barstate.isfirst and mk == "NQ" and wkey == "0200-45"
+    DATA := dNQ.w0200_45()
+if barstate.isfirst and mk == "NQ" and wkey == "0200-60"
+    DATA := dNQ.w0200_60()
+if barstate.isfirst and mk == "NQ" and wkey == "0300-15"
+    DATA := dNQ.w0300_15()
+if barstate.isfirst and mk == "NQ" and wkey == "0300-30"
+    DATA := dNQ.w0300_30()
+if barstate.isfirst and mk == "NQ" and wkey == "0300-45"
+    DATA := dNQ.w0300_45()
+if barstate.isfirst and mk == "NQ" and wkey == "0300-60"
+    DATA := dNQ.w0300_60()
+if barstate.isfirst and mk == "NQ" and wkey == "0400-15"
+    DATA := dNQ.w0400_15()
+if barstate.isfirst and mk == "NQ" and wkey == "0400-30"
+    DATA := dNQ.w0400_30()
+if barstate.isfirst and mk == "NQ" and wkey == "0400-45"
+    DATA := dNQ.w0400_45()
+if barstate.isfirst and mk == "NQ" and wkey == "0400-60"
+    DATA := dNQ.w0400_60()
+if barstate.isfirst and mk == "NQ" and wkey == "0500-15"
+    DATA := dNQ.w0500_15()
+if barstate.isfirst and mk == "NQ" and wkey == "0500-30"
+    DATA := dNQ.w0500_30()
+if barstate.isfirst and mk == "NQ" and wkey == "0500-45"
+    DATA := dNQ.w0500_45()
+if barstate.isfirst and mk == "NQ" and wkey == "0500-60"
+    DATA := dNQ.w0500_60()
+if barstate.isfirst and mk == "NQ" and wkey == "0600-15"
+    DATA := dNQ.w0600_15()
+if barstate.isfirst and mk == "NQ" and wkey == "0600-30"
+    DATA := dNQ.w0600_30()
+if barstate.isfirst and mk == "NQ" and wkey == "0600-45"
+    DATA := dNQ.w0600_45()
+if barstate.isfirst and mk == "NQ" and wkey == "0600-60"
+    DATA := dNQ.w0600_60()
+if barstate.isfirst and mk == "NQ" and wkey == "0700-15"
+    DATA := dNQ.w0700_15()
+if barstate.isfirst and mk == "NQ" and wkey == "0700-30"
+    DATA := dNQ.w0700_30()
+if barstate.isfirst and mk == "NQ" and wkey == "0700-45"
+    DATA := dNQ.w0700_45()
+if barstate.isfirst and mk == "NQ" and wkey == "0700-60"
+    DATA := dNQ.w0700_60()
+if barstate.isfirst and mk == "NQ" and wkey == "0800-15"
+    DATA := dNQ.w0800_15()
+if barstate.isfirst and mk == "NQ" and wkey == "0800-30"
+    DATA := dNQ.w0800_30()
+if barstate.isfirst and mk == "NQ" and wkey == "0800-45"
+    DATA := dNQ.w0800_45()
+if barstate.isfirst and mk == "NQ" and wkey == "0800-60"
+    DATA := dNQ.w0800_60()
+if barstate.isfirst and mk == "NQ" and wkey == "0900-15"
+    DATA := dNQ.w0900_15()
+if barstate.isfirst and mk == "NQ" and wkey == "0900-30"
+    DATA := dNQ.w0900_30()
+if barstate.isfirst and mk == "NQ" and wkey == "0900-45"
+    DATA := dNQ.w0900_45()
+if barstate.isfirst and mk == "NQ" and wkey == "0900-60"
+    DATA := dNQ.w0900_60()
+if barstate.isfirst and mk == "NQ" and wkey == "1000-15"
+    DATA := dNQ.w1000_15()
+if barstate.isfirst and mk == "NQ" and wkey == "1000-30"
+    DATA := dNQ.w1000_30()
+if barstate.isfirst and mk == "NQ" and wkey == "1000-45"
+    DATA := dNQ.w1000_45()
+if barstate.isfirst and mk == "NQ" and wkey == "1000-60"
+    DATA := dNQ.w1000_60()
+if barstate.isfirst and mk == "NQ" and wkey == "1100-15"
+    DATA := dNQ.w1100_15()
+if barstate.isfirst and mk == "NQ" and wkey == "1100-30"
+    DATA := dNQ.w1100_30()
+if barstate.isfirst and mk == "NQ" and wkey == "1100-45"
+    DATA := dNQ.w1100_45()
+if barstate.isfirst and mk == "NQ" and wkey == "1100-60"
+    DATA := dNQ.w1100_60()
+if barstate.isfirst and mk == "NQ" and wkey == "1200-15"
+    DATA := dNQ.w1200_15()
+if barstate.isfirst and mk == "NQ" and wkey == "1200-30"
+    DATA := dNQ.w1200_30()
+if barstate.isfirst and mk == "NQ" and wkey == "1200-45"
+    DATA := dNQ.w1200_45()
+if barstate.isfirst and mk == "NQ" and wkey == "1200-60"
+    DATA := dNQ.w1200_60()
+if barstate.isfirst and mk == "NQ" and wkey == "1300-15"
+    DATA := dNQ.w1300_15()
+if barstate.isfirst and mk == "NQ" and wkey == "1300-30"
+    DATA := dNQ.w1300_30()
+if barstate.isfirst and mk == "NQ" and wkey == "1300-45"
+    DATA := dNQ.w1300_45()
+if barstate.isfirst and mk == "NQ" and wkey == "1300-60"
+    DATA := dNQ.w1300_60()
+if barstate.isfirst and mk == "NQ" and wkey == "1400-15"
+    DATA := dNQ.w1400_15()
+if barstate.isfirst and mk == "NQ" and wkey == "1400-30"
+    DATA := dNQ.w1400_30()
+if barstate.isfirst and mk == "NQ" and wkey == "1400-45"
+    DATA := dNQ.w1400_45()
+if barstate.isfirst and mk == "NQ" and wkey == "1400-60"
+    DATA := dNQ.w1400_60()
+if barstate.isfirst and mk == "NQ" and wkey == "1500-15"
+    DATA := dNQ.w1500_15()
+if barstate.isfirst and mk == "NQ" and wkey == "1500-30"
+    DATA := dNQ.w1500_30()
+if barstate.isfirst and mk == "NQ" and wkey == "0830-15"
+    DATA := dNQ.w0830_15()
+if barstate.isfirst and mk == "NQ" and wkey == "0830-30"
+    DATA := dNQ.w0830_30()
+if barstate.isfirst and mk == "NQ" and wkey == "0830-45"
+    DATA := dNQ.w0830_45()
+if barstate.isfirst and mk == "NQ" and wkey == "0830-60"
+    DATA := dNQ.w0830_60()
+if barstate.isfirst and mk == "NQ" and wkey == "0930-15"
+    DATA := dNQ.w0930_15()
+if barstate.isfirst and mk == "NQ" and wkey == "0930-30"
+    DATA := dNQ.w0930_30()
+if barstate.isfirst and mk == "NQ" and wkey == "0930-45"
+    DATA := dNQ.w0930_45()
+if barstate.isfirst and mk == "NQ" and wkey == "0930-60"
+    DATA := dNQ.w0930_60()
+if barstate.isfirst and mk == "NQ" and wkey == "1030-15"
+    DATA := dNQ.w1030_15()
+if barstate.isfirst and mk == "NQ" and wkey == "1030-30"
+    DATA := dNQ.w1030_30()
+if barstate.isfirst and mk == "NQ" and wkey == "1030-45"
+    DATA := dNQ.w1030_45()
+if barstate.isfirst and mk == "NQ" and wkey == "1030-60"
+    DATA := dNQ.w1030_60()
+if barstate.isfirst and mk == "ES" and wkey == "1800-15"
+    DATA := dES.w1800_15()
+if barstate.isfirst and mk == "ES" and wkey == "1800-30"
+    DATA := dES.w1800_30()
+if barstate.isfirst and mk == "ES" and wkey == "1800-45"
+    DATA := dES.w1800_45()
+if barstate.isfirst and mk == "ES" and wkey == "1800-60"
+    DATA := dES.w1800_60()
+if barstate.isfirst and mk == "ES" and wkey == "1900-15"
+    DATA := dES.w1900_15()
+if barstate.isfirst and mk == "ES" and wkey == "1900-30"
+    DATA := dES.w1900_30()
+if barstate.isfirst and mk == "ES" and wkey == "1900-45"
+    DATA := dES.w1900_45()
+if barstate.isfirst and mk == "ES" and wkey == "1900-60"
+    DATA := dES.w1900_60()
+if barstate.isfirst and mk == "ES" and wkey == "2000-15"
+    DATA := dES.w2000_15()
+if barstate.isfirst and mk == "ES" and wkey == "2000-30"
+    DATA := dES.w2000_30()
+if barstate.isfirst and mk == "ES" and wkey == "2000-45"
+    DATA := dES.w2000_45()
+if barstate.isfirst and mk == "ES" and wkey == "2000-60"
+    DATA := dES.w2000_60()
+if barstate.isfirst and mk == "ES" and wkey == "2100-15"
+    DATA := dES.w2100_15()
+if barstate.isfirst and mk == "ES" and wkey == "2100-30"
+    DATA := dES.w2100_30()
+if barstate.isfirst and mk == "ES" and wkey == "2100-45"
+    DATA := dES.w2100_45()
+if barstate.isfirst and mk == "ES" and wkey == "2100-60"
+    DATA := dES.w2100_60()
+if barstate.isfirst and mk == "ES" and wkey == "2200-15"
+    DATA := dES.w2200_15()
+if barstate.isfirst and mk == "ES" and wkey == "2200-30"
+    DATA := dES.w2200_30()
+if barstate.isfirst and mk == "ES" and wkey == "2200-45"
+    DATA := dES.w2200_45()
+if barstate.isfirst and mk == "ES" and wkey == "2200-60"
+    DATA := dES.w2200_60()
+if barstate.isfirst and mk == "ES" and wkey == "2300-15"
+    DATA := dES.w2300_15()
+if barstate.isfirst and mk == "ES" and wkey == "2300-30"
+    DATA := dES.w2300_30()
+if barstate.isfirst and mk == "ES" and wkey == "2300-45"
+    DATA := dES.w2300_45()
+if barstate.isfirst and mk == "ES" and wkey == "2300-60"
+    DATA := dES.w2300_60()
+if barstate.isfirst and mk == "ES" and wkey == "0000-15"
+    DATA := dES.w0000_15()
+if barstate.isfirst and mk == "ES" and wkey == "0000-30"
+    DATA := dES.w0000_30()
+if barstate.isfirst and mk == "ES" and wkey == "0000-45"
+    DATA := dES.w0000_45()
+if barstate.isfirst and mk == "ES" and wkey == "0000-60"
+    DATA := dES.w0000_60()
+if barstate.isfirst and mk == "ES" and wkey == "0100-15"
+    DATA := dES.w0100_15()
+if barstate.isfirst and mk == "ES" and wkey == "0100-30"
+    DATA := dES.w0100_30()
+if barstate.isfirst and mk == "ES" and wkey == "0100-45"
+    DATA := dES.w0100_45()
+if barstate.isfirst and mk == "ES" and wkey == "0100-60"
+    DATA := dES.w0100_60()
+if barstate.isfirst and mk == "ES" and wkey == "0200-15"
+    DATA := dES.w0200_15()
+if barstate.isfirst and mk == "ES" and wkey == "0200-30"
+    DATA := dES.w0200_30()
+if barstate.isfirst and mk == "ES" and wkey == "0200-45"
+    DATA := dES.w0200_45()
+if barstate.isfirst and mk == "ES" and wkey == "0200-60"
+    DATA := dES.w0200_60()
+if barstate.isfirst and mk == "ES" and wkey == "0300-15"
+    DATA := dES.w0300_15()
+if barstate.isfirst and mk == "ES" and wkey == "0300-30"
+    DATA := dES.w0300_30()
+if barstate.isfirst and mk == "ES" and wkey == "0300-45"
+    DATA := dES.w0300_45()
+if barstate.isfirst and mk == "ES" and wkey == "0300-60"
+    DATA := dES.w0300_60()
+if barstate.isfirst and mk == "ES" and wkey == "0400-15"
+    DATA := dES.w0400_15()
+if barstate.isfirst and mk == "ES" and wkey == "0400-30"
+    DATA := dES.w0400_30()
+if barstate.isfirst and mk == "ES" and wkey == "0400-45"
+    DATA := dES.w0400_45()
+if barstate.isfirst and mk == "ES" and wkey == "0400-60"
+    DATA := dES.w0400_60()
+if barstate.isfirst and mk == "ES" and wkey == "0500-15"
+    DATA := dES.w0500_15()
+if barstate.isfirst and mk == "ES" and wkey == "0500-30"
+    DATA := dES.w0500_30()
+if barstate.isfirst and mk == "ES" and wkey == "0500-45"
+    DATA := dES.w0500_45()
+if barstate.isfirst and mk == "ES" and wkey == "0500-60"
+    DATA := dES.w0500_60()
+if barstate.isfirst and mk == "ES" and wkey == "0600-15"
+    DATA := dES.w0600_15()
+if barstate.isfirst and mk == "ES" and wkey == "0600-30"
+    DATA := dES.w0600_30()
+if barstate.isfirst and mk == "ES" and wkey == "0600-45"
+    DATA := dES.w0600_45()
+if barstate.isfirst and mk == "ES" and wkey == "0600-60"
+    DATA := dES.w0600_60()
+if barstate.isfirst and mk == "ES" and wkey == "0700-15"
+    DATA := dES.w0700_15()
+if barstate.isfirst and mk == "ES" and wkey == "0700-30"
+    DATA := dES.w0700_30()
+if barstate.isfirst and mk == "ES" and wkey == "0700-45"
+    DATA := dES.w0700_45()
+if barstate.isfirst and mk == "ES" and wkey == "0700-60"
+    DATA := dES.w0700_60()
+if barstate.isfirst and mk == "ES" and wkey == "0800-15"
+    DATA := dES.w0800_15()
+if barstate.isfirst and mk == "ES" and wkey == "0800-30"
+    DATA := dES.w0800_30()
+if barstate.isfirst and mk == "ES" and wkey == "0800-45"
+    DATA := dES.w0800_45()
+if barstate.isfirst and mk == "ES" and wkey == "0800-60"
+    DATA := dES.w0800_60()
+if barstate.isfirst and mk == "ES" and wkey == "0900-15"
+    DATA := dES.w0900_15()
+if barstate.isfirst and mk == "ES" and wkey == "0900-30"
+    DATA := dES.w0900_30()
+if barstate.isfirst and mk == "ES" and wkey == "0900-45"
+    DATA := dES.w0900_45()
+if barstate.isfirst and mk == "ES" and wkey == "0900-60"
+    DATA := dES.w0900_60()
+if barstate.isfirst and mk == "ES" and wkey == "1000-15"
+    DATA := dES.w1000_15()
+if barstate.isfirst and mk == "ES" and wkey == "1000-30"
+    DATA := dES.w1000_30()
+if barstate.isfirst and mk == "ES" and wkey == "1000-45"
+    DATA := dES.w1000_45()
+if barstate.isfirst and mk == "ES" and wkey == "1000-60"
+    DATA := dES.w1000_60()
+if barstate.isfirst and mk == "ES" and wkey == "1100-15"
+    DATA := dES.w1100_15()
+if barstate.isfirst and mk == "ES" and wkey == "1100-30"
+    DATA := dES.w1100_30()
+if barstate.isfirst and mk == "ES" and wkey == "1100-45"
+    DATA := dES.w1100_45()
+if barstate.isfirst and mk == "ES" and wkey == "1100-60"
+    DATA := dES.w1100_60()
+if barstate.isfirst and mk == "ES" and wkey == "1200-15"
+    DATA := dES.w1200_15()
+if barstate.isfirst and mk == "ES" and wkey == "1200-30"
+    DATA := dES.w1200_30()
+if barstate.isfirst and mk == "ES" and wkey == "1200-45"
+    DATA := dES.w1200_45()
+if barstate.isfirst and mk == "ES" and wkey == "1200-60"
+    DATA := dES.w1200_60()
+if barstate.isfirst and mk == "ES" and wkey == "1300-15"
+    DATA := dES.w1300_15()
+if barstate.isfirst and mk == "ES" and wkey == "1300-30"
+    DATA := dES.w1300_30()
+if barstate.isfirst and mk == "ES" and wkey == "1300-45"
+    DATA := dES.w1300_45()
+if barstate.isfirst and mk == "ES" and wkey == "1300-60"
+    DATA := dES.w1300_60()
+if barstate.isfirst and mk == "ES" and wkey == "1400-15"
+    DATA := dES.w1400_15()
+if barstate.isfirst and mk == "ES" and wkey == "1400-30"
+    DATA := dES.w1400_30()
+if barstate.isfirst and mk == "ES" and wkey == "1400-45"
+    DATA := dES.w1400_45()
+if barstate.isfirst and mk == "ES" and wkey == "1400-60"
+    DATA := dES.w1400_60()
+if barstate.isfirst and mk == "ES" and wkey == "1500-15"
+    DATA := dES.w1500_15()
+if barstate.isfirst and mk == "ES" and wkey == "1500-30"
+    DATA := dES.w1500_30()
+if barstate.isfirst and mk == "ES" and wkey == "0830-15"
+    DATA := dES.w0830_15()
+if barstate.isfirst and mk == "ES" and wkey == "0830-30"
+    DATA := dES.w0830_30()
+if barstate.isfirst and mk == "ES" and wkey == "0830-45"
+    DATA := dES.w0830_45()
+if barstate.isfirst and mk == "ES" and wkey == "0830-60"
+    DATA := dES.w0830_60()
+if barstate.isfirst and mk == "ES" and wkey == "0930-15"
+    DATA := dES.w0930_15()
+if barstate.isfirst and mk == "ES" and wkey == "0930-30"
+    DATA := dES.w0930_30()
+if barstate.isfirst and mk == "ES" and wkey == "0930-45"
+    DATA := dES.w0930_45()
+if barstate.isfirst and mk == "ES" and wkey == "0930-60"
+    DATA := dES.w0930_60()
+if barstate.isfirst and mk == "ES" and wkey == "1030-15"
+    DATA := dES.w1030_15()
+if barstate.isfirst and mk == "ES" and wkey == "1030-30"
+    DATA := dES.w1030_30()
+if barstate.isfirst and mk == "ES" and wkey == "1030-45"
+    DATA := dES.w1030_45()
+if barstate.isfirst and mk == "ES" and wkey == "1030-60"
+    DATA := dES.w1030_60()
+if barstate.isfirst and mk == "RTY" and wkey == "1800-15"
+    DATA := dRTY.w1800_15()
+if barstate.isfirst and mk == "RTY" and wkey == "1800-30"
+    DATA := dRTY.w1800_30()
+if barstate.isfirst and mk == "RTY" and wkey == "1800-45"
+    DATA := dRTY.w1800_45()
+if barstate.isfirst and mk == "RTY" and wkey == "1800-60"
+    DATA := dRTY.w1800_60()
+if barstate.isfirst and mk == "RTY" and wkey == "1900-15"
+    DATA := dRTY.w1900_15()
+if barstate.isfirst and mk == "RTY" and wkey == "1900-30"
+    DATA := dRTY.w1900_30()
+if barstate.isfirst and mk == "RTY" and wkey == "1900-45"
+    DATA := dRTY.w1900_45()
+if barstate.isfirst and mk == "RTY" and wkey == "1900-60"
+    DATA := dRTY.w1900_60()
+if barstate.isfirst and mk == "RTY" and wkey == "2000-15"
+    DATA := dRTY.w2000_15()
+if barstate.isfirst and mk == "RTY" and wkey == "2000-30"
+    DATA := dRTY.w2000_30()
+if barstate.isfirst and mk == "RTY" and wkey == "2000-45"
+    DATA := dRTY.w2000_45()
+if barstate.isfirst and mk == "RTY" and wkey == "2000-60"
+    DATA := dRTY.w2000_60()
+if barstate.isfirst and mk == "RTY" and wkey == "2100-15"
+    DATA := dRTY.w2100_15()
+if barstate.isfirst and mk == "RTY" and wkey == "2100-30"
+    DATA := dRTY.w2100_30()
+if barstate.isfirst and mk == "RTY" and wkey == "2100-45"
+    DATA := dRTY.w2100_45()
+if barstate.isfirst and mk == "RTY" and wkey == "2100-60"
+    DATA := dRTY.w2100_60()
+if barstate.isfirst and mk == "RTY" and wkey == "2200-15"
+    DATA := dRTY.w2200_15()
+if barstate.isfirst and mk == "RTY" and wkey == "2200-30"
+    DATA := dRTY.w2200_30()
+if barstate.isfirst and mk == "RTY" and wkey == "2200-45"
+    DATA := dRTY.w2200_45()
+if barstate.isfirst and mk == "RTY" and wkey == "2200-60"
+    DATA := dRTY.w2200_60()
+if barstate.isfirst and mk == "RTY" and wkey == "2300-15"
+    DATA := dRTY.w2300_15()
+if barstate.isfirst and mk == "RTY" and wkey == "2300-30"
+    DATA := dRTY.w2300_30()
+if barstate.isfirst and mk == "RTY" and wkey == "2300-45"
+    DATA := dRTY.w2300_45()
+if barstate.isfirst and mk == "RTY" and wkey == "2300-60"
+    DATA := dRTY.w2300_60()
+if barstate.isfirst and mk == "RTY" and wkey == "0000-15"
+    DATA := dRTY.w0000_15()
+if barstate.isfirst and mk == "RTY" and wkey == "0000-30"
+    DATA := dRTY.w0000_30()
+if barstate.isfirst and mk == "RTY" and wkey == "0000-45"
+    DATA := dRTY.w0000_45()
+if barstate.isfirst and mk == "RTY" and wkey == "0000-60"
+    DATA := dRTY.w0000_60()
+if barstate.isfirst and mk == "RTY" and wkey == "0100-15"
+    DATA := dRTY.w0100_15()
+if barstate.isfirst and mk == "RTY" and wkey == "0100-30"
+    DATA := dRTY.w0100_30()
+if barstate.isfirst and mk == "RTY" and wkey == "0100-45"
+    DATA := dRTY.w0100_45()
+if barstate.isfirst and mk == "RTY" and wkey == "0100-60"
+    DATA := dRTY.w0100_60()
+if barstate.isfirst and mk == "RTY" and wkey == "0200-15"
+    DATA := dRTY.w0200_15()
+if barstate.isfirst and mk == "RTY" and wkey == "0200-30"
+    DATA := dRTY.w0200_30()
+if barstate.isfirst and mk == "RTY" and wkey == "0200-45"
+    DATA := dRTY.w0200_45()
+if barstate.isfirst and mk == "RTY" and wkey == "0200-60"
+    DATA := dRTY.w0200_60()
+if barstate.isfirst and mk == "RTY" and wkey == "0300-15"
+    DATA := dRTY.w0300_15()
+if barstate.isfirst and mk == "RTY" and wkey == "0300-30"
+    DATA := dRTY.w0300_30()
+if barstate.isfirst and mk == "RTY" and wkey == "0300-45"
+    DATA := dRTY.w0300_45()
+if barstate.isfirst and mk == "RTY" and wkey == "0300-60"
+    DATA := dRTY.w0300_60()
+if barstate.isfirst and mk == "RTY" and wkey == "0400-15"
+    DATA := dRTY.w0400_15()
+if barstate.isfirst and mk == "RTY" and wkey == "0400-30"
+    DATA := dRTY.w0400_30()
+if barstate.isfirst and mk == "RTY" and wkey == "0400-45"
+    DATA := dRTY.w0400_45()
+if barstate.isfirst and mk == "RTY" and wkey == "0400-60"
+    DATA := dRTY.w0400_60()
+if barstate.isfirst and mk == "RTY" and wkey == "0500-15"
+    DATA := dRTY.w0500_15()
+if barstate.isfirst and mk == "RTY" and wkey == "0500-30"
+    DATA := dRTY.w0500_30()
+if barstate.isfirst and mk == "RTY" and wkey == "0500-45"
+    DATA := dRTY.w0500_45()
+if barstate.isfirst and mk == "RTY" and wkey == "0500-60"
+    DATA := dRTY.w0500_60()
+if barstate.isfirst and mk == "RTY" and wkey == "0600-15"
+    DATA := dRTY.w0600_15()
+if barstate.isfirst and mk == "RTY" and wkey == "0600-30"
+    DATA := dRTY.w0600_30()
+if barstate.isfirst and mk == "RTY" and wkey == "0600-45"
+    DATA := dRTY.w0600_45()
+if barstate.isfirst and mk == "RTY" and wkey == "0600-60"
+    DATA := dRTY.w0600_60()
+if barstate.isfirst and mk == "RTY" and wkey == "0700-15"
+    DATA := dRTY.w0700_15()
+if barstate.isfirst and mk == "RTY" and wkey == "0700-30"
+    DATA := dRTY.w0700_30()
+if barstate.isfirst and mk == "RTY" and wkey == "0700-45"
+    DATA := dRTY.w0700_45()
+if barstate.isfirst and mk == "RTY" and wkey == "0700-60"
+    DATA := dRTY.w0700_60()
+if barstate.isfirst and mk == "RTY" and wkey == "0800-15"
+    DATA := dRTY.w0800_15()
+if barstate.isfirst and mk == "RTY" and wkey == "0800-30"
+    DATA := dRTY.w0800_30()
+if barstate.isfirst and mk == "RTY" and wkey == "0800-45"
+    DATA := dRTY.w0800_45()
+if barstate.isfirst and mk == "RTY" and wkey == "0800-60"
+    DATA := dRTY.w0800_60()
+if barstate.isfirst and mk == "RTY" and wkey == "0900-15"
+    DATA := dRTY.w0900_15()
+if barstate.isfirst and mk == "RTY" and wkey == "0900-30"
+    DATA := dRTY.w0900_30()
+if barstate.isfirst and mk == "RTY" and wkey == "0900-45"
+    DATA := dRTY.w0900_45()
+if barstate.isfirst and mk == "RTY" and wkey == "0900-60"
+    DATA := dRTY.w0900_60()
+if barstate.isfirst and mk == "RTY" and wkey == "1000-15"
+    DATA := dRTY.w1000_15()
+if barstate.isfirst and mk == "RTY" and wkey == "1000-30"
+    DATA := dRTY.w1000_30()
+if barstate.isfirst and mk == "RTY" and wkey == "1000-45"
+    DATA := dRTY.w1000_45()
+if barstate.isfirst and mk == "RTY" and wkey == "1000-60"
+    DATA := dRTY.w1000_60()
+if barstate.isfirst and mk == "RTY" and wkey == "1100-15"
+    DATA := dRTY.w1100_15()
+if barstate.isfirst and mk == "RTY" and wkey == "1100-30"
+    DATA := dRTY.w1100_30()
+if barstate.isfirst and mk == "RTY" and wkey == "1100-45"
+    DATA := dRTY.w1100_45()
+if barstate.isfirst and mk == "RTY" and wkey == "1100-60"
+    DATA := dRTY.w1100_60()
+if barstate.isfirst and mk == "RTY" and wkey == "1200-15"
+    DATA := dRTY.w1200_15()
+if barstate.isfirst and mk == "RTY" and wkey == "1200-30"
+    DATA := dRTY.w1200_30()
+if barstate.isfirst and mk == "RTY" and wkey == "1200-45"
+    DATA := dRTY.w1200_45()
+if barstate.isfirst and mk == "RTY" and wkey == "1200-60"
+    DATA := dRTY.w1200_60()
+if barstate.isfirst and mk == "RTY" and wkey == "1300-15"
+    DATA := dRTY.w1300_15()
+if barstate.isfirst and mk == "RTY" and wkey == "1300-30"
+    DATA := dRTY.w1300_30()
+if barstate.isfirst and mk == "RTY" and wkey == "1300-45"
+    DATA := dRTY.w1300_45()
+if barstate.isfirst and mk == "RTY" and wkey == "1300-60"
+    DATA := dRTY.w1300_60()
+if barstate.isfirst and mk == "RTY" and wkey == "1400-15"
+    DATA := dRTY.w1400_15()
+if barstate.isfirst and mk == "RTY" and wkey == "1400-30"
+    DATA := dRTY.w1400_30()
+if barstate.isfirst and mk == "RTY" and wkey == "1400-45"
+    DATA := dRTY.w1400_45()
+if barstate.isfirst and mk == "RTY" and wkey == "1400-60"
+    DATA := dRTY.w1400_60()
+if barstate.isfirst and mk == "RTY" and wkey == "1500-15"
+    DATA := dRTY.w1500_15()
+if barstate.isfirst and mk == "RTY" and wkey == "1500-30"
+    DATA := dRTY.w1500_30()
+if barstate.isfirst and mk == "RTY" and wkey == "0830-15"
+    DATA := dRTY.w0830_15()
+if barstate.isfirst and mk == "RTY" and wkey == "0830-30"
+    DATA := dRTY.w0830_30()
+if barstate.isfirst and mk == "RTY" and wkey == "0830-45"
+    DATA := dRTY.w0830_45()
+if barstate.isfirst and mk == "RTY" and wkey == "0830-60"
+    DATA := dRTY.w0830_60()
+if barstate.isfirst and mk == "RTY" and wkey == "0930-15"
+    DATA := dRTY.w0930_15()
+if barstate.isfirst and mk == "RTY" and wkey == "0930-30"
+    DATA := dRTY.w0930_30()
+if barstate.isfirst and mk == "RTY" and wkey == "0930-45"
+    DATA := dRTY.w0930_45()
+if barstate.isfirst and mk == "RTY" and wkey == "0930-60"
+    DATA := dRTY.w0930_60()
+if barstate.isfirst and mk == "RTY" and wkey == "1030-15"
+    DATA := dRTY.w1030_15()
+if barstate.isfirst and mk == "RTY" and wkey == "1030-30"
+    DATA := dRTY.w1030_30()
+if barstate.isfirst and mk == "RTY" and wkey == "1030-45"
+    DATA := dRTY.w1030_45()
+if barstate.isfirst and mk == "RTY" and wkey == "1030-60"
+    DATA := dRTY.w1030_60()
+if barstate.isfirst and mk == "GC" and wkey == "1800-15"
+    DATA := dGC.w1800_15()
+if barstate.isfirst and mk == "GC" and wkey == "1800-30"
+    DATA := dGC.w1800_30()
+if barstate.isfirst and mk == "GC" and wkey == "1800-45"
+    DATA := dGC.w1800_45()
+if barstate.isfirst and mk == "GC" and wkey == "1800-60"
+    DATA := dGC.w1800_60()
+if barstate.isfirst and mk == "GC" and wkey == "1900-15"
+    DATA := dGC.w1900_15()
+if barstate.isfirst and mk == "GC" and wkey == "1900-30"
+    DATA := dGC.w1900_30()
+if barstate.isfirst and mk == "GC" and wkey == "1900-45"
+    DATA := dGC.w1900_45()
+if barstate.isfirst and mk == "GC" and wkey == "1900-60"
+    DATA := dGC.w1900_60()
+if barstate.isfirst and mk == "GC" and wkey == "2000-15"
+    DATA := dGC.w2000_15()
+if barstate.isfirst and mk == "GC" and wkey == "2000-30"
+    DATA := dGC.w2000_30()
+if barstate.isfirst and mk == "GC" and wkey == "2000-45"
+    DATA := dGC.w2000_45()
+if barstate.isfirst and mk == "GC" and wkey == "2000-60"
+    DATA := dGC.w2000_60()
+if barstate.isfirst and mk == "GC" and wkey == "2100-15"
+    DATA := dGC.w2100_15()
+if barstate.isfirst and mk == "GC" and wkey == "2100-30"
+    DATA := dGC.w2100_30()
+if barstate.isfirst and mk == "GC" and wkey == "2100-45"
+    DATA := dGC.w2100_45()
+if barstate.isfirst and mk == "GC" and wkey == "2100-60"
+    DATA := dGC.w2100_60()
+if barstate.isfirst and mk == "GC" and wkey == "2200-15"
+    DATA := dGC.w2200_15()
+if barstate.isfirst and mk == "GC" and wkey == "2200-30"
+    DATA := dGC.w2200_30()
+if barstate.isfirst and mk == "GC" and wkey == "2200-45"
+    DATA := dGC.w2200_45()
+if barstate.isfirst and mk == "GC" and wkey == "2200-60"
+    DATA := dGC.w2200_60()
+if barstate.isfirst and mk == "GC" and wkey == "2300-15"
+    DATA := dGC.w2300_15()
+if barstate.isfirst and mk == "GC" and wkey == "2300-30"
+    DATA := dGC.w2300_30()
+if barstate.isfirst and mk == "GC" and wkey == "2300-45"
+    DATA := dGC.w2300_45()
+if barstate.isfirst and mk == "GC" and wkey == "2300-60"
+    DATA := dGC.w2300_60()
+if barstate.isfirst and mk == "GC" and wkey == "0000-15"
+    DATA := dGC.w0000_15()
+if barstate.isfirst and mk == "GC" and wkey == "0000-30"
+    DATA := dGC.w0000_30()
+if barstate.isfirst and mk == "GC" and wkey == "0000-45"
+    DATA := dGC.w0000_45()
+if barstate.isfirst and mk == "GC" and wkey == "0000-60"
+    DATA := dGC.w0000_60()
+if barstate.isfirst and mk == "GC" and wkey == "0100-15"
+    DATA := dGC.w0100_15()
+if barstate.isfirst and mk == "GC" and wkey == "0100-30"
+    DATA := dGC.w0100_30()
+if barstate.isfirst and mk == "GC" and wkey == "0100-45"
+    DATA := dGC.w0100_45()
+if barstate.isfirst and mk == "GC" and wkey == "0100-60"
+    DATA := dGC.w0100_60()
+if barstate.isfirst and mk == "GC" and wkey == "0200-15"
+    DATA := dGC.w0200_15()
+if barstate.isfirst and mk == "GC" and wkey == "0200-30"
+    DATA := dGC.w0200_30()
+if barstate.isfirst and mk == "GC" and wkey == "0200-45"
+    DATA := dGC.w0200_45()
+if barstate.isfirst and mk == "GC" and wkey == "0200-60"
+    DATA := dGC.w0200_60()
+if barstate.isfirst and mk == "GC" and wkey == "0300-15"
+    DATA := dGC.w0300_15()
+if barstate.isfirst and mk == "GC" and wkey == "0300-30"
+    DATA := dGC.w0300_30()
+if barstate.isfirst and mk == "GC" and wkey == "0300-45"
+    DATA := dGC.w0300_45()
+if barstate.isfirst and mk == "GC" and wkey == "0300-60"
+    DATA := dGC.w0300_60()
+if barstate.isfirst and mk == "GC" and wkey == "0400-15"
+    DATA := dGC.w0400_15()
+if barstate.isfirst and mk == "GC" and wkey == "0400-30"
+    DATA := dGC.w0400_30()
+if barstate.isfirst and mk == "GC" and wkey == "0400-45"
+    DATA := dGC.w0400_45()
+if barstate.isfirst and mk == "GC" and wkey == "0400-60"
+    DATA := dGC.w0400_60()
+if barstate.isfirst and mk == "GC" and wkey == "0500-15"
+    DATA := dGC.w0500_15()
+if barstate.isfirst and mk == "GC" and wkey == "0500-30"
+    DATA := dGC.w0500_30()
+if barstate.isfirst and mk == "GC" and wkey == "0500-45"
+    DATA := dGC.w0500_45()
+if barstate.isfirst and mk == "GC" and wkey == "0500-60"
+    DATA := dGC.w0500_60()
+if barstate.isfirst and mk == "GC" and wkey == "0600-15"
+    DATA := dGC.w0600_15()
+if barstate.isfirst and mk == "GC" and wkey == "0600-30"
+    DATA := dGC.w0600_30()
+if barstate.isfirst and mk == "GC" and wkey == "0600-45"
+    DATA := dGC.w0600_45()
+if barstate.isfirst and mk == "GC" and wkey == "0600-60"
+    DATA := dGC.w0600_60()
+if barstate.isfirst and mk == "GC" and wkey == "0700-15"
+    DATA := dGC.w0700_15()
+if barstate.isfirst and mk == "GC" and wkey == "0700-30"
+    DATA := dGC.w0700_30()
+if barstate.isfirst and mk == "GC" and wkey == "0700-45"
+    DATA := dGC.w0700_45()
+if barstate.isfirst and mk == "GC" and wkey == "0700-60"
+    DATA := dGC.w0700_60()
+if barstate.isfirst and mk == "GC" and wkey == "0800-15"
+    DATA := dGC.w0800_15()
+if barstate.isfirst and mk == "GC" and wkey == "0800-30"
+    DATA := dGC.w0800_30()
+if barstate.isfirst and mk == "GC" and wkey == "0800-45"
+    DATA := dGC.w0800_45()
+if barstate.isfirst and mk == "GC" and wkey == "0800-60"
+    DATA := dGC.w0800_60()
+if barstate.isfirst and mk == "GC" and wkey == "0900-15"
+    DATA := dGC.w0900_15()
+if barstate.isfirst and mk == "GC" and wkey == "0900-30"
+    DATA := dGC.w0900_30()
+if barstate.isfirst and mk == "GC" and wkey == "0900-45"
+    DATA := dGC.w0900_45()
+if barstate.isfirst and mk == "GC" and wkey == "0900-60"
+    DATA := dGC.w0900_60()
+if barstate.isfirst and mk == "GC" and wkey == "1000-15"
+    DATA := dGC.w1000_15()
+if barstate.isfirst and mk == "GC" and wkey == "1000-30"
+    DATA := dGC.w1000_30()
+if barstate.isfirst and mk == "GC" and wkey == "1000-45"
+    DATA := dGC.w1000_45()
+if barstate.isfirst and mk == "GC" and wkey == "1000-60"
+    DATA := dGC.w1000_60()
+if barstate.isfirst and mk == "GC" and wkey == "1100-15"
+    DATA := dGC.w1100_15()
+if barstate.isfirst and mk == "GC" and wkey == "1100-30"
+    DATA := dGC.w1100_30()
+if barstate.isfirst and mk == "GC" and wkey == "1100-45"
+    DATA := dGC.w1100_45()
+if barstate.isfirst and mk == "GC" and wkey == "1100-60"
+    DATA := dGC.w1100_60()
+if barstate.isfirst and mk == "GC" and wkey == "1200-15"
+    DATA := dGC.w1200_15()
+if barstate.isfirst and mk == "GC" and wkey == "1200-30"
+    DATA := dGC.w1200_30()
+if barstate.isfirst and mk == "GC" and wkey == "1200-45"
+    DATA := dGC.w1200_45()
+if barstate.isfirst and mk == "GC" and wkey == "1200-60"
+    DATA := dGC.w1200_60()
+if barstate.isfirst and mk == "GC" and wkey == "1300-15"
+    DATA := dGC.w1300_15()
+if barstate.isfirst and mk == "GC" and wkey == "1300-30"
+    DATA := dGC.w1300_30()
+if barstate.isfirst and mk == "GC" and wkey == "1300-45"
+    DATA := dGC.w1300_45()
+if barstate.isfirst and mk == "GC" and wkey == "1300-60"
+    DATA := dGC.w1300_60()
+if barstate.isfirst and mk == "GC" and wkey == "1400-15"
+    DATA := dGC.w1400_15()
+if barstate.isfirst and mk == "GC" and wkey == "1400-30"
+    DATA := dGC.w1400_30()
+if barstate.isfirst and mk == "GC" and wkey == "1400-45"
+    DATA := dGC.w1400_45()
+if barstate.isfirst and mk == "GC" and wkey == "1400-60"
+    DATA := dGC.w1400_60()
+if barstate.isfirst and mk == "GC" and wkey == "1500-15"
+    DATA := dGC.w1500_15()
+if barstate.isfirst and mk == "GC" and wkey == "1500-30"
+    DATA := dGC.w1500_30()
+if barstate.isfirst and mk == "GC" and wkey == "0830-15"
+    DATA := dGC.w0830_15()
+if barstate.isfirst and mk == "GC" and wkey == "0830-30"
+    DATA := dGC.w0830_30()
+if barstate.isfirst and mk == "GC" and wkey == "0830-45"
+    DATA := dGC.w0830_45()
+if barstate.isfirst and mk == "GC" and wkey == "0830-60"
+    DATA := dGC.w0830_60()
+if barstate.isfirst and mk == "GC" and wkey == "0930-15"
+    DATA := dGC.w0930_15()
+if barstate.isfirst and mk == "GC" and wkey == "0930-30"
+    DATA := dGC.w0930_30()
+if barstate.isfirst and mk == "GC" and wkey == "0930-45"
+    DATA := dGC.w0930_45()
+if barstate.isfirst and mk == "GC" and wkey == "0930-60"
+    DATA := dGC.w0930_60()
+if barstate.isfirst and mk == "GC" and wkey == "1030-15"
+    DATA := dGC.w1030_15()
+if barstate.isfirst and mk == "GC" and wkey == "1030-30"
+    DATA := dGC.w1030_30()
+if barstate.isfirst and mk == "GC" and wkey == "1030-45"
+    DATA := dGC.w1030_45()
+if barstate.isfirst and mk == "GC" and wkey == "1030-60"
+    DATA := dGC.w1030_60()
+
+var array<float> V = array.new<float>()
+var int NDAYS = 0
+if barstate.isfirst and str.length(DATA) > 0
+    int sep = str.pos(DATA, "|")
+    NDAYS := int(str.tonumber(str.substring(DATA, 0, sep)))
+    string body = str.substring(DATA, sep + 1)
+    for i = 0 to str.length(body) - 1
+        int ix = str.pos(ALPHA, str.substring(body, i, i + 1))
+        array.push(V, ix < 0 ? na : ix / 61.0)
+
+bool hasData = array.size(V) == 1196
+
+f_v(int i) =>
+    hasData ? array.get(V, i) : na
+
+// Tabellen-Layout (siehe data-lab/ib_ext_stats.py):
+//   T1 0–575    ((Wochentag·3 + zuerst)·2 + Seite)·16 + k          P(erreicht) bei IB-Ende
+//   G  576–1195 576 + (Seite·10 + Zeitstufe)·31 + Abstandsstufe   P(noch erreicht | Abstand, Zeit)
+f_t1(int w, int f, int side, int k) =>
+    float x = f_v(((w * 3 + f) * 2 + side) * 16 + k)
+    if na(x)
+        x := f_v((f * 2 + side) * 16 + k)
+    if na(x)
+        x := f_v(((w * 3) * 2 + side) * 16 + k)
+    if na(x)
+        x := f_v(side * 16 + k)
+    x
+
+f_gd(int side, int i, int j0, int j1, float fr) =>
+    float a = f_v(576 + (side * 10 + i) * 31 + j0)
+    float b = f_v(576 + (side * 10 + i) * 31 + j1)
+    na(a) ? b : na(b) ? a : a + (b - a) * fr
+
+// P(Level wird noch erreicht | Abstand d in IB-Ranges, vergangene Zeit q), linear interpoliert; q = 1 → 0
+f_g(int side, float q, float d) =>
+    float x  = d / 0.1 - 0.5
+    int   j0 = math.max(0, math.min(30, int(math.floor(x))))
+    int   j1 = math.min(j0 + 1, 30)
+    float fr = math.max(0.0, math.min(1.0, x - j0))
+    float qq = math.max(0.0, math.min(1.0, q)) * 10
+    int   i0 = math.min(int(math.floor(qq)), 9)
+    float a0 = f_gd(side, i0, j0, j1, fr)
+    float a1 = i0 >= 9 ? 0.0 : f_gd(side, i0 + 1, j0, j1, fr)
+    na(a0) ? a1 : na(a1) ? a0 : a0 + (a1 - a0) * (qq - i0)
+
+// ═══════════════════════════════ ZEIT ═══════════════════════════════
+f_rel(int t) =>
+    (hour(t, TZ) * 60 + minute(t, TZ) - 1080 + 1440) % 1440
+
+int relS   = (int(str.tonumber(str.substring(startIn, 0, 2))) * 60 + int(str.tonumber(str.substring(startIn, 3, 5))) - 1080 + 1440) % 1440
+int relE   = relS + lenIn
+int relEnd = relS < 930 ? 1380 : 1320
+int relNow = f_rel(time)
+
+// ═══════════════════════════════ TAGES-STATUS ═══════════════════════════════
+var float ibH   = na
+var float ibL   = na
+var int   tH    = na
+var int   tL    = na
+var bool  done  = false
+var int   upMax = -1
+var int   dnMax = -1
+var int   wdDay = 0
+var int   ffDay = 0
+var int   tIB   = na
+var int   tEnd  = na
+var array<line>  LU = array.new<line>()
+var array<line>  LD = array.new<line>()
+var array<label> LB = array.new<label>()
+
+if timeframe.isintraday and timeframe.change("D")
+    ibH   := na
+    ibL   := na
+    tH    := na
+    tL    := na
+    done  := false
+    upMax := -1
+    dnMax := -1
+    array.clear(LU)
+    array.clear(LD)
+    for lb in LB
+        label.delete(lb)
+    array.clear(LB)
+
+if relNow >= relS and relNow < relE
+    if na(ibH) or high > ibH
+        ibH := high
+        tH  := time
+    if na(ibL) or low < ibL
+        ibL := low
+        tL  := time
+
+float R = ibH - ibL
+
+f_price(int side, int k) =>
+    side == 0 ? ibH + k * 0.1 * R : ibL - k * 0.1 * R
+
+// IB fertig → 2 × 16 Linien
+if not done and not na(ibH) and R > 0 and relNow >= relE and relNow < relEnd and hasData
+    done  := true
+    tIB   := time
+    tEnd  := time + (relEnd - relNow) * 60000
+    wdDay := useWd ? math.max(0, math.min(5, dayofweek(time_tradingday) - 1)) : 0
+    ffDay := tH < tL ? 1 : tL < tH ? 2 : 0
+    for k = 0 to 15
+        array.push(LU, line.new(time, f_price(0, k), tEnd, f_price(0, k), xloc = xloc.bar_time, color = cNeu))
+        array.push(LD, line.new(time, f_price(1, k), tEnd, f_price(1, k), xloc = xloc.bar_time, color = cNeu))
+
+// erreichte Levels
+if done and relNow < relEnd
+    while upMax < 15 and (upMax < 0 ? high > ibH : high >= f_price(0, upMax + 1))
+        upMax += 1
+    while dnMax < 15 and (dnMax < 0 ? low < ibL : low <= f_price(1, dnMax + 1))
+        dnMax += 1
+
+// ═══════════════════════════════ WAHRSCHEINLICHKEIT ═══════════════════════════════
+float qNow = done ? (relNow - relE + 1) / float(relEnd - relE) : 0.0
+
+f_dist(int side, int k) =>
+    side == 0 ? (f_price(0, k) - close) / R : (close - f_price(1, k)) / R
+
+// bis zum ersten erreichten Level: Übergang von T1 (Wochentag, zuerst gebildet) zu G in den ersten 10 % der Restzeit
+f_prob(int side, int k) =>
+    float g = f_g(side, qNow, math.max(0.0, f_dist(side, k)))
+    float p = g
+    if upMax < 0 and dnMax < 0
+        float t1 = f_t1(wdDay, ffDay, side, k)
+        float w  = math.min(qNow / 0.1, 1.0)
+        p := na(t1) ? g : na(g) ? t1 : (1 - w) * t1 + w * g
+    p
+
+f_fmt(int k) =>
+    str.replace(str.tostring(k / 10.0, "0.0"), ".", ",")
+
+f_pct(float p) =>
+    str.tostring(math.round(p * 100)) + " %"
+
+// Uhrzeit, ab der ein TP-Level unter die Schwelle fällt (wenn der Kurs bis dahin hier bleibt)
+f_valid(int side, int k) =>
+    string out = "Tagesende"
+    float d = math.max(0.0, f_dist(side, k))
+    float q = qNow
+    while q <= 1.0
+        if f_g(side, q, d) < thrTP / 100.0
+            out := str.format_time(int(tIB + q * (tEnd - tIB)), "HH:mm", TZ)
+            break
+        q += 0.02
+    out
+
+// Linienfarben auf jedem Bar (Historie behält den Endstand), Beschriftung nur auf dem letzten Bar
+bool drawLbl = barstate.islast
+if done and relNow < relEnd
+    if drawLbl
+        for lb in LB
+            label.delete(lb)
+        array.clear(LB)
+    int xLbl = time + 3 * timeframe.in_seconds() * 1000
+    for side = 0 to 1
+        int   reached = side == 0 ? upMax : dnMax
+        int   bestTP  = -1
+        int   firstSL = -1
+        float pTP     = na
+        float pSL     = na
+        for k = 0 to 15
+            line ln = side == 0 ? array.get(LU, k) : array.get(LD, k)
+            bool isIB = k == 0
+            if k <= reached
+                line.set_color(ln, color.new(isIB ? cIB : cNeu, 70))
+                line.set_style(ln, line.style_dotted)
+                line.set_width(ln, 1)
+            else
+                float p = f_prob(side, k)
+                bool tp = not na(p) and p >= thrTP / 100.0
+                bool sl = not na(p) and p <= 1 - thrSL / 100.0
+                color c = tp ? cTP : sl ? cSL : isIB ? cIB : cNeu
+                line.set_color(ln, tp or sl or isIB ? c : color.new(c, showNeu ? 70 : 100))
+                line.set_style(ln, sl ? line.style_dashed : line.style_solid)
+                line.set_width(ln, isIB ? 2 : 1)
+                if tp
+                    bestTP := k
+                    pTP    := p
+                if sl and firstSL < 0
+                    firstSL := k
+                    pSL     := p
+                if drawLbl and lblMode == "Alle Levels" and not na(p)
+                    string nm = (side == 0 ? "+" : "−") + f_fmt(k)
+                    array.push(LB, label.new(xLbl, f_price(side, k), nm + " · " + f_pct(p), xloc = xloc.bar_time, style = label.style_label_left, color = color.new(c, 100), textcolor = c, size = size.tiny))
+        if drawLbl and lblMode == "Grenzen"
+            string sg = side == 0 ? "+" : "−"
+            if bestTP >= 0
+                string t = "TP " + sg + f_fmt(bestTP) + " IB · " + f_pct(pTP) + " · gültig bis " + f_valid(side, bestTP)
+                array.push(LB, label.new(xLbl, f_price(side, bestTP), t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cTP, 80), textcolor = cTP, size = size.small))
+            if firstSL >= 0
+                string t = "Geschützt " + sg + f_fmt(firstSL) + " IB · " + f_pct(1 - pSL) + " hält"
+                array.push(LB, label.new(xLbl, f_price(side, firstSL), t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cSL, 80), textcolor = cSL, size = size.small))
+
+// ═══════════════════════════════ INFO ═══════════════════════════════
+var table tb = table.new(position.top_right, 2, 5, bgcolor = color.new(color.black, 80))
+if showTab and barstate.islast
+    string wdTxt = array.get(array.from("alle Tage", "Mo", "Di", "Mi", "Do", "Fr"), wdDay)
+    table.cell(tb, 0, 0, "IB", text_color = color.gray, text_size = size.small)
+    table.cell(tb, 1, 0, mk == "" ? "nur NQ/ES/RTY/GC" : mk + " · " + startIn + " · " + str.tostring(lenIn) + " Min", text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 1, "Statistik", text_color = color.gray, text_size = size.small)
+    table.cell(tb, 1, 1, hasData ? str.tostring(NDAYS) + " Tage · 5 J · " + wdTxt : "keine Daten für dieses Fenster", text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 2, "Zuerst", text_color = color.gray, text_size = size.small)
+    table.cell(tb, 1, 2, not done ? "IB läuft" : ffDay == 1 ? "IB-Hoch" : ffDay == 2 ? "IB-Tief" : "gleich", text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 3, "Erreicht", text_color = color.gray, text_size = size.small)
+    table.cell(tb, 1, 3, done ? "oben " + (upMax < 0 ? "–" : "+" + f_fmt(upMax)) + " · unten " + (dnMax < 0 ? "–" : "−" + f_fmt(dnMax)) : "–", text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 4, "Restzeit", text_color = color.gray, text_size = size.small)
+    table.cell(tb, 1, 4, done and relNow < relEnd ? str.tostring(math.round((1 - qNow) * 100)) + " % · Ende " + str.format_time(tEnd, "HH:mm", TZ) : "–", text_color = color.white, text_size = size.small)
