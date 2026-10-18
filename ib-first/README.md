@@ -4,13 +4,13 @@ Eigenständiges Projekt (unabhängig von `gotham-zones/IB-Expansion`).
 
 **Idee:** Entsteht in der Initial Balance zuerst das Tief, wird danach meist das IB-Hoch geholt – und umgekehrt.
 
-## Indikator `IB-First.pine` (Englisch, für Käufer vereinfacht)
+## Indikator `IB-First.pine` (Englisch, reiner Kontext – keine Strategie)
 NQ, ES, RTY, GC (+ Micros), Markt wird erkannt. Eine IB je Tag: Startzeit + Länge (Auto = beste Länge je Markt und Start).
 Am IB-Ende:
-- **LONG 85% / SHORT 85%** – Richtung; 85 % = so oft kam TP1 vor SL (Signal nur ab „Signal strength“, Standard 70 %)
-- **TP1** – andere Seite der IB · **TP2 81%** – Ausdehnung (Off / 60 / 70 / 80 / 90 %) · **SL** – das Extrem, das zuerst kam
-- kein klarer Vorteil → „No signal“. Treffer: TP1 ✓, TP2 ✓, SL ✗ (dann TPs grau). Alarme mit Preisen.
-Test letztes Jahr bei 70 %: Signal an ~56 % der Tage, TP1 vor SL ~85 %.
+- klein grau „Low first“ / „High first“ am Extrem, das zuerst kam
+- Linie an der anderen IB-Seite: „IB High 86%“ = so oft wurde sie an solchen Tagen geholt (ab „Show from“, Standard 70 %)
+- optional „+0.4 IB 81%“ = weiteste Ausdehnung mit mindestens der gewählten % (Off / 60 / 70 / 80 / 90)
+- erreicht → ✓. Kein SL, kein Long/Short.
 
 Die % hängen ab von Markt, Startzeit, IB-Länge, was zuerst kam, **IB-Größe ggü. den 20 Tagen davor** (News-IB!) und
 **Lage des Kurses am IB-Ende**. Logistische Modelle, Koeffizienten im Skript.
