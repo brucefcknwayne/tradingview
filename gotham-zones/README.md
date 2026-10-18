@@ -18,6 +18,7 @@ Gotham Zones (±0.5/1/1.5/2σ um das Daily Open, σ aus VIX1D/VIX9D/VXN) – Aus
   live nach Abstand zum Kurs und Restzeit, mit „gültig bis“. Daten in vier Libraries (einmal privat veröffentlichen),
   Indikator importiert sie. Beides wird von `data-lab/ib_ext_stats.py` aus `IB-Expansion_template.pine` gebaut.
   Kalibrierung auf dem ungesehenen letzten Jahr: `data-lab/results/ib_ext_stats.md`.
+- `IB-Expansion_<Markt>.pine` – dieselbe Logik als eigenständiger Indikator je Markt (Daten im Skript, ohne Library).
 
 Ergebnisse (Python, `data-lab/`):
 - Zonen pauschal (Fade oder Breakout) haben keinen Vorteil, Reaktion im Median 20–30 Pkt

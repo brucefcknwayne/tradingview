@@ -17,6 +17,7 @@ Live (wie im Indikator): bis zum ersten erreichten Level T1, danach G mit linear
 1. Kalibrierung: Tabellen aus den 3 Jahren vor dem letzten Jahr, Test auf dem letzten Jahr (ungesehen).
 2. Endgültige Tabellen aus den letzten 3 Jahren → Pine-Libraries gotham-zones/IBX_<Markt>_library.pine
    + Indikator gotham-zones/IB-Expansion_indicator.pine (importiert die Libraries)
+   + eigenständige Indikatoren gotham-zones/IB-Expansion_<Markt>.pine (Daten im Skript)
 
 Aufruf: python data-lab/ib_ext_stats.py
 """
@@ -253,3 +254,19 @@ for root in MARKETS:
         loads.append(f'if barstate.isfirst and mk == "{root}" and wkey == "{w}"\n    DATA := d{root}.w{w.replace("-", "_")}()')
 (ROOT / "gotham-zones/IB-Expansion_indicator.pine").write_text(tpl.replace("{{LOADS}}", "\n".join(loads)))
 print("Indikator", len(tpl.replace("{{LOADS}}", "\n".join(loads))), "Zeichen")
+
+# 4) Eigenständige Indikatoren je Markt (Daten direkt im Skript, nichts zu veröffentlichen)
+LIB_NOTE = """//  DATEN kommen aus vier Libraries (IBX_NQ, IBX_ES, IBX_RTY, IBX_GC), die du einmal selbst
+//  veröffentlichen musst (privat reicht). Steht dein TradingView-Name anders als unten,
+//  die vier import-Zeilen anpassen. Statistik: Databento CME 1m, letzte 3 Jahre."""
+IMPORTS = "\n".join(f"import Brucefcknwayne/IBX_{m}/1 as d{m}" for m in MARKETS) + "\n"
+for root in MARKETS:
+    one = tpl.replace(LIB_NOTE, f"//  Eigenständige Version nur für {root} (Daten im Skript, nichts zu veröffentlichen).\n"
+                                f"//  Statistik: Databento CME 1m, letzte {YEARS} Jahre bis {end.date()}.")
+    one = one.replace(IMPORTS, "")
+    one = one.replace('indicator("IB Expansion · TP & geschützte Level", shorttitle = "IB-Exp"',
+                      f'indicator("IB Expansion {root} · TP & geschützte Level", shorttitle = "IB-Exp {root}"')
+    assert "import " not in one and "Libraries" not in one
+    loads = [f'if barstate.isfirst and mk == "{root}" and wkey == "{w}"\n    DATA := "{n}|{d}"' for w, (d, n) in data[root].items()]
+    (ROOT / f"gotham-zones/IB-Expansion_{root}.pine").write_text(one.replace("{{LOADS}}", "\n".join(loads)))
+    print(root, "eigenständig", len(one.replace("{{LOADS}}", "\n".join(loads)).splitlines()), "Zeilen")
