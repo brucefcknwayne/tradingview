@@ -4,7 +4,10 @@ indicator("IB Expansion · Targets & Protects", shorttitle = "IB-Exp", overlay =
 // Vier IBs ab derselben Startzeit (15/30/45/60 Min). Levels ±0,1 … ±3,0 IB-Range, gezeigt wird NUR, was ≥ 70 % hat:
 //   Target (blau) = wird bis Tagesende erreicht · Target zurück (blau) = Eröffnung 09:30 außerhalb der IB → IB-Rand wird noch berührt
 //   Protect (orange, gestrichelt) = wird NICHT erreicht. Jede Linie läuft, bis sie getroffen ist oder der Tag endet.
-// Level-Tabelle: Target grau = offen / grün = getroffen · Protect grau = hält / rot = gebrochen.
+// Einstufung bleibt: Ist ein Level einmal ≥ 70 %, bleibt es Target/Protect (mit % von diesem Moment), bis es berührt wird
+//   oder der Tag endet – genau so wurde die Statistik gemessen. Level-Tabelle: Target grau = offen / grün = getroffen,
+//   Protect grau = hält / rot = gebrochen; nach Tagesende „nicht erreicht“ bzw. „gehalten“.
+// Alarme: Alarm anlegen → Bedingung „IB-Exp“ → „Jeder alert()-Funktionsaufruf“.
 // Statistik: Databento CME 1m, letzte {{YEARS}} Jahre bis {{END}}, als kompakte Formel je Fenster (data-lab/ib_ext_model.py):
 //   IB-Größe (klein/normal/groß ggü. 20 Vortagen) + live Abstand Level ↔ Kurs + Restzeit, minus Korrektur aus dem Prüfjahr.
 // Gesperrt (im Test unzuverlässig): neue Targets in den letzten 10 % der Zeit, Target zurück später als 10 % der Zeit ab 09:30.
@@ -34,6 +37,8 @@ bool   showTab = input.bool(true, "Info-Tabelle", group = G_A)
 bool   showLvl = input.bool(true, "Level-Tabelle", group = G_A)
 string lvlMode = input.string("Kompakt", "Level-Tabelle zeigt", options = ["Kompakt", "Alle"], group = G_A, tooltip = "Kompakt: je IB und Seite das weiteste Target und das erste Protect. Alle: jedes aktive Level.")
 string lvlPos  = input.string("Unten rechts", "Position Level-Tabelle", options = ["Unten rechts", "Unten links", "Oben links", "Mitte rechts"], group = G_A)
+bool   alHit   = input.bool(true, "Alarm: Target getroffen / Protect gebrochen", group = "Alarme")
+bool   alNew   = input.bool(false, "Alarm: neues Level ≥ Schwelle", group = "Alarme")
 color  cHit    = input.color(#00c853, "Target getroffen", inline = "s", group = G_A)
 color  cBrk    = input.color(#ff1744, "Protect gebrochen", inline = "s", group = G_A)
 color  cOpen   = input.color(#787b86, "Offen", inline = "s", group = G_A)
@@ -158,14 +163,12 @@ var array<bool>  aRtHit = array.new<bool>(NI, false)
 var array<bool>  aRtSet = array.new<bool>(NI, false)
 var array<line>  aRtLn  = array.new<line>(NI)
 var array<bool>  aRtAct = array.new<bool>(NI, false)
-var array<bool>  aRtOk  = array.new<bool>(NI, false)
 var array<float> aRtP   = array.new<float>(NI, na)
 var array<line>  LU     = array.new<line>(NI * NK)
 var array<line>  LD     = array.new<line>(NI * NK)
 var array<label> LB     = array.new<label>()
-// Level-Status je IB, Seite, Level: Art (0 nichts, 1 Target, 2 Protect), aktiv, getroffen, letzte Sicherheit
+// Level-Status je IB, Seite, Level: Art (0 nichts, 1 Target, 2 Protect; bleibt bis Tagesende), getroffen, % beim Erscheinen
 var array<int>   ST     = array.new<int>(NI * 2 * NK, 0)
-var array<bool>  SA     = array.new<bool>(NI * 2 * NK, false)
 var array<bool>  SH     = array.new<bool>(NI * 2 * NK, false)
 var array<float> SP     = array.new<float>(NI * 2 * NK, na)
 
@@ -194,10 +197,8 @@ if timeframe.isintraday and timeframe.change("D")
     array.fill(aRtHit, false)
     array.fill(aRtSet, false)
     array.fill(aRtAct, false)
-    array.fill(aRtOk, false)
     array.fill(aRtP, na)
     array.fill(ST, 0)
-    array.fill(SA, false)
     array.fill(SH, false)
     array.fill(SP, na)
     f_clearLB()
@@ -275,8 +276,10 @@ f_valid(int j, int side, int k) =>
     out
 
 // ═══ LINIEN & BESCHRIFTUNG ═══
-bool drawLbl = barstate.islast
-int  xLbl    = time + 3 * timeframe.in_seconds() * 1000
+bool   drawLbl = barstate.islast
+int    xLbl    = time + 3 * timeframe.in_seconds() * 1000
+string msgHit  = ""
+string msgNew  = ""
 if drawLbl
     f_clearLB()
 
@@ -290,47 +293,46 @@ for j = 0 to NI - 1
             string sg      = side == 0 ? "+" : "−"
             int    bestTP  = -1
             int    firstSL = -1
-            float  pTP     = na
-            float  pSL     = na
             for k = 0 to NK - 1
-                int  ix = j * NK + k
-                int  si = f_si(j, side, k)
-                line ln = side == 0 ? array.get(LU, ix) : array.get(LD, ix)
+                int  ix  = j * NK + k
+                int  si  = f_si(j, side, k)
+                int  typ = array.get(ST, si)
+                line ln  = side == 0 ? array.get(LU, ix) : array.get(LD, ix)
                 // läuft weiter, bis getroffen (dieser Bar ist dann der letzte) oder Tagesende
                 if k > reached and not na(ln)
                     line.set_x2(ln, time)
-                if k > reached and k <= nowMax and array.get(SA, si)
+                if k > reached and k <= nowMax and typ > 0
                     array.set(SH, si, true)
-                if k > nowMax
+                    msgHit += tag + (typ == 1 ? "Target " : "Protect ") + sg + f_fmt(k) + " IB" + (typ == 1 ? " getroffen ✓" : " gebrochen ✗") + "\n"
+                // noch nicht eingestuft: erreicht es jetzt die Schwelle, bleibt die Einstufung bis Treffer oder Tagesende
+                if k > nowMax and typ == 0
                     float p  = f_g(j, array.get(aCls, j), side, q, f_dist(j, side, k))
                     float pT = p - f_corr(DT, q)          // Target: Sicherheit erreicht (korrigiert)
                     float pS = 1 - p - f_corr(DP, q)      // Protect: Sicherheit hält (korrigiert)
-                    bool  tp = not na(p) and p >= 0.5 and pT >= thrTP / 100.0 and q < 0.9
+                    bool  tp = not na(p) and p >= 0.5 and pT >= thrTP / 100.0 and q < 0.9   // letzte 10 % der Zeit: Targets unzuverlässig
                     bool  sl = not na(p) and p < 0.5 and pS >= thrSL / 100.0
-                    float lv = f_price(j, side, k)
-                    if (tp or sl) and na(ln)
-                        ln := line.new(time, lv, time, lv, xloc = xloc.bar_time)
-                        array.set(side == 0 ? LU : LD, ix, ln)
-                    if not na(ln)
-                        line.set_color(ln, tp ? cTP : sl ? cSL : k == 0 and showIB ? color.new(cIB, 40) : color.new(cIB, 100))
-                        line.set_style(ln, sl ? line.style_dashed : line.style_solid)
-                        line.set_width(ln, k == 0 and (tp or sl) ? 2 : 1)
-                    array.set(SA, si, tp or sl)
                     if tp or sl
-                        array.set(ST, si, tp ? 1 : 2)
+                        typ := tp ? 1 : 2
+                        array.set(ST, si, typ)
                         array.set(SP, si, tp ? pT : pS)
-                    if tp
-                        bestTP := k
-                        pTP    := pT
-                    if sl and firstSL < 0
-                        firstSL := k
-                        pSL     := pS
-                    if drawLbl and lblMode == "Alle Levels" and (tp or sl)
-                        f_lbl(xLbl, lv, tag + sg + f_fmt(k) + " · " + f_pct(sl ? pS : pT), tp ? cTP : cSL, false)
+                        float lv = f_price(j, side, k)
+                        if na(ln)
+                            ln := line.new(time, lv, time, lv, xloc = xloc.bar_time)
+                            array.set(side == 0 ? LU : LD, ix, ln)
+                        line.set_color(ln, tp ? cTP : cSL)
+                        line.set_style(ln, sl ? line.style_dashed : line.style_solid)
+                        line.set_width(ln, k == 0 ? 2 : 1)
+                        msgNew += tag + (tp ? "Target " : "Protect ") + sg + f_fmt(k) + " IB · " + f_pct(tp ? pT : pS) + "\n"
+                if k > nowMax and typ == 1
+                    bestTP := k
+                if k > nowMax and typ == 2 and firstSL < 0
+                    firstSL := k
+                if drawLbl and lblMode == "Alle Levels" and k > nowMax and typ > 0
+                    f_lbl(xLbl, f_price(j, side, k), tag + sg + f_fmt(k) + " · " + f_pct(array.get(SP, si)), typ == 1 ? cTP : cSL, false)
             if drawLbl and lblMode == "Grenzen" and bestTP >= 0
-                f_lbl(xLbl, f_price(j, side, bestTP), tag + "Target " + sg + f_fmt(bestTP) + " IB · " + f_pct(pTP) + " · gültig bis " + f_valid(j, side, bestTP), cTP, true)
+                f_lbl(xLbl, f_price(j, side, bestTP), tag + "Target " + sg + f_fmt(bestTP) + " IB · " + f_pct(array.get(SP, f_si(j, side, bestTP))) + " · gültig bis " + f_valid(j, side, bestTP), cTP, true)
             if drawLbl and lblMode == "Grenzen" and firstSL >= 0
-                f_lbl(xLbl, f_price(j, side, firstSL), tag + "Protect " + sg + f_fmt(firstSL) + " IB · " + f_pct(pSL) + " hält", cSL, true)
+                f_lbl(xLbl, f_price(j, side, firstSL), tag + "Protect " + sg + f_fmt(firstSL) + " IB · " + f_pct(array.get(SP, f_si(j, side, firstSL))) + " hält", cSL, true)
 
 // ═══ TARGET ZURÜCK ZUR IB: nur IBs fertig bis 09:30, Eröffnung über IB-Hoch / unter IB-Tief ═══
 for j = 0 to NI - 1
@@ -343,24 +345,31 @@ for j = 0 to NI - 1
             array.set(aRtS, j, s0)
             if s0 >= 0
                 array.set(aRtLn, j, line.new(time, s0 == 0 ? H : L, time, s0 == 0 ? H : L, xloc = xloc.bar_time, color = color.new(cTP, 100), width = 2))
-        int sd = array.get(aRtS, j)
+        int    sd = array.get(aRtS, j)
+        string nm = str.tostring(array.get(LENS, j)) + "m Target " + (sd == 0 ? "IB-Hoch" : "IB-Tief") + " (zurück)"
         if sd >= 0 and not array.get(aRtHit, j)
             line ln = array.get(aRtLn, j)
             line.set_x2(ln, time)
             if sd == 0 ? low <= H : high >= L
                 array.set(aRtHit, j, true)
-                array.set(aRtAct, j, array.get(aRtOk, j))
-            else
-                float qR = (relNow - rel930 + 1) / float(relEnd - rel930)   // Zeit ab 09:30
+                if array.get(aRtAct, j)
+                    msgHit += nm + " getroffen ✓\n"
+            else if not array.get(aRtAct, j)
+                // einmal ≥ Schwelle (nur direkt nach der Eröffnung verlässlich) → bleibt bis Treffer oder Tagesende
+                float qR = (relNow - rel930 + 1) / float(relEnd - rel930)
                 float p  = f_rt(j, sd, qR, sd == 0 ? (close - H) / f_R(j) : (L - close) / f_R(j)) - f_corr(DR, qR)
-                bool  ok = not na(p) and p >= thrTP / 100.0 and qR < 0.1    // nur direkt nach der Eröffnung verlässlich
-                line.set_color(ln, ok ? cTP : color.new(cTP, 100))
-                array.set(aRtOk, j, ok)
-                array.set(aRtAct, j, ok)
-                if ok
+                if not na(p) and p >= thrTP / 100.0 and qR < 0.1
+                    array.set(aRtAct, j, true)
                     array.set(aRtP, j, p)
-                if drawLbl and ok
-                    f_lbl(xLbl, sd == 0 ? H : L, str.tostring(array.get(LENS, j)) + "m Target " + (sd == 0 ? "IB-Hoch" : "IB-Tief") + " (zurück) · " + f_pct(p), cTP, true)
+                    line.set_color(ln, cTP)
+                    msgNew += nm + " · " + f_pct(p) + "\n"
+            if drawLbl and array.get(aRtAct, j) and not array.get(aRtHit, j)
+                f_lbl(xLbl, sd == 0 ? H : L, nm + " · " + f_pct(array.get(aRtP, j)), cTP, true)
+
+if alHit and msgHit != ""
+    alert("IB-Exp " + mk + " · " + startIn + "\n" + msgHit, alert.freq_once_per_bar)
+if alNew and msgNew != ""
+    alert("IB-Exp " + mk + " · " + startIn + " · neu\n" + msgNew, alert.freq_once_per_bar)
 
 // ═══ INFO-TABELLE ═══
 var table tb = table.new(position.top_right, 5, NI + 2, bgcolor = color.new(color.black, 80))
@@ -373,7 +382,7 @@ if showTab and barstate.islast
         float  rs = array.get(aRsz, j)
         int    ff = array.get(aFF, j)
         string sz = not dn ? "–" : (c == 1 ? "klein" : c == 2 ? "normal" : c == 3 ? "groß" : "?") + (na(rs) ? "" : " " + str.replace(str.tostring(rs, "0.0"), ".", ",") + "×")
-        string fs = not dn ? (f_on(j) ? "läuft" : "aus") : ff == 1 ? "Hoch" : ff == 2 ? "Tief" : "gleich"
+        string fs = not dn ? (not f_on(j) ? "aus" : not array.get(HAS, j) ? "keine Daten" : "läuft") : ff == 1 ? "Hoch" : ff == 2 ? "Tief" : "gleich"
         string er = not dn ? "–" : (array.get(aUp, j) < 0 ? "–" : "+" + f_fmt(array.get(aUp, j))) + " / " + (array.get(aDn, j) < 0 ? "–" : "−" + f_fmt(array.get(aDn, j)))
         for [i, s] in array.from(str.tostring(array.get(LENS, j)) + " Min", sz, fs, er, array.get(HAS, j) ? "{{YEARS}} J" : "–")
             table.cell(tb, i, j + 1, s, text_color = color.white, text_size = size.small)
@@ -385,36 +394,36 @@ f_pos(string p) =>
 
 var table lt = table.new(f_pos(lvlPos), 5, 42, bgcolor = color.new(color.black, 80), border_width = 1, border_color = color.new(color.black, 100))
 
-f_lrow(int r, string ib, string lvl, float price, float p, int typ, bool hit) =>
+f_lrow(int r, string ib, string lvl, float price, float p, int typ, bool hit, bool ended) =>
     table.cell(lt, 0, r, ib, text_color = color.white, text_size = size.small)
     table.cell(lt, 1, r, typ == 1 ? "Target" : "Protect", text_color = typ == 1 ? cTP : cSL, text_size = size.small)
     table.cell(lt, 2, r, lvl + "  " + str.tostring(price, format.mintick), text_color = color.white, text_size = size.small)
     table.cell(lt, 3, r, na(p) ? "" : f_pct(p), text_color = color.white, text_size = size.small)
-    table.cell(lt, 4, r, hit ? (typ == 1 ? "getroffen ✓" : "gebrochen ✗") : (typ == 1 ? "offen" : "hält"), text_color = color.white, bgcolor = color.new(hit ? (typ == 1 ? cHit : cBrk) : cOpen, 25), text_size = size.small)
+    table.cell(lt, 4, r, hit ? (typ == 1 ? "getroffen ✓" : "gebrochen ✗") : ended ? (typ == 1 ? "nicht erreicht" : "gehalten ✓") : (typ == 1 ? "offen" : "hält"), text_color = color.white, bgcolor = color.new(hit ? (typ == 1 ? cHit : cBrk) : cOpen, 25), text_size = size.small)
 
 if showLvl and barstate.islast
     table.clear(lt, 0, 0, 4, 41)
-    for [c, s] in array.from("IB", "Art", "Level · Preis", "%", "Status")
+    for [c, s] in array.from("IB", "Art", "Level · Preis", "% beim Erscheinen", "Status")
         table.cell(lt, c, 0, s, text_color = color.gray, text_size = size.small)
     int r = 1
     for j = 0 to NI - 1
         if array.get(aDone, j)
-            string ib = str.tostring(array.get(LENS, j)) + "m"
+            string ib    = str.tostring(array.get(LENS, j)) + "m"
+            bool   ended = timenow >= array.get(aTEnd, j)
             for side = 0 to 1
-                // Kompakt: weitestes Target und erstes Protect; Alle: jedes aktive oder getroffene Level
+                // Kompakt: weitestes Target und erstes Protect; Alle: jedes eingestufte Level
                 int kT = -1
                 int kS = -1
                 for k = 0 to NK - 1
                     int si = f_si(j, side, k)
-                    if array.get(SA, si) or array.get(SH, si)
-                        kT := array.get(ST, si) == 1 ? k : kT
-                        kS := array.get(ST, si) == 2 and kS < 0 ? k : kS
+                    kT := array.get(ST, si) == 1 ? k : kT
+                    kS := array.get(ST, si) == 2 and kS < 0 ? k : kS
                 for k = 0 to NK - 1
                     int si = f_si(j, side, k)
-                    if (array.get(SA, si) or array.get(SH, si)) and r < 42 and (lvlMode == "Alle" or k == kT or k == kS)
-                        f_lrow(r, ib, (side == 0 ? "+" : "−") + f_fmt(k), f_price(j, side, k), array.get(SP, si), array.get(ST, si), array.get(SH, si))
+                    if array.get(ST, si) > 0 and r < 42 and (lvlMode == "Alle" or k == kT or k == kS)
+                        f_lrow(r, ib, (side == 0 ? "+" : "−") + f_fmt(k), f_price(j, side, k), array.get(SP, si), array.get(ST, si), array.get(SH, si), ended)
                         r += 1
             if array.get(aRtAct, j) and r < 42
                 int sd = array.get(aRtS, j)
-                f_lrow(r, ib, sd == 0 ? "IB-Hoch (zurück)" : "IB-Tief (zurück)", sd == 0 ? array.get(aH, j) : array.get(aL, j), array.get(aRtP, j), 1, array.get(aRtHit, j))
+                f_lrow(r, ib, sd == 0 ? "IB-Hoch (zurück)" : "IB-Tief (zurück)", sd == 0 ? array.get(aH, j) : array.get(aL, j), array.get(aRtP, j), 1, array.get(aRtHit, j), ended)
                 r += 1
