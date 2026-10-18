@@ -8,7 +8,8 @@ pine = open(f"{REPO}/gotham-zones/IB-Expansion_ALL.pine").read()
 A = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 KEYS = re.search(r'KEYS  = "([^"]*)"', pine).group(1).split(" ")
 KPB = int(re.search(r'KPB   = (\d+)', pine).group(1))
-RAW = {(m, int(b)): s for m, b, s in re.findall(r'mk == "(\w+)" and kb == (\d+) \? "([^"]*)"', pine)}
+RAW = {(m, int(b)): s for b, m, s in re.findall(r'B(\d) := barstate.isfirst and mk == "(\w+)" \? "([^"]*)"', pine)}
+NC = int(re.search(r'const int    NC    = (\d+)', pine).group(1))
 COR = dict(re.findall(r'COR := barstate.isfirst and mk == "(\w+)" \? "([^"]*)"', pine))
 def dec(s, p, sc):
     a, b = s[p], s[p + 1]
@@ -35,10 +36,10 @@ for mk in ["NQ", "ES", "RTY", "GC"]:
         a = np.array(a); return a[i0] + (a[i1] - a[i0]) * np.minimum(qq - i0, 1)
     test = dts > dts.max() - pd.DateOffset(years=1)
     for st in STARTS:
-        ki = KEYS.index(st); blk = RAW[(mk, ki // KPB)]; p0 = (ki % KPB) * 4 * 84
+        ki = KEYS.index(st); blk = RAW[(mk, ki // KPB)]; p0 = (ki % KPB) * 4 * NC * 2
         s = rel(st); relEnd = 1380 if s < 930 else 1320
         for j, L in enumerate(LENS):
-            cf = np.array([dec(blk, p0 + (j * 42 + i) * 2, 100) for i in range(42)])
+            cf = np.array([dec(blk, p0 + (j * NC + i) * 2, 100) for i in range(NC)])
             if np.isnan(cf[:30]).any() or np.isnan(cf[40:]).any() or s + L >= relEnd: continue
             with np.errstate(all="ignore"):
                 H = np.nanmax(G["high"][:, s:s + L], 1); Lo = np.nanmin(G["low"][:, s:s + L], 1)
@@ -61,7 +62,8 @@ for mk in ["NQ", "ES", "RTY", "GC"]:
                     dist = ((lv - cl[:, None]) if side == 0 else (cl[:, None] - lv)) / R[d]
                     u = np.log(np.maximum(dist, 0) + 0.03)
                     b = cf[((c - 1) * 2 + side) * 5:((c - 1) * 2 + side) * 5 + 5]
-                    p = 1 / (1 + np.exp(-(b[0] + b[1] * u + b[2] * vv + b[3] * u * vv + b[4] * u * u)))
+                    w = cf[42 + side * 5 + dts[d].weekday()] if NC > 42 else 0.0     # Wochentag-Zuschlag
+                    p = 1 / (1 + np.exp(-(b[0] + b[1] * u + b[2] * vv + b[3] * u * vv + b[4] * u * u + w)))
                     pT = p - corr(DT, q)[:, None]; pS = 1 - p - corr(DP, q)[:, None]
                     tp = (p >= 0.5) & (pT >= 0.7) & (q[:, None] < 0.9) & ~reach & np.isfinite(hi)[:, None]
                     sl = (p < 0.5) & (pS >= 0.7) & ~reach & np.isfinite(hi)[:, None]
