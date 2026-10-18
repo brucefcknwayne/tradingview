@@ -22,6 +22,8 @@ string lenIn    = input.string("Auto", "IB length (minutes)", options = ["Auto",
 int    minIn    = input.int(70, "Show from (min %)", minval = 50, maxval = 95, group = G_I, tooltip = "Only draw the IB side line if it got taken at least this often.")
 string tpIn     = input.string("80%", "Extension", options = ["Off", "60%", "70%", "80%", "90%"], group = G_I, tooltip = "Shows the farthest level beyond the IB side that was reached at least this often. Lower % = further away.")
 bool   showIB   = input.bool(true, "Show IB while forming", group = G_A)
+bool   showOth  = input.bool(true, "Also show other IB lengths", inline = "o", group = G_I, tooltip = "Adds a thinner line for every other IB length (15/30/45/60) whose other side got taken at least this often.")
+int    othMin   = input.int(80, "from %", minval = 50, maxval = 95, inline = "o", group = G_I)
 bool   delOld   = input.bool(true, "Today only", group = G_A)
 color  cUp      = input.color(#26a69a, "Above", inline = "c", group = G_A)
 color  cDn      = input.color(#ef5350, "Below", inline = "c", group = G_A)
@@ -53,10 +55,10 @@ f_dec(string s, int p) =>
     int c2 = str.pos(ALPHA, str.substring(s, p + 1, p + 2))
     c1 >= 0 and c2 >= 0 ? (c1 * 62 + c2 - 1922) / 100.0 : na
 
-// coefficients for start ki and length li
-f_coefs() =>
+// coefficients for start ki and IB length index l (0 = 15m … 3 = 60m)
+f_coefs(int l) =>
     string src = int(ki / KPB) == 0 ? B0 : B1
-    int    p0  = ((ki % KPB) * 4 + li) * NCF * 2
+    int    p0  = ((ki % KPB) * 4 + l) * NCF * 2
     array<float> c = array.new<float>(NCF, na)
     if str.length(src) >= p0 + NCF * 2
         for i = 0 to NCF - 1
@@ -190,7 +192,7 @@ string msg = ""
 if not done and mk != "" and not na(H) and H > Lo and relNow >= relE and relNow < relEnd
     done := true
     int f = tL < tH ? 0 : tH < tL ? 1 : -1
-    array<float> c = f_coefs()
+    array<float> c = f_coefs(li)
     if f >= 0 and not na(array.get(c, 0))
         bool  lf  = f == 0
         float R   = H - Lo
@@ -216,7 +218,7 @@ if not done and mk != "" and not na(H) and H > Lo and relNow >= relE and relNow 
         string first = lf ? "Low first" : "High first"
         lbF := label.new(lf ? tL : tH, lf ? Lo : H, first, xloc = xloc.bar_time, style = lf ? label.style_label_up : label.style_label_down, color = color.new(cGray, 100), textcolor = cGray, size = size.small)
         if pO >= minIn / 100.0
-            f_add(0, oy, dir, true, (lf ? "IB High " : "IB Low ") + f_pct(pO), cc, 2, line.style_solid)
+            f_add(0, oy, dir, true, str.tostring(L) + "m " + (lf ? "IB High " : "IB Low ") + f_pct(pO), cc, 2, line.style_solid)
             msg := first + " → " + (lf ? "IB High " : "IB Low ") + f_pct(pO) + " @ " + str.tostring(oy, format.mintick)
             if not na(xTP)
                 float ey = oy + dir * xTP * R
@@ -241,3 +243,80 @@ if done and relNow < relEnd
                 msgHit += array.get(RX, i) + " ✓\n"
 if alOn and msgHit != ""
     alert("IB-First " + mk + "\n" + msgHit, alert.freq_once_per_bar)
+
+// ═══ OTHER IB LENGTHS (context): thinner line at the other side if it got taken ≥ "from %" ═══
+var array<float>  OH  = array.new<float>(4, na)
+var array<float>  OL  = array.new<float>(4, na)
+var array<int>    OTH = array.new<int>(4, na)
+var array<int>    OTL = array.new<int>(4, na)
+var array<bool>   ODN = array.new<bool>(4, false)
+var array<line>   OLN = array.new<line>(4)
+var array<label>  OLB = array.new<label>(4)
+var array<float>  OY  = array.new<float>(4, na)
+var array<int>    ODR = array.new<int>(4, 0)
+var array<bool>   OHT = array.new<bool>(4, false)
+var array<string> OTX = array.new<string>(4, "")
+
+if timeframe.isintraday and timeframe.change("D")
+    for l = 0 to 3
+        if delOld
+            line.delete(array.get(OLN, l))
+            label.delete(array.get(OLB, l))
+        array.set(OLN, l, na)
+        array.set(OLB, l, na)
+        array.set(OH, l, na)
+        array.set(OL, l, na)
+        array.set(OTH, l, na)
+        array.set(OTL, l, na)
+    array.fill(ODN, false)
+    array.fill(OY, na)
+    array.fill(OHT, false)
+
+string msgOth = ""
+for l = 0 to 3
+    int e = relS + (l + 1) * 15
+    if timeframe.isintraday and relNow >= relS and relNow < e
+        if na(array.get(OH, l)) or high > array.get(OH, l)
+            array.set(OH, l, high)
+            array.set(OTH, l, time)
+        if na(array.get(OL, l)) or low < array.get(OL, l)
+            array.set(OL, l, low)
+            array.set(OTL, l, time)
+    float oh = array.get(OH, l)
+    float ol = array.get(OL, l)
+    if showOth and l != li and mk != "" and not array.get(ODN, l) and relNow >= e and relNow < relEnd and not na(oh) and oh > ol
+        array.set(ODN, l, true)
+        int f = array.get(OTL, l) < array.get(OTH, l) ? 0 : array.get(OTH, l) < array.get(OTL, l) ? 1 : -1
+        array<float> c = f_coefs(l)
+        if f >= 0 and not na(array.get(c, 0))
+            bool  lf  = f == 0
+            float R   = oh - ol
+            float ml  = l == 0 ? m15 : l == 1 ? m30 : l == 2 ? m45 : m60
+            float z   = na(ml) or ml <= 0 ? 0.0 : math.max(-ZMAX, math.min(ZMAX, math.log(R / ml)))
+            float pr  = (close[1] - ol) / R
+            float pos = math.max(0.0, math.min(1.0, lf ? pr : 1 - pr))
+            array<float> x = array.from(1.0, lf ? 1.0 : 0.0, z, z * z, pos, pos * pos, wdI == 1 ? 1.0 : 0.0, wdI == 2 ? 1.0 : 0.0, wdI == 3 ? 1.0 : 0.0, wdI == 4 ? 1.0 : 0.0)
+            float pO  = f_pext(c, x, 0.0)
+            float y   = lf ? oh : ol
+            float y0  = array.get(RY, 0)
+            // skip if it sits on the main line (same price)
+            if pO >= othMin / 100.0 and (na(y0) or math.abs(y - y0) > syminfo.mintick / 2)
+                color  cc = lf ? cUp : cDn
+                string t  = str.tostring((l + 1) * 15) + "m " + (lf ? "IB High " : "IB Low ") + f_pct(pO)
+                array.set(OY, l, y)
+                array.set(ODR, l, lf ? 1 : -1)
+                array.set(OTX, l, t)
+                array.set(OLN, l, line.new(time, y, time, y, xloc = xloc.bar_time, color = color.new(cc, 35), width = 1))
+                array.set(OLB, l, label.new(time, y, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cc, 100), textcolor = color.new(cc, 20), size = size.small))
+                msgOth += t + " @ " + str.tostring(y, format.mintick) + "\n"
+    // run until reached (✓) or session end
+    float y1 = array.get(OY, l)
+    if not na(y1) and not array.get(OHT, l) and relNow < relEnd
+        line.set_x2(array.get(OLN, l), time)
+        label.set_x(array.get(OLB, l), time)
+        if array.get(ODR, l) == 1 ? high > y1 : low < y1
+            array.set(OHT, l, true)
+            label.set_text(array.get(OLB, l), array.get(OTX, l) + " ✓")
+            msgOth += array.get(OTX, l) + " ✓\n"
+if alOn and msgOth != ""
+    alert("IB-First " + mk + "\n" + msgOth, alert.freq_once_per_bar)

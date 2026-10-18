@@ -10,6 +10,8 @@ Am IB-Ende:
 - klein grau „Low first“ / „High first“ am Extrem, das zuerst kam
 - Linie an der anderen IB-Seite: „IB High 86%“ = so oft wurde sie an solchen Tagen geholt (ab „Show from“, Standard 70 %)
 - optional „+0.4 IB 81%“ = weiteste Ausdehnung mit mindestens der gewählten % (Off / 60 / 70 / 80 / 90)
+- zusätzlich: andere IB-Längen (15/30/45/60) als dünne Linie, wenn ihre andere Seite ≥ 80 % hat (z. B. „30m IB High 84%“),
+  nicht doppelt auf dem Preis der Hauptlinie
 - erreicht → ✓. Kein SL, kein Long/Short.
 
 Die % hängen ab von Markt, Startzeit, IB-Länge, was zuerst kam, **IB-Größe ggü. den 20 Tagen davor** (News-IB!) und
