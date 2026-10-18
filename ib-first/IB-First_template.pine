@@ -5,7 +5,9 @@ indicator("IB First · Tief zuerst → Hoch wird geholt", shorttitle = "IB-First
 // Am Ende der IB (Länge automatisch die beste für Markt und Startzeit, oder fest gewählt) zeigt der Indikator:
 //   Gegenseite = „Hoch wird geholt 86% · vor Stop 76%“ (vor Stop = bevor das zuerst gebildete Extrem noch einmal bricht)
 //   TP         = die weiteste Ausdehnung über die Gegenseite, die mindestens die gewählte Sicherheit hat (TP-Modus)
-//   Stop-Seite = „Tief nochmal 35%“ – wie oft das zuerst gebildete Extrem noch einmal gebrochen wird
+//   Stop-Seite = „Stop · Tief nochmal 35%“ – wie oft das zuerst gebildete Extrem bis Tagesende noch einmal gebrochen wird
+// Linien nur bei Signal (Ziel vor Stop ≥ Einstellung, Standard 70 %), sonst grau „kein Signal“.
+// Kommt der Stop zuerst: Ziel und TP enden grau mit „Stop zuerst ✗“. Kommt das Ziel zuerst: ✓, Stop-Linie endet.
 // Die % hängen ab von: Markt, Startzeit, IB-Länge, was zuerst kam, IB-Größe ggü. den 20 Tagen davor (z. B. News-IB) und
 // Lage des Kurses am IB-Ende. Modell: {{MODEL}}. Wochentag geprüft: im Test kein Vorteil, daher nicht drin.
 // Jede Linie läuft bis zur Berührung (✓) oder bis Tagesende (17:00 für IBs vor 09:30, sonst 16:00).
@@ -24,8 +26,9 @@ const string G_A   = "Anzeige"
 
 string startIn  = input.string("09:30", "IB-Start (NY)", options = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "12:00", "13:00", "14:00", "15:00"], group = G_I)
 string lenIn    = input.string("Auto", "IB-Länge", options = ["Auto", "15", "30", "45", "60"], group = G_I, tooltip = "Auto: die Länge mit der besten Quote „Ziel vor Stop“ für Markt und Startzeit (aus den Daten).")
+int    sigIn    = input.int(70, "Signal ab (Ziel vor Stop %)", minval = 50, maxval = 95, group = G_I, tooltip = "Linien nur, wenn die Gegenseite mit mindestens dieser Wahrscheinlichkeit VOR der Stop-Seite kommt. Sonst: „kein Signal“. Test letztes Jahr bei 70 %: Signal an ~56 % der Tage, Ziel vor Stop ~85 %.")
 string tpIn     = input.string("80 %", "TP-Modus", options = ["60 % (mehr Weg, mehr Risiko)", "70 %", "80 %", "90 % (sicher, kurz)"], group = G_I, tooltip = "Zeigt das weiteste Ziel über der Gegenseite, das mindestens diese Wahrscheinlichkeit hat.")
-bool   showStop = input.bool(true, "Stop-Seite (Erstseite nochmal) zeigen", group = G_A)
+bool   showStop = input.bool(true, "Stop-Seite zeigen", group = G_A)
 bool   showIB   = input.bool(true, "IB während der Bildung zeigen", group = G_A)
 bool   delOld   = input.bool(true, "Nur heute zeigen", group = G_A)
 color  cUp      = input.color(#26a69a, "Ziel oben", inline = "c", group = G_A)
@@ -134,6 +137,8 @@ var bool  done = false
 var line  ibH  = na
 var line  ibL  = na
 var label lbF  = na
+var int   res  = 0      // 0 offen, 1 Ziel zuerst, −1 Stop zuerst
+var float stY  = na     // Stop-Level (zuerst gebildetes Extrem)
 // Linien nach der IB: 0 Gegenseite, 1 TP, 2 Stop-Seite
 var array<line>   RL = array.new<line>(3)
 var array<label>  RB = array.new<label>(3)
@@ -164,6 +169,8 @@ if timeframe.isintraday and timeframe.change("D")
     tH   := na
     tL   := na
     done := false
+    res  := 0
+    stY  := na
 
 // IB bilden (erstes Auftreten von Hoch und Tief zählt)
 if timeframe.isintraday and relNow >= relS and relNow < relE
@@ -223,31 +230,54 @@ if not done and mk != "" and not na(H) and H > Lo and relNow >= relE and relNow 
                 xTP := k / 10.0
                 pTP := pk
         string head = (lf ? "Hoch" : "Tief") + " wird geholt " + f_pct(pO) + " · vor Stop " + f_pct(pZ)
-        f_add(0, oy, dir, true, (pOT >= thrTP and na(xTP) ? "TP · " : "") + head, cc, 2, line.style_solid)
-        if not na(xTP)
-            f_add(1, oy + dir * xTP * R, dir, false, "TP +" + f_fmt(xTP) + " IB · " + f_pct(pTP), cc, 1, line.style_dashed)
-        if showStop
-            f_add(2, lf ? Lo : H, -dir, true, (lf ? "Tief" : "Hoch") + " nochmal " + f_pct(pS), cGray, 1, line.style_dotted)
         string info = (lf ? "Tief zuerst" : "Hoch zuerst") + " · " + str.tostring(L) + "m" + (na(med) ? "" : " · IB " + f_fmt(R / med) + "×")
+        if pZ >= sigIn / 100.0
+            stY := lf ? Lo : H
+            f_add(0, oy, dir, true, (pOT >= thrTP and na(xTP) ? "TP · " : "") + head, cc, 2, line.style_solid)
+            if not na(xTP)
+                f_add(1, oy + dir * xTP * R, dir, false, "TP +" + f_fmt(xTP) + " IB · " + f_pct(pTP), cc, 1, line.style_dashed)
+            if showStop
+                f_add(2, stY, -dir, true, "Stop · " + (lf ? "Tief" : "Hoch") + " nochmal " + f_pct(pS), cGray, 1, line.style_dotted)
+            msg := info + "\n" + head + (na(xTP) ? "" : "\nTP +" + f_fmt(xTP) + " IB " + f_pct(pTP) + " @ " + str.tostring(oy + dir * xTP * R, format.mintick))
+        else
+            info += " · kein Signal (vor Stop " + f_pct(pZ) + ")"
         lbF := label.new(lf ? tL : tH, lf ? Lo : H, info, xloc = xloc.bar_time, style = lf ? label.style_label_up : label.style_label_down, color = color.new(cGray, 100), textcolor = cGray, size = size.small)
-        msg := info + "\n" + head + (na(xTP) ? "" : "\nTP +" + f_fmt(xTP) + " IB " + f_pct(pTP) + " @ " + str.tostring(oy + dir * xTP * R, format.mintick))
 if alOn and msg != ""
     alert("IB-First " + mk + " · " + startIn + "\n" + msg, alert.freq_once_per_bar)
 
-// Linien laufen bis zur Berührung (✓) oder Tagesende
+// Linien laufen bis Tagesende; was kommt zuerst: Ziel (Gegenseite) oder Stop (gleicher Bar zählt als Stop, wie in der Statistik)
+f_end(int i, string add, bool gray) =>
+    if not na(array.get(RY, i)) and not array.get(RH, i)
+        array.set(RH, i, true)
+        label.set_text(array.get(RB, i), array.get(RX, i) + add)
+        if gray
+            line.set_color(array.get(RL, i), color.new(cGray, 40))
+            label.set_textcolor(array.get(RB, i), cGray)
+
 string msgHit = ""
-if done and relNow < relEnd
+if done and relNow < relEnd and not na(array.get(RY, 0))
     for i = 0 to 2
-        float y = array.get(RY, i)
-        if not na(y) and not array.get(RH, i)
+        if not na(array.get(RY, i)) and not array.get(RH, i)
             line.set_x2(array.get(RL, i), time)
             label.set_x(array.get(RB, i), time)
-            bool st  = array.get(RS, i)
-            bool hit = array.get(RD, i) == 1 ? (st ? high > y : high >= y) : (st ? low < y : low <= y)
-            if hit
-                array.set(RH, i, true)
-                string t = array.get(RX, i) + " ✓"
-                label.set_text(array.get(RB, i), t)
-                msgHit += t + "\n"
+    int   d    = array.get(RD, 0)
+    float ty   = array.get(RY, 0)
+    bool  sHit = d == 1 ? low < stY : high > stY
+    bool  tHit = d == 1 ? high > ty : low < ty
+    if res == 0 and sHit
+        res := -1
+        f_end(0, " · Stop zuerst ✗", true)
+        f_end(1, " · Stop zuerst ✗", true)
+        f_end(2, " ✗", false)
+        msgHit += "Stop zuerst ✗ @ " + str.tostring(stY, format.mintick)
+    else if res == 0 and tHit
+        res := 1
+        f_end(0, " ✓", false)
+        f_end(2, "", false)
+        msgHit += array.get(RX, 0) + " ✓\n"
+    float tpy = array.get(RY, 1)
+    if res == 1 and not na(tpy) and not array.get(RH, 1) and (d == 1 ? high >= tpy : low <= tpy)
+        f_end(1, " ✓", false)
+        msgHit += array.get(RX, 1) + " ✓"
 if alOn and msgHit != ""
     alert("IB-First " + mk + "\n" + msgHit, alert.freq_once_per_bar)
