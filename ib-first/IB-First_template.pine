@@ -185,7 +185,7 @@ f_add(int i, float y, int dir, bool strict, string t, color c, int w, string st)
     array.set(RS, i, strict)
     array.set(RX, i, t)
     array.set(RL, i, line.new(time, y, time, y, xloc = xloc.bar_time, color = c, width = w, style = st))
-    array.set(RB, i, label.new(time, y, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(c, 100), textcolor = c, size = f_size()))
+    array.set(RB, i, label.new(time, y, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(c, 10), textcolor = color.white, size = f_size()))
 
 // IB done: which came first, how big, where is price → probabilities
 string msg = ""
@@ -216,7 +216,7 @@ if not done and mk != "" and not na(H) and H > Lo and relNow >= relE and relNow 
                 xTP := k / 10.0
                 pTP := pk
         string first = lf ? "Low first" : "High first"
-        lbF := label.new(lf ? tL : tH, lf ? Lo : H, first, xloc = xloc.bar_time, style = lf ? label.style_label_up : label.style_label_down, color = color.new(cGray, 100), textcolor = cGray, size = size.small)
+        lbF := label.new(lf ? tL : tH, lf ? Lo : H, first, xloc = xloc.bar_time, style = lf ? label.style_label_up : label.style_label_down, color = color.new(cGray, 25), textcolor = color.white, size = size.small)
         if pO >= minIn / 100.0
             f_add(0, oy, dir, true, str.tostring(L) + "m " + (lf ? "IB High " : "IB Low ") + f_pct(pO), cc, 2, line.style_solid)
             msg := first + " → " + (lf ? "IB High " : "IB Low ") + f_pct(pO) + " @ " + str.tostring(oy, format.mintick)
@@ -240,6 +240,7 @@ if done and relNow < relEnd
             if hit
                 array.set(RH, i, true)
                 label.set_text(array.get(RB, i), array.get(RX, i) + " ✓")
+                label.set_color(array.get(RB, i), color.new(cGray, 25))       // reached: grey box
                 msgHit += array.get(RX, i) + " ✓\n"
 if alOn and msgHit != ""
     alert("IB-First " + mk + "\n" + msgHit, alert.freq_once_per_bar)
@@ -306,8 +307,8 @@ for l = 0 to 3
                 array.set(OY, l, y)
                 array.set(ODR, l, lf ? 1 : -1)
                 array.set(OTX, l, t)
-                array.set(OLN, l, line.new(time, y, time, y, xloc = xloc.bar_time, color = color.new(cc, 35), width = 1))
-                array.set(OLB, l, label.new(time, y, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cc, 100), textcolor = color.new(cc, 20), size = size.small))
+                array.set(OLN, l, line.new(time, y, time, y, xloc = xloc.bar_time, color = cc, width = 2, style = line.style_dotted))
+                array.set(OLB, l, label.new(time, y, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cc, 10), textcolor = color.white, size = f_size()))
                 msgOth += t + " @ " + str.tostring(y, format.mintick) + "\n"
     // run until reached (✓) or session end
     float y1 = array.get(OY, l)
@@ -317,6 +318,7 @@ for l = 0 to 3
         if array.get(ODR, l) == 1 ? high > y1 : low < y1
             array.set(OHT, l, true)
             label.set_text(array.get(OLB, l), array.get(OTX, l) + " ✓")
+            label.set_color(array.get(OLB, l), color.new(cGray, 25))
             msgOth += array.get(OTX, l) + " ✓\n"
 if alOn and msgOth != ""
     alert("IB-First " + mk + "\n" + msgOth, alert.freq_once_per_bar)
