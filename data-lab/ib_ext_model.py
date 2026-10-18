@@ -292,18 +292,19 @@ md = ["# IB-Expansion als Formel – Kalibrierung (≥ 70 % nach Korrektur)", ""
 (HERE / "results/ib_ext_model.md").write_text("\n".join(md))
 print("\n".join(md))
 
-# Pine: ein Indikator für alle Märkte; je Markt und Startzeit eine Anweisung (4 Längen x 84 Zeichen)
+# Pine: ein Indikator für alle Märkte; je Markt Datenblöcke mit KPB Startzeiten (je 4 Längen x 84 Zeichen, < 4096 Zeichen)
+# und eine Korrektur-Zeile (3 Arten x 10 Zeitstufen, 2 Zeichen, Auflösung 0,001)
+KPB = 9
 tpl = (ROOT / "gotham-zones/IB-Expansion-ALL_template.pine").read_text()
-loads, corr = [], []
+loads = []
 for root in MARKETS:
-    for st in STARTS:
-        sk = st.replace(":", "")
-        body = "".join(data[root].get(f"{sk}-{L}", "~" * 84) for L in LENGTHS)
-        loads.append(f'if barstate.isfirst and mk == "{root}" and skey == "{sk}"\n    DATA := "{body}"')
-    for art, nm in [("Target", "DT"), ("Protect", "DP"), ("Rücklauf", "DR")]:
-        vals = ", ".join(f"{d_fin.get((root, art, q), 0.0):.3f}" for q in range(NQB))
-        corr.append(f'if barstate.isfirst and mk == "{root}"\n    {nm} := array.from({vals})')
-out = (tpl.replace("{{YEARS}}", str(YEARS)).replace("{{END}}", str(end.date()))
-          .replace("{{LOADS}}", "\n".join(loads)).replace("{{CORR}}", "\n".join(corr)))
+    bodies = ["".join(data[root].get(f"{st.replace(':', '')}-{L}", "~" * 84) for L in LENGTHS) for st in STARTS]
+    for b in range(0, len(STARTS), KPB):
+        loads.append(f'RAW := barstate.isfirst and mk == "{root}" and kb == {b // KPB} ? "{"".join(bodies[b:b + KPB])}" : RAW')
+    cor = "".join(enc2(d_fin.get((root, art, q), 0.0) * 10) for art in ("Target", "Protect", "Rücklauf") for q in range(NQB))
+    loads.append(f'COR := barstate.isfirst and mk == "{root}" ? "{cor}" : COR')
+out = (tpl.replace("{{YEARS}}", str(YEARS)).replace("{{END}}", str(end.date())).replace("{{KEYS}}", " ".join(STARTS))
+          .replace("{{KPB}}", str(KPB)).replace("{{LOADS}}", "\n".join(loads)))
+assert "{{" not in out
 (ROOT / "gotham-zones/IB-Expansion_ALL.pine").write_text(out)
 print("Indikator:", len(out.splitlines()), "Zeilen,", len(out), "Zeichen")

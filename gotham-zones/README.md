@@ -13,7 +13,7 @@ Gotham Zones (±0.5/1/1.5/2σ um das Daily Open, σ aus VIX1D/VIX9D/VXN) – Aus
   15/30/45/60 Min), Linien als „geschützt“ / „bricht“ mit Wahrscheinlichkeit (NQ, ES, RTY, GC, 1J/3J/5J).
   Wird von `data-lab/ib_levels_stats.py` aus `IB-Levels_template.pine` gebaut – nicht von Hand ändern, sondern das Template.
 
-- `IB-Expansion_ALL.pine` – **ein** Indikator für NQ, ES, RTY und GC (Markt wird automatisch erkannt), ~70.000 Zeichen.
+- `IB-Expansion_ALL.pine` – **ein** Indikator für NQ, ES, RTY und GC (Markt wird automatisch erkannt), ~57.000 Zeichen, 435 Zeilen.
   Gleiche Anzeige wie die Einzel-Versionen, aber die Statistik steckt als kleine Formel (logistische Regression je
   IB-Fenster, Größenklasse und Seite) statt als Tabelle im Skript – rund 30× kleiner, im Prüfjahr gleich gut kalibriert.
   Gesperrt, weil im Test nicht verlässlich: neue Targets in den letzten 10 % der Restzeit, späte Rückläufe.
