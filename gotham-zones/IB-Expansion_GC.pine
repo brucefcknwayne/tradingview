@@ -8,8 +8,8 @@ indicator("IB Expansion GC · Targets & Protects", shorttitle = "IB-Exp GC", ove
 //  08:30/09:30/10:30, Länge 15/30/45/60 Min). Gezeigt wird NUR, was mindestens 70 % hat:
 //    Target  (blau)            = wird bis Tagesende zu ≥ 70 % erreicht
 //    Protect (orange, gestr.)  = wird zu ≥ 70 % NICHT erreicht → Stop dahinter
-//    Rücklauf (grün)           = nur IBs bis 09:30: Eröffnung 09:30 außerhalb der IB →
-//                                IB-Rand wird zu ≥ 70 % noch einmal berührt
+//    Target zurück (blau)      = nur IBs bis 09:30: Eröffnung 09:30 außerhalb der IB →
+//                                IB-Rand wird zu ≥ 70 % noch einmal berührt (Target Richtung IB)
 //  Wahrscheinlichkeiten aus den Daten (Databento CME 1m, letzte 3 Jahre bis 2026-10-16):
 //    · IB-Größe: klein / normal / groß im Vergleich zu den 20 Tagen davor (gleiche Uhrzeit)
 //    · bei IB-Ende: zusätzlich ob IB-Hoch oder IB-Tief zuerst gebildet wurde
@@ -35,13 +35,11 @@ string startIn = input.string("09:30", "IB-Start (NY)", options = ["18:00", "19:
 int    lenIn   = input.int(30, "IB-Länge (Min)", options = [15, 30, 45, 60], group = G_I)
 int    thrTP   = input.int(70, "Target ab (% erreicht)", minval = 50, maxval = 95, group = G_S)
 int    thrSL   = input.int(70, "Protect ab (% hält)", minval = 50, maxval = 95, group = G_S)
-int    thrRT   = input.int(70, "Rücklauf ab (%)", minval = 50, maxval = 95, group = G_S)
 string lblMode = input.string("Grenzen", "Beschriftung", options = ["Grenzen", "Alle Levels"], group = G_A, tooltip = "Grenzen: weitestes Target und erstes Protect je Seite.")
 bool   showIB  = input.bool(true, "IB-Hoch/-Tief immer zeigen", group = G_A, tooltip = "Als dünne Orientierung, auch unter der Schwelle.")
 bool   showTab = input.bool(true, "Info-Tabelle", group = G_A)
 color  cTP     = input.color(#2962ff, "Target", inline = "c", group = G_A)
 color  cSL     = input.color(#ff9800, "Protect", inline = "c", group = G_A)
-color  cRT     = input.color(#00c853, "Rücklauf", inline = "c", group = G_A)
 color  cIB     = input.color(#e535f5, "IB", inline = "c", group = G_A)
 
 // ═══════════════════════════════ DATEN ═══════════════════════════════
@@ -506,15 +504,15 @@ if done and relNow < relEnd
                 string t = "Protect " + sg + f_fmt(firstSL) + " IB · " + f_pct(pSL) + " hält"
                 array.push(LB, label.new(xLbl, f_price(side, firstSL), t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cSL, 80), textcolor = cSL, size = size.small))
 
-// ═══════════════════════════════ RÜCKLAUF NACH 09:30 ═══════════════════════════════
-// nur IBs, die bis 09:30 fertig sind: Eröffnung über dem IB-Hoch / unter dem IB-Tief
+// ═══════════════════════════════ TARGET ZURÜCK ZUR IB (nach 09:30) ═══════════════════════════════
+// nur IBs, die bis 09:30 fertig sind: Eröffnung über dem IB-Hoch / unter dem IB-Tief → Rücklauf zum IB-Rand
 if done and relE <= rel930 and relNow >= rel930 and relNow < relEnd
     if na(rtLn) and rtSide < 0 and not rtHit
         rtSide := open > ibH ? 0 : open < ibL ? 1 : -1
         rtHit  := rtSide < 0
         if rtSide >= 0
             float lvl = rtSide == 0 ? ibH : ibL
-            rtLn := line.new(time, lvl, time, lvl, xloc = xloc.bar_time, color = color.new(cRT, 100), width = 2)
+            rtLn := line.new(time, lvl, time, lvl, xloc = xloc.bar_time, color = color.new(cTP, 100), width = 2)
     if rtSide >= 0 and not rtHit
         line.set_x2(rtLn, time)
         bool back = rtSide == 0 ? low <= ibH : high >= ibL
@@ -524,11 +522,11 @@ if done and relE <= rel930 and relNow >= rel930 and relNow < relEnd
             float d  = rtSide == 0 ? (close - ibH) / R : (ibL - close) / R
             float qR = (relNow - rel930 + 1) / float(relEnd - rel930)   // Zeit ab 09:30
             float p  = f_rt(rtSide, qR, d) - f_corr(DR, qR)
-            bool  ok = not na(p) and p >= thrRT / 100.0
-            line.set_color(rtLn, ok ? cRT : color.new(cRT, 100))
+            bool  ok = not na(p) and p >= thrTP / 100.0
+            line.set_color(rtLn, ok ? cTP : color.new(cTP, 100))
             if drawLbl and ok
-                string t = "Rücklauf " + (rtSide == 0 ? "IB-Hoch" : "IB-Tief") + " · " + f_pct(p)
-                array.push(LB, label.new(xLbl, rtSide == 0 ? ibH : ibL, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cRT, 80), textcolor = cRT, size = size.small))
+                string t = "Target " + (rtSide == 0 ? "IB-Hoch" : "IB-Tief") + " (zurück) · " + f_pct(p)
+                array.push(LB, label.new(xLbl, rtSide == 0 ? ibH : ibL, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cTP, 80), textcolor = cTP, size = size.small))
 
 // ═══════════════════════════════ INFO ═══════════════════════════════
 var table tb = table.new(position.top_right, 2, 6, bgcolor = color.new(color.black, 80))
