@@ -4,15 +4,13 @@ Eigenständiges Projekt (unabhängig von `gotham-zones/IB-Expansion`).
 
 **Idee:** Entsteht in der Initial Balance zuerst das Tief, wird danach meist das IB-Hoch geholt – und umgekehrt.
 
-## Indikator `IB-First.pine`
+## Indikator `IB-First.pine` (Englisch, für Käufer vereinfacht)
 NQ, ES, RTY, GC (+ Micros), Markt wird erkannt. Eine IB je Tag: Startzeit + Länge (Auto = beste Länge je Markt und Start).
 Am IB-Ende:
-- **Gegenseite**: „Hoch wird geholt 89% · vor Stop 89%“ (vor Stop = bevor das zuerst gebildete Extrem noch einmal bricht)
-- **TP**: weitestes Ziel über der Gegenseite mit mindestens der gewählten Sicherheit (TP-Modus 60 / 70 / 80 / 90 %)
-- **Stop-Seite**: „Stop · Tief nochmal 35%“
-Linien nur bei **Signal** („Ziel vor Stop“ ≥ 70 %, einstellbar; Test letztes Jahr: Signal an ~56 % der Tage, Ziel vor Stop ~85 %),
-sonst graues Label „kein Signal“. Kommt der Stop zuerst, enden Ziel und TP grau mit „Stop zuerst ✗“; kommt das Ziel zuerst: ✓.
-Alarme für IB-Ende und Treffer.
+- **LONG 85% / SHORT 85%** – Richtung; 85 % = so oft kam TP1 vor SL (Signal nur ab „Signal strength“, Standard 70 %)
+- **TP1** – andere Seite der IB · **TP2 81%** – Ausdehnung (Off / 60 / 70 / 80 / 90 %) · **SL** – das Extrem, das zuerst kam
+- kein klarer Vorteil → „No signal“. Treffer: TP1 ✓, TP2 ✓, SL ✗ (dann TPs grau). Alarme mit Preisen.
+Test letztes Jahr bei 70 %: Signal an ~56 % der Tage, TP1 vor SL ~85 %.
 
 Die % hängen ab von Markt, Startzeit, IB-Länge, was zuerst kam, **IB-Größe ggü. den 20 Tagen davor** (News-IB!) und
 **Lage des Kurses am IB-Ende**. Logistische Modelle, Koeffizienten im Skript.
