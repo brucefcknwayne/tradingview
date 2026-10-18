@@ -13,18 +13,15 @@ Gotham Zones (±0.5/1/1.5/2σ um das Daily Open, σ aus VIX1D/VIX9D/VXN) – Aus
   15/30/45/60 Min), Linien als „geschützt“ / „bricht“ mit Wahrscheinlichkeit (NQ, ES, RTY, GC, 1J/3J/5J).
   Wird von `data-lab/ib_levels_stats.py` aus `IB-Levels_template.pine` gebaut – nicht von Hand ändern, sondern das Template.
 
-- `IB-Expansion_ALL.pine` – **ein** Indikator für NQ, ES, RTY und GC (Markt wird automatisch erkannt), ~65.000 Zeichen, 432 Zeilen.
-  Gleiche Anzeige wie die Einzel-Versionen, aber die Statistik steckt als kleine Formel (logistische Regression je
-  IB-Fenster, Größenklasse und Seite) statt als Tabelle im Skript – rund 30× kleiner, im Prüfjahr gleich gut kalibriert.
-  Einstufung bleibt: Ein Level, das einmal ≥ 70 % hat, bleibt Target/Protect (mit % beim Erscheinen) bis Treffer oder Tagesende
-  (Prüfung: `data-lab/results/ib_ext_lock_check.md`). Alarme für Treffer/Brüche und neue Levels.
-  Wochentag geht in die Formel ein (Zuschlag je Seite und Wochentag, gedämpft; Vergleich mit/ohne in `ib_ext_model.md`).
-  Optional eine 2. Startzeit gleichzeitig (z. B. 08:30 + 09:30) mit eigenen Farben.
-  Anzeige als graue Box mit Text („Target 73% · 30m“, „Protected 82% · 15m“), keine Tabellen. Kompakt (Standard): je Seite nur
-  das weiteste Target und das nächste Protected aus allen IBs; „Je IB“ / „Alle Levels“ wählbar. Vortage werden gelöscht.
-  Gesperrt, weil im Test nicht verlässlich: neue Targets in den letzten 10 % der Restzeit, späte Rückläufe.
-  Wird von `data-lab/ib_ext_model.py` aus `IB-Expansion-ALL_template.pine` gebaut (`--pine`: nur neu bauen aus
-  `results/ib_ext_coefs.json`). Prüfung: `data-lab/results/ib_ext_model.md`.
+- `IB-Expansion_ALL.pine` – **ein** Indikator für NQ, ES, RTY und GC (Markt wird automatisch erkannt) als **Tagesplan**:
+  Sobald die IBs fertig sind (15/30/45/60 Min ab der Startzeit, optional 2. Startzeit), werden einmal am Tag höchstens
+  4 Linien gewählt – TP oben/unten (weitestes Level ≥ 80 % erreicht) und Protected oben/unten (nächstes Level ≥ 80 % hält),
+  über alle IBs. Linie läuft bis Berührung (✓ / ✗) oder Tagesende. Keine Tabellen.
+  Statistik als kleine Formel (logistische Regression je IB-Fenster, Größenklasse, Seite, Wochentag), Korrektur aus dem
+  Prüfjahr plus Plan-Korrektur für Protected (Auswahl aus 4 IBs). Im ungesehenen Testjahr: TP 81 % angezeigt → 80 % erreicht,
+  Protected 81 % → 82 % gehalten (`data-lab/results/ib_ext_plan_check.md`).
+  Gebaut von `data-lab/ib_ext_model.py` aus `IB-Expansion-ALL_template.pine` (`--pine`: nur neu bauen aus
+  `results/ib_ext_coefs.json`); Plan-Korrektur von `data-lab/ib_ext_plan_check.py`. Formel-Prüfung: `ib_ext_model.md`.
 
 - `IB-Expansion_<Markt>.pine` – ältere Tabellen-Version, ein Indikator je Markt (NQ, ES, RTY, GC), Daten im Skript. Vier IBs gleichzeitig
   (15/30/45/60 Min ab derselben Startzeit), je IB Levels ±0,1 … ±3,0 IB-Range,

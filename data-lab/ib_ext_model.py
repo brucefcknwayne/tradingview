@@ -266,8 +266,9 @@ def deltas(P):
 
 
 # Pine: ein Indikator für alle Märkte; je Markt Datenblöcke mit KPB Startzeiten (je 4 Längen x 104 Zeichen, < 4096 Zeichen)
-# und eine Korrektur-Zeile (3 Arten x 10 Zeitstufen, 2 Zeichen, Auflösung 0,001)
+# und eine Korrektur-Zeile (3 Arten x 10 Zeitstufen + Plan-Korrektur Protected je Startzeit, 2 Zeichen, Auflösung 0,001)
 KPB = 9
+COEF = HERE / "results/ib_ext_coefs.json"
 
 
 def write_pine(data, dfin, end_date):
@@ -279,6 +280,8 @@ def write_pine(data, dfin, end_date):
         for b in range(0, len(STARTS), KPB):
             loads.append(f'B{b // KPB} := barstate.isfirst and mk == "{root}" ? "{"".join(bodies[b:b + KPB])}" : B{b // KPB}')
         cor = "".join(enc2(dfin.get(f"{root}|{art}|{q}", 0.0) * 10) for art in ("Target", "Protect", "Rücklauf") for q in range(NQB))
+        dplan = json.loads(COEF.read_text()).get("dplan", {}) if COEF.exists() else {}     # aus ib_ext_plan_check.py
+        cor += "".join(enc2(dplan.get(f"{root}|{st}|Protected", 0.0) * 10) for st in STARTS)
         loads.append(f'COR := barstate.isfirst and mk == "{root}" ? "{cor}" : COR')
     out = (tpl.replace("{{YEARS}}", str(YEARS)).replace("{{END}}", end_date).replace("{{KEYS}}", " ".join(STARTS))
               .replace("{{KPB}}", str(KPB)).replace("{{LOADS}}", "\n".join(loads)))
@@ -301,7 +304,6 @@ def encode(B, RT, thr, W):
     return s
 
 
-COEF = HERE / "results/ib_ext_coefs.json"
 if "--pine" in sys.argv:                      # nur Pine neu bauen aus gespeicherten Zahlen
     J = json.loads(COEF.read_text())
     write_pine(J["data"], J["dfin"], J["end"])
@@ -395,6 +397,8 @@ md = ["# IB-Expansion als Formel – Kalibrierung (≥ 70 % nach Korrektur)", ""
 (HERE / "results/ib_ext_model.md").write_text("\n".join(md))
 print("\n".join(md))
 
+old = json.loads(COEF.read_text()) if COEF.exists() else {}
 COEF.write_text(json.dumps({"data": data, "dfin": {f"{m}|{a}|{q}": float(v) for (m, a, q), v in d_fin.items()},
-                            "end": str(end.date()), "lam": best}))
+                            "end": str(end.date()), "lam": best, "dplan": old.get("dplan", {})}))
+print("Hinweis: Plan-Korrektur danach neu schätzen: python data-lab/ib_ext_plan_check.py && python data-lab/ib_ext_model.py --pine")
 write_pine(data, json.loads(COEF.read_text())["dfin"], str(end.date()))
