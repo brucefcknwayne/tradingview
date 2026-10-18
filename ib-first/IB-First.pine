@@ -4,8 +4,8 @@ indicator("IB First", shorttitle = "IB-First", overlay = true, max_lines_count =
 // Which side of the Initial Balance breaks first after the IB is done?
 // If the IB makes its LOW first, the IB HIGH usually breaks first afterwards – and vice versa.
 // When the IB is done:  line at the side that broke first most often, e.g. "15m · High breaks first 76%"
-//                       ✓ = that side broke first · ✗ = the other side broke first (line ends there,
-//                       the box stays right of the last candle until session end; same level for several IBs = one box)
+//                       ✓ = that side broke first · ✗ = the other side broke first → small marker where it happened
+//                       (open levels: box right of the last candle; same level for several IBs = one box)
 //                       optional extension beyond it, e.g. "+0.4 IB 81%" (reached by session end)
 // Also other IB lengths (15/30/45/60) as dotted lines if their side broke first at least "from %" often.
 // The % depend on market, start time, IB length, which extreme formed first, IB size vs. the 20 previous days (e.g. news)
@@ -160,6 +160,8 @@ var string eTx = ""
 var line   ibH = na
 var line   ibL = na
 var label  lbF = na
+var int    tS  = na                               // time of the first IB bar (lines start there)
+var array<color>  FC  = array.new<color>(4, na)
 
 if timeframe.isintraday and timeframe.change("D")
     if delOld
@@ -174,6 +176,7 @@ if timeframe.isintraday and timeframe.change("D")
     ibH := na
     ibL := na
     lbF := na
+    tS  := na
     eLn := na
     eLb := na
     eY  := na
@@ -197,6 +200,8 @@ for l = 0 to 3
     bool main = l == li
     // build the IB (first occurrence of high and low counts)
     if timeframe.isintraday and relNow >= relS and relNow < e
+        if na(tS)
+            tS := time
         if na(array.get(AH, l)) or high > array.get(AH, l)
             array.set(AH, l, high)
             array.set(ATH, l, time)
@@ -233,7 +238,7 @@ for l = 0 to 3
             bool  up   = opp == lf                        // favoured side is the IB high
             float y    = up ? H : Lo
             if main
-                lbF := label.new(lf ? array.get(ATL, l) : array.get(ATH, l), lf ? Lo : H, lf ? "low formed first" : "high formed first", xloc = xloc.bar_time, style = lf ? label.style_label_up : label.style_label_down, color = color.new(cGray, 25), textcolor = color.white, size = size.small)
+                lbF := label.new(lf ? array.get(ATL, l) : array.get(ATH, l), lf ? Lo : H, lf ? "low formed first" : "high formed first", xloc = xloc.bar_time, style = lf ? label.style_label_up : label.style_label_down, color = color.new(cGray, 25), textcolor = color.white, size = size.tiny)
             if p >= (main ? minIn : othMin) / 100.0
                 color  cc   = up ? cUp : cDn
                 string rest = (up ? "High" : "Low") + " breaks first " + f_pct(p)
@@ -256,7 +261,8 @@ for l = 0 to 3
                     array.set(FD, l, up ? 1 : -1)
                     array.set(FP, l, str.tostring((l + 1) * 15))
                     array.set(FT, l, t)
-                    array.set(LN, l, line.new(time, y, time, y, xloc = xloc.bar_time, color = cc, width = 2, style = main ? line.style_solid : line.style_dotted))
+                    array.set(FC, l, cc)
+                    array.set(LN, l, line.new(na(tS) ? time : tS, y, time, y, xloc = xloc.bar_time, color = cc, width = 2, style = main ? line.style_solid : line.style_dotted))
                     array.set(LB, l, label.new(xR, y, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cc, 10), textcolor = color.white, size = f_size()))
                     msg += t + " @ " + str.tostring(y, format.mintick) + "\n"
                 // extension beyond the other IB side (main IB only, only when that side is the favoured one)
@@ -276,12 +282,11 @@ for l = 0 to 3
                         eLn := line.new(time, eY, time, eY, xloc = xloc.bar_time, color = cc, width = 1, style = line.style_dashed)
                         eLb := label.new(xR, eY, eTx, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cc, 10), textcolor = color.white, size = f_size())
                         msg += eTx + " @ " + str.tostring(eY, format.mintick) + "\n"
-    // run until one side breaks: ✓ favoured side first, ✗ other side first (same bar = ✗, like the stats)
-    // line runs until one side breaks; the box stays right of the last candle until session end
+    // open: line runs on, box sits right of the last candle · decided: line ends, small marker at that spot
+    // ✓ = favoured side broke first, ✗ = other side broke first (same bar = ✗, like the stats)
     float fy = array.get(FY, l)
-    if not na(fy) and relNow < relEnd
-        label.set_x(array.get(LB, l), xR)
     if not na(fy) and not array.get(FR, l) and relNow < relEnd
+        label.set_x(array.get(LB, l), xR)
         line.set_x2(array.get(LN, l), time)
         int  d    = array.get(FD, l)
         float oy  = array.get(OY, l)
@@ -289,18 +294,20 @@ for l = 0 to 3
         bool oHit = d == 1 ? low < oy : high > oy
         if fHit or oHit
             array.set(FR, l, true)
-            string t = array.get(FT, l) + (fHit and not oHit ? " ✓" : " ✗")
-            label.set_text(array.get(LB, l), t)
-            msg += t + "\n"
+            bool ok = fHit and not oHit
+            label.delete(array.get(LB, l))
+            array.set(LB, l, label.new(time, fy, array.get(FP, l) + "m " + (ok ? "✓" : "✗"), xloc = xloc.bar_time, style = d == 1 ? label.style_label_down : label.style_label_up, color = color.new(array.get(FC, l), 10), textcolor = color.white, size = size.small))
+            msg += array.get(FT, l) + (ok ? " ✓" : " ✗") + "\n"
 
 // extension runs until reached (✓) or session end
-if not na(eY) and relNow < relEnd
-    label.set_x(eLb, xR)
 if not na(eY) and not eHit and relNow < relEnd
+    label.set_x(eLb, xR)
     line.set_x2(eLn, time)
     if eD == 1 ? high >= eY : low <= eY
         eHit := true
-        label.set_text(eLb, eTx + " ✓")
+        color ec = eD == 1 ? cUp : cDn
+        label.delete(eLb)
+        eLb := label.new(time, eY, array.get(str.split(eTx, " "), 0) + " IB ✓", xloc = xloc.bar_time, style = eD == 1 ? label.style_label_down : label.style_label_up, color = color.new(ec, 10), textcolor = color.white, size = size.small)
         msg += eTx + " ✓\n"
 
 if alOn and msg != ""
