@@ -4,24 +4,26 @@ indicator("IB Expansion {{MARKET}} · Targets & Protects", shorttitle = "IB-Exp 
 // ─────────────────────────────────────────────────────────────────────────────
 //  🦇  IB EXPANSION {{MARKET}}  ·  by @Brucefcknwayne
 //
-//  Levels ±0,1 … ±3,0 IB-Range über/unter der Initial Balance (jede volle Stunde +
-//  08:30/09:30/10:30, Länge 15/30/45/60 Min). Gezeigt wird NUR, was mindestens 70 % hat:
+//  Vier Initial Balances gleichzeitig ab derselben Startzeit: 15, 30, 45 und 60 Minuten
+//  (jede einzeln abschaltbar). Für jede IB Levels ±0,1 … ±3,0 IB-Range – gezeigt wird NUR,
+//  was mindestens 70 % hat:
 //    Target  (blau)            = wird bis Tagesende zu ≥ 70 % erreicht
-//    Protect (orange, gestr.)  = wird zu ≥ 70 % NICHT erreicht → Stop dahinter
 //    Target zurück (blau)      = nur IBs bis 09:30: Eröffnung 09:30 außerhalb der IB →
-//                                IB-Rand wird zu ≥ 70 % noch einmal berührt (Target Richtung IB)
+//                                IB-Rand wird zu ≥ 70 % noch einmal berührt
+//    Protect (orange, gestr.)  = wird zu ≥ 70 % NICHT erreicht → Stop dahinter
+//  Jede Linie läuft, bis das Level getroffen ist oder der Tag endet.
 //  Wahrscheinlichkeiten aus den Daten (Databento CME 1m, letzte {{YEARS}} Jahre bis {{END}}):
 //    · IB-Größe: klein / normal / groß im Vergleich zu den 20 Tagen davor (gleiche Uhrzeit)
 //    · bei IB-Ende: zusätzlich ob IB-Hoch oder IB-Tief zuerst gebildet wurde
 //    · danach live: Abstand des Levels zum aktuellen Kurs + verbleibende Zeit
-//  Jede Linie läuft mit, bis das Level erreicht ist oder der Tag endet.
-//  Tagesende: 17:00 NY für IBs vor 09:30, sonst 16:00. Für 1m–5m-Charts.
 //  Korrektur: Was die Statistik im letzten Jahr zu optimistisch war, wird je Uhrzeit-Stufe abgezogen.
+//  Tagesende: 17:00 NY für IBs vor 09:30, sonst 16:00. Für 1m–5m-Charts.
 //  Getestet auf dem letzten Jahr (ungesehen): data-lab/results/ib_ext_stats.md
 // ─────────────────────────────────────────────────────────────────────────────
 
 const string TZ    = "America/New_York"
 const string ALPHA = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+const int    NI    = 4      // IB-Längen 15 / 30 / 45 / 60
 const int    NK    = 31     // Level 0 … 30 (0,0 … 3,0 IB)
 const int    O_G   = 744    // Start Tabelle G
 const int    O_RT  = 2244   // Start Tabelle Rücklauf
@@ -32,64 +34,54 @@ const string G_A   = "Anzeige"
 
 // ═══════════════════════════════ INPUTS ═══════════════════════════════
 string startIn = input.string("09:30", "IB-Start (NY)", options = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "12:00", "13:00", "14:00", "15:00"], group = G_I)
-int    lenIn   = input.int(30, "IB-Länge (Min)", options = [15, 30, 45, 60], group = G_I)
+bool   on15    = input.bool(true, "15 Min", inline = "l", group = G_I)
+bool   on30    = input.bool(true, "30 Min", inline = "l", group = G_I)
+bool   on45    = input.bool(true, "45 Min", inline = "l", group = G_I)
+bool   on60    = input.bool(true, "60 Min", inline = "l", group = G_I)
 int    thrTP   = input.int(70, "Target ab (% erreicht)", minval = 50, maxval = 95, group = G_S)
 int    thrSL   = input.int(70, "Protect ab (% hält)", minval = 50, maxval = 95, group = G_S)
-string lblMode = input.string("Grenzen", "Beschriftung", options = ["Grenzen", "Alle Levels"], group = G_A, tooltip = "Grenzen: weitestes Target und erstes Protect je Seite.")
+string lblMode = input.string("Grenzen", "Beschriftung", options = ["Grenzen", "Alle Levels"], group = G_A, tooltip = "Grenzen: je IB und Seite das weiteste Target und das erste Protect.")
 bool   showIB  = input.bool(true, "IB-Hoch/-Tief immer zeigen", group = G_A, tooltip = "Als dünne Orientierung, auch unter der Schwelle.")
 bool   showTab = input.bool(true, "Info-Tabelle", group = G_A)
 color  cTP     = input.color(#2962ff, "Target", inline = "c", group = G_A)
 color  cSL     = input.color(#ff9800, "Protect", inline = "c", group = G_A)
 color  cIB     = input.color(#e535f5, "IB", inline = "c", group = G_A)
 
+var array<int> LENS = array.from(15, 30, 45, 60)
+
+f_on(int j) =>
+    j == 0 ? on15 : j == 1 ? on30 : j == 2 ? on45 : on60
+
 // ═══════════════════════════════ DATEN ═══════════════════════════════
 string root = syminfo.root
 string mk   = root == "NQ" or root == "MNQ" ? "NQ" : root == "ES" or root == "MES" ? "ES" : root == "RTY" or root == "M2K" ? "RTY" : root == "GC" or root == "MGC" ? "GC" : ""
-string wkey = str.replace(startIn, ":", "") + "-" + str.tostring(lenIn)
+string skey = str.replace(startIn, ":", "")
 
-var string DATA = ""
+var array<string> DATAS = array.from("", "", "", "")
 {{LOADS}}
 
-var array<float> V = array.new<float>()
-var int   NDAYS = 0
-var float THR1  = na
-var float THR2  = na
-if barstate.isfirst and str.length(DATA) > 0
-    array<string> parts = str.split(DATA, "|")
-    NDAYS := int(str.tonumber(array.get(parts, 0)))
-    THR1  := str.tonumber(array.get(parts, 1))
-    THR2  := str.tonumber(array.get(parts, 2))
-    string body = array.get(parts, 3)
-    for i = 0 to str.length(body) - 1
-        int ix = str.pos(ALPHA, str.substring(body, i, i + 1))
-        array.push(V, ix < 0 ? na : ix / 61.0)
+var array<float> VV    = array.new<float>(NI * N_ALL, na)
+var array<int>   NDAYS = array.new<int>(NI, 0)
+var array<float> THR1  = array.new<float>(NI, na)
+var array<float> THR2  = array.new<float>(NI, na)
+var array<bool>  HAS   = array.new<bool>(NI, false)
+if barstate.isfirst
+    for j = 0 to NI - 1
+        string dstr = array.get(DATAS, j)
+        if str.length(dstr) > 0
+            array<string> parts = str.split(dstr, "|")
+            array.set(NDAYS, j, int(str.tonumber(array.get(parts, 0))))
+            array.set(THR1, j, str.tonumber(array.get(parts, 1)))
+            array.set(THR2, j, str.tonumber(array.get(parts, 2)))
+            string body = array.get(parts, 3)
+            if str.length(body) == N_ALL
+                for i = 0 to N_ALL - 1
+                    int ix = str.pos(ALPHA, str.substring(body, i, i + 1))
+                    array.set(VV, j * N_ALL + i, ix < 0 ? na : ix / 61.0)
+                array.set(HAS, j, true)
 
-bool hasData = array.size(V) == N_ALL
-
-f_v(int i) =>
-    hasData ? array.get(V, i) : na
-
-// Tabellen-Layout (siehe data-lab/ib_ext_stats.py):
-//   T1 0–743     ((Größe·3 + zuerst)·2 + Seite)·31 + k              P(erreicht) bei IB-Ende
-//   G  744–2243  744 + (((Größe−1)·2 + Seite)·10 + Zeit)·25 + Abstand P(noch erreicht | Abstand, Zeit)
-//   RT 2244–2543 2244 + (Seite·10 + Zeit ab 9:30)·15 + Abstand      P(Rücklauf | Abstand, Zeit)
-f_t1(int c, int f, int side, int k) =>
-    float x = f_v(((c * 3 + f) * 2 + side) * NK + k)
-    if na(x)
-        x := f_v(((c * 3) * 2 + side) * NK + k)
-    if na(x)
-        x := f_v((f * 2 + side) * NK + k)
-    if na(x)
-        x := f_v(side * NK + k)
-    x
-
-f_dbin(float d) =>
-    float dd = math.max(d, 0.0)
-    dd < 2.0 ? int(math.floor(dd / 0.1)) : dd < 3.0 ? 20 + int(math.floor((dd - 2.0) / 0.25)) : 24
-
-f_rbin(float d) =>
-    float dd = math.max(d, 0.0)
-    dd < 1.0 ? int(math.floor(dd / 0.1)) : dd < 2.0 ? 10 + int(math.floor((dd - 1.0) / 0.25)) : 14
+f_v(int j, int i) =>
+    array.get(HAS, j) ? array.get(VV, j * N_ALL + i) : na
 
 // Korrektur je Zeitstufe (0 … 90 % der Restzeit): so viel war die Statistik im Prüfjahr zu optimistisch
 var array<float> DT = array.from({{DT}})
@@ -104,25 +96,47 @@ f_corr(array<float> a, float q) =>
     float x1 = array.get(a, i1)
     x0 + (x1 - x0) * math.min(qq - i0, 1.0)
 
+// Tabellen-Layout je IB (siehe data-lab/ib_ext_stats.py):
+//   T1 0–743     ((Größe·3 + zuerst)·2 + Seite)·31 + k              P(erreicht) bei IB-Ende
+//   G  744–2243  744 + (((Größe−1)·2 + Seite)·10 + Zeit)·25 + Abstand P(noch erreicht | Abstand, Zeit)
+//   RT 2244–2543 2244 + (Seite·10 + Zeit ab 9:30)·15 + Abstand      P(Rücklauf | Abstand, Zeit)
+f_t1(int j, int c, int f, int side, int k) =>
+    float x = f_v(j, ((c * 3 + f) * 2 + side) * NK + k)
+    if na(x)
+        x := f_v(j, ((c * 3) * 2 + side) * NK + k)
+    if na(x)
+        x := f_v(j, (f * 2 + side) * NK + k)
+    if na(x)
+        x := f_v(j, side * NK + k)
+    x
+
+f_dbin(float d) =>
+    float dd = math.max(d, 0.0)
+    dd < 2.0 ? int(math.floor(dd / 0.1)) : dd < 3.0 ? 20 + int(math.floor((dd - 2.0) / 0.25)) : 24
+
+f_rbin(float d) =>
+    float dd = math.max(d, 0.0)
+    dd < 1.0 ? int(math.floor(dd / 0.1)) : dd < 2.0 ? 10 + int(math.floor((dd - 1.0) / 0.25)) : 14
+
 f_lerp(float a0, float a1, float fr) =>
     na(a0) ? a1 : na(a1) ? a0 : a0 + (a1 - a0) * fr
 
-// P(Level wird noch erreicht | Größe, Abstand d, Zeit q) – zwischen Zeitstufen linear, nach 100 % = 0
-f_g(int c, int side, float q, float d) =>
+// P(Level wird noch erreicht | Größe, Abstand d, Zeit q) – zwischen Zeitstufen linear, nach 100 % = 0 (roh)
+f_g(int j, int c, int side, float q, float d) =>
     int   cg = (c == 0 ? 2 : c) - 1
     int   b  = f_dbin(d)
     float qq = math.max(0.0, math.min(1.0, q)) * 10
     int   i0 = math.min(int(math.floor(qq)), 9)
-    float a0 = f_v(O_G + ((cg * 2 + side) * 10 + i0) * 25 + b)
-    float a1 = i0 >= 9 ? 0.0 : f_v(O_G + ((cg * 2 + side) * 10 + i0 + 1) * 25 + b)
+    float a0 = f_v(j, O_G + ((cg * 2 + side) * 10 + i0) * 25 + b)
+    float a1 = i0 >= 9 ? 0.0 : f_v(j, O_G + ((cg * 2 + side) * 10 + i0 + 1) * 25 + b)
     f_lerp(a0, a1, qq - i0)
 
-f_rt(int side, float q, float d) =>
+f_rt(int j, int side, float q, float d) =>
     int   b  = f_rbin(d)
     float qq = math.max(0.0, math.min(1.0, q)) * 10
     int   i0 = math.min(int(math.floor(qq)), 9)
-    float a0 = f_v(O_RT + (side * 10 + i0) * 15 + b)
-    float a1 = i0 >= 9 ? 0.0 : f_v(O_RT + (side * 10 + i0 + 1) * 15 + b)
+    float a0 = f_v(j, O_RT + (side * 10 + i0) * 15 + b)
+    float a1 = i0 >= 9 ? 0.0 : f_v(j, O_RT + (side * 10 + i0 + 1) * 15 + b)
     f_lerp(a0, a1, qq - i0)
 
 // ═══════════════════════════════ ZEIT ═══════════════════════════════
@@ -130,10 +144,12 @@ f_rel(int t) =>
     (hour(t, TZ) * 60 + minute(t, TZ) - 1080 + 1440) % 1440
 
 int relS   = (int(str.tonumber(str.substring(startIn, 0, 2))) * 60 + int(str.tonumber(str.substring(startIn, 3, 5))) - 1080 + 1440) % 1440
-int relE   = relS + lenIn
 int relEnd = relS < 930 ? 1380 : 1320
 int rel930 = 930
 int relNow = f_rel(time)
+
+f_relE(int j) =>
+    relS + array.get(LENS, j)
 
 // IB-Größe: Median der IB-Range derselben Uhrzeit an den 20 Tagen davor (aus 15-Min-Kerzen, reicht weiter zurück)
 f_ibMedian(int rs, int len) =>
@@ -154,92 +170,121 @@ f_ibMedian(int rs, int len) =>
                 array.shift(hist)
     med
 
-float ibMed = request.security(syminfo.tickerid, "15", f_ibMedian(relS, lenIn))
+float med15 = request.security(syminfo.tickerid, "15", f_ibMedian(relS, 15))
+float med30 = request.security(syminfo.tickerid, "15", f_ibMedian(relS, 30))
+float med45 = request.security(syminfo.tickerid, "15", f_ibMedian(relS, 45))
+float med60 = request.security(syminfo.tickerid, "15", f_ibMedian(relS, 60))
 
-// ═══════════════════════════════ TAGES-STATUS ═══════════════════════════════
-var float ibH    = na
-var float ibL    = na
-var int   tH     = na
-var int   tL     = na
-var bool  done   = false
-var int   upMax  = -1
-var int   dnMax  = -1
-var int   ffDay  = 0
-var int   cls    = 0
-var float rsz    = na
-var int   tIB    = na
-var int   tEnd   = na
-var int   rtSide = -1
-var bool  rtHit  = false
-var line  rtLn   = na
-var array<line>  LU = array.new<line>()
-var array<line>  LD = array.new<line>()
-var array<label> LB = array.new<label>()
+f_med(int j) =>
+    j == 0 ? med15 : j == 1 ? med30 : j == 2 ? med45 : med60
+
+// ═══════════════════════════════ TAGES-STATUS (je IB) ═══════════════════════════════
+var array<float> aH     = array.new<float>(NI, na)
+var array<float> aL     = array.new<float>(NI, na)
+var array<int>   aTH    = array.new<int>(NI, na)
+var array<int>   aTL    = array.new<int>(NI, na)
+var array<bool>  aDone  = array.new<bool>(NI, false)
+var array<int>   aUp    = array.new<int>(NI, -1)
+var array<int>   aDn    = array.new<int>(NI, -1)
+var array<int>   aFF    = array.new<int>(NI, 0)
+var array<int>   aCls   = array.new<int>(NI, 0)
+var array<float> aRsz   = array.new<float>(NI, na)
+var array<int>   aTIB   = array.new<int>(NI, na)
+var array<int>   aTEnd  = array.new<int>(NI, na)
+var array<int>   aRtS   = array.new<int>(NI, -1)
+var array<bool>  aRtHit = array.new<bool>(NI, false)
+var array<bool>  aRtSet = array.new<bool>(NI, false)
+var array<line>  aRtLn  = array.new<line>(NI)
+var array<line>  LU     = array.new<line>(NI * NK)
+var array<line>  LD     = array.new<line>(NI * NK)
+var array<label> LB     = array.new<label>()
 
 if timeframe.isintraday and timeframe.change("D")
-    ibH    := na
-    ibL    := na
-    tH     := na
-    tL     := na
-    done   := false
-    upMax  := -1
-    dnMax  := -1
-    rtSide := -1
-    rtHit  := false
-    rtLn   := na
-    array.clear(LU)
-    array.clear(LD)
+    for j = 0 to NI - 1
+        array.set(aH, j, na)
+        array.set(aL, j, na)
+        array.set(aTH, j, na)
+        array.set(aTL, j, na)
+        array.set(aDone, j, false)
+        array.set(aUp, j, -1)
+        array.set(aDn, j, -1)
+        array.set(aRtS, j, -1)
+        array.set(aRtHit, j, false)
+        array.set(aRtSet, j, false)
+        array.set(aRtLn, j, na)
+        for k = 0 to NK - 1
+            array.set(LU, j * NK + k, na)
+            array.set(LD, j * NK + k, na)
     for lb in LB
         label.delete(lb)
     array.clear(LB)
 
-if relNow >= relS and relNow < relE
-    if na(ibH) or high > ibH
-        ibH := high
-        tH  := time
-    if na(ibL) or low < ibL
-        ibL := low
-        tL  := time
+// IB aufbauen (erstes Auftreten von Hoch/Tief zählt)
+for j = 0 to NI - 1
+    if relNow >= relS and relNow < f_relE(j)
+        float h0 = array.get(aH, j)
+        float l0 = array.get(aL, j)
+        if na(h0) or high > h0
+            array.set(aH, j, high)
+            array.set(aTH, j, time)
+        if na(l0) or low < l0
+            array.set(aL, j, low)
+            array.set(aTL, j, time)
 
-float R = ibH - ibL
+f_R(int j) =>
+    array.get(aH, j) - array.get(aL, j)
 
-f_price(int side, int k) =>
-    side == 0 ? ibH + k * 0.1 * R : ibL - k * 0.1 * R
+f_price(int j, int side, int k) =>
+    side == 0 ? array.get(aH, j) + k * 0.1 * f_R(j) : array.get(aL, j) - k * 0.1 * f_R(j)
 
-// IB fertig → je Seite 31 Linien (unsichtbar, bis sie die Schwelle erreichen)
-if not done and not na(ibH) and R > 0 and relNow >= relE and relNow < relEnd and hasData
-    done  := true
-    tIB   := time
-    tEnd  := time + (relEnd - relNow) * 60000
-    ffDay := tH < tL ? 1 : tL < tH ? 2 : 0
-    rsz   := na(ibMed) or ibMed <= 0 ? na : R / ibMed
-    cls   := na(rsz) or na(THR1) ? 0 : rsz <= THR1 ? 1 : rsz >= THR2 ? 3 : 2
-    for k = 0 to NK - 1
-        array.push(LU, line.new(time, f_price(0, k), time, f_price(0, k), xloc = xloc.bar_time, color = color.new(cIB, 100)))
-        array.push(LD, line.new(time, f_price(1, k), time, f_price(1, k), xloc = xloc.bar_time, color = color.new(cIB, 100)))
+// IB fertig
+for j = 0 to NI - 1
+    float R = f_R(j)
+    if f_on(j) and mk == "{{MARKET}}" and not array.get(aDone, j) and not na(R) and R > 0 and relNow >= f_relE(j) and relNow < relEnd and array.get(HAS, j)
+        array.set(aDone, j, true)
+        array.set(aTIB, j, time)
+        array.set(aTEnd, j, time + (relEnd - relNow) * 60000)
+        int tH = array.get(aTH, j)
+        int tL = array.get(aTL, j)
+        array.set(aFF, j, tH < tL ? 1 : tL < tH ? 2 : 0)
+        float med = f_med(j)
+        float rs  = na(med) or med <= 0 ? na : R / med
+        array.set(aRsz, j, rs)
+        array.set(aCls, j, na(rs) or na(array.get(THR1, j)) ? 0 : rs <= array.get(THR1, j) ? 1 : rs >= array.get(THR2, j) ? 3 : 2)
+        if showIB
+            array.set(LU, j * NK, line.new(time, array.get(aH, j), time, array.get(aH, j), xloc = xloc.bar_time, color = color.new(cIB, 40)))
+            array.set(LD, j * NK, line.new(time, array.get(aL, j), time, array.get(aL, j), xloc = xloc.bar_time, color = color.new(cIB, 40)))
 
-// erreichte Levels (Stand vor diesem Bar merken: was jetzt erreicht wird, endet auf diesem Bar)
-int upPrev = upMax
-int dnPrev = dnMax
-if done and relNow < relEnd
-    while upMax < NK - 1 and (upMax < 0 ? high > ibH : high >= f_price(0, upMax + 1))
-        upMax += 1
-    while dnMax < NK - 1 and (dnMax < 0 ? low < ibL : low <= f_price(1, dnMax + 1))
-        dnMax += 1
+// erreichte Levels (Stand vor diesem Bar merken: was jetzt getroffen wird, endet auf diesem Bar)
+array<int> upPrev = array.copy(aUp)
+array<int> dnPrev = array.copy(aDn)
+for j = 0 to NI - 1
+    if array.get(aDone, j) and relNow < relEnd
+        int u = array.get(aUp, j)
+        while u < NK - 1 and (u < 0 ? high > array.get(aH, j) : high >= f_price(j, 0, u + 1))
+            u += 1
+        array.set(aUp, j, u)
+        int d = array.get(aDn, j)
+        while d < NK - 1 and (d < 0 ? low < array.get(aL, j) : low <= f_price(j, 1, d + 1))
+            d += 1
+        array.set(aDn, j, d)
 
 // ═══════════════════════════════ WAHRSCHEINLICHKEIT ═══════════════════════════════
-float qNow = done ? (relNow - relE + 1) / float(relEnd - relE) : 0.0
+f_q(int j) =>
+    (relNow - f_relE(j) + 1) / float(relEnd - f_relE(j))
 
-f_dist(int side, int k) =>
-    side == 0 ? (f_price(0, k) - close) / R : (close - f_price(1, k)) / R
+f_dist(int j, int side, int k) =>
+    side == 0 ? (f_price(j, 0, k) - close) / f_R(j) : (close - f_price(j, 1, k)) / f_R(j)
 
 // bis zum ersten erreichten Level: Übergang von T1 (Größe, zuerst gebildet) zu G in den ersten 10 % der Restzeit
-f_prob(int side, int k) =>
-    float g = f_g(cls, side, qNow, f_dist(side, k))
+f_prob(int j, int side, int k) =>
+    int   c = array.get(aCls, j)
+    float q = f_q(j)
+    float g = f_g(j, c, side, q, f_dist(j, side, k))
     float p = g
-    if upMax < 0 and dnMax < 0
-        float t1 = f_t1(cls, ffDay, side, k)
-        float w  = math.min(qNow / 0.1, 1.0)
+    if array.get(aUp, j) < 0 and array.get(aDn, j) < 0
+        float t1 = f_t1(j, c, array.get(aFF, j), side, k)
+        float w  = math.min(q / 0.1, 1.0)
         p := na(t1) ? g : na(g) ? t1 : (1 - w) * t1 + w * g
     p
 
@@ -250,13 +295,16 @@ f_pct(float p) =>
     str.tostring(math.round(p * 100)) + " %"
 
 // Uhrzeit, ab der ein Target unter die Schwelle fällt (wenn der Kurs bis dahin hier bleibt)
-f_valid(int side, int k) =>
+f_valid(int j, int side, int k) =>
     string out = "Tagesende"
-    float d = f_dist(side, k)
-    float q = qNow
+    float d   = f_dist(j, side, k)
+    int   c   = array.get(aCls, j)
+    int   t0  = array.get(aTIB, j)
+    int   t1  = array.get(aTEnd, j)
+    float q   = f_q(j)
     while q <= 1.0
-        if f_g(cls, side, q, d) - f_corr(DT, q) < thrTP / 100.0
-            out := str.format_time(int(tIB + q * (tEnd - tIB)), "HH:mm", TZ)
+        if f_g(j, c, side, q, d) - f_corr(DT, q) < thrTP / 100.0
+            out := str.format_time(int(t0 + q * (t1 - t0)), "HH:mm", TZ)
             break
         q += 0.02
     out
@@ -264,88 +312,116 @@ f_valid(int side, int k) =>
 // ═══════════════════════════════ LINIEN & BESCHRIFTUNG ═══════════════════════════════
 bool drawLbl = barstate.islast
 int  xLbl    = time + 3 * timeframe.in_seconds() * 1000
-if done and relNow < relEnd
-    if drawLbl
-        for lb in LB
-            label.delete(lb)
-        array.clear(LB)
-    for side = 0 to 1
-        int   reached = side == 0 ? upPrev : dnPrev
-        int   nowMax  = side == 0 ? upMax : dnMax
-        int   bestTP  = -1
-        int   firstSL = -1
-        float pTP     = na
-        float pSL     = na
-        for k = 0 to NK - 1
-            line ln = side == 0 ? array.get(LU, k) : array.get(LD, k)
-            bool isIB = k == 0
-            if k > reached
-                line.set_x2(ln, time)
-            if k > nowMax
-                float p  = f_prob(side, k)
-                float pT = p - f_corr(DT, qNow)          // Target: Sicherheit erreicht (korrigiert)
-                float pS = 1 - p - f_corr(DP, qNow)      // Protect: Sicherheit hält (korrigiert)
-                bool  tp = not na(p) and p >= 0.5 and pT >= thrTP / 100.0
-                bool  sl = not na(p) and p < 0.5 and pS >= thrSL / 100.0
-                color c  = tp ? cTP : sl ? cSL : cIB
-                line.set_color(ln, tp or sl ? c : isIB and showIB ? color.new(cIB, 40) : color.new(c, 100))
-                line.set_style(ln, sl ? line.style_dashed : line.style_solid)
-                line.set_width(ln, isIB and (tp or sl) ? 2 : 1)
-                if tp
-                    bestTP := k
-                    pTP    := pT
-                if sl and firstSL < 0
-                    firstSL := k
-                    pSL     := pS
-                if drawLbl and lblMode == "Alle Levels" and (tp or sl)
-                    string nm = (side == 0 ? "+" : "−") + f_fmt(k)
-                    array.push(LB, label.new(xLbl, f_price(side, k), nm + " · " + f_pct(sl ? pS : pT), xloc = xloc.bar_time, style = label.style_label_left, color = color.new(c, 100), textcolor = c, size = size.tiny))
-        if drawLbl and lblMode == "Grenzen"
-            string sg = side == 0 ? "+" : "−"
-            if bestTP >= 0
-                string t = "Target " + sg + f_fmt(bestTP) + " IB · " + f_pct(pTP) + " · gültig bis " + f_valid(side, bestTP)
-                array.push(LB, label.new(xLbl, f_price(side, bestTP), t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cTP, 80), textcolor = cTP, size = size.small))
-            if firstSL >= 0
-                string t = "Protect " + sg + f_fmt(firstSL) + " IB · " + f_pct(pSL) + " hält"
-                array.push(LB, label.new(xLbl, f_price(side, firstSL), t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cSL, 80), textcolor = cSL, size = size.small))
+if drawLbl
+    for lb in LB
+        label.delete(lb)
+    array.clear(LB)
+
+for j = 0 to NI - 1
+    if array.get(aDone, j) and relNow < relEnd
+        string tag = str.tostring(array.get(LENS, j)) + "m "
+        float  q   = f_q(j)
+        for side = 0 to 1
+            int   reached = side == 0 ? array.get(upPrev, j) : array.get(dnPrev, j)
+            int   nowMax  = side == 0 ? array.get(aUp, j) : array.get(aDn, j)
+            int   bestTP  = -1
+            int   firstSL = -1
+            float pTP     = na
+            float pSL     = na
+            for k = 0 to NK - 1
+                int  ix   = j * NK + k
+                line ln   = side == 0 ? array.get(LU, ix) : array.get(LD, ix)
+                bool isIB = k == 0
+                // läuft weiter, bis getroffen (dieser Bar ist dann der letzte) oder Tagesende
+                if k > reached and not na(ln)
+                    line.set_x2(ln, time)
+                if k > nowMax
+                    float p  = f_prob(j, side, k)
+                    float pT = p - f_corr(DT, q)          // Target: Sicherheit erreicht (korrigiert)
+                    float pS = 1 - p - f_corr(DP, q)      // Protect: Sicherheit hält (korrigiert)
+                    bool  tp = not na(p) and p >= 0.5 and pT >= thrTP / 100.0
+                    bool  sl = not na(p) and p < 0.5 and pS >= thrSL / 100.0
+                    float lv = f_price(j, side, k)
+                    if (tp or sl) and na(ln)
+                        ln := line.new(time, lv, time, lv, xloc = xloc.bar_time)
+                        if side == 0
+                            array.set(LU, ix, ln)
+                        else
+                            array.set(LD, ix, ln)
+                    if not na(ln)
+                        color c = tp ? cTP : sl ? cSL : cIB
+                        line.set_color(ln, tp or sl ? c : isIB and showIB ? color.new(cIB, 40) : color.new(c, 100))
+                        line.set_style(ln, sl ? line.style_dashed : line.style_solid)
+                        line.set_width(ln, isIB and (tp or sl) ? 2 : 1)
+                    if tp
+                        bestTP := k
+                        pTP    := pT
+                    if sl and firstSL < 0
+                        firstSL := k
+                        pSL     := pS
+                    if drawLbl and lblMode == "Alle Levels" and (tp or sl)
+                        string nm = tag + (side == 0 ? "+" : "−") + f_fmt(k) + " · " + f_pct(sl ? pS : pT)
+                        array.push(LB, label.new(xLbl, lv, nm, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(tp ? cTP : cSL, 100), textcolor = tp ? cTP : cSL, size = size.tiny))
+            if drawLbl and lblMode == "Grenzen"
+                string sg = side == 0 ? "+" : "−"
+                if bestTP >= 0
+                    string t = tag + "Target " + sg + f_fmt(bestTP) + " IB · " + f_pct(pTP) + " · gültig bis " + f_valid(j, side, bestTP)
+                    array.push(LB, label.new(xLbl, f_price(j, side, bestTP), t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cTP, 80), textcolor = cTP, size = size.small))
+                if firstSL >= 0
+                    string t = tag + "Protect " + sg + f_fmt(firstSL) + " IB · " + f_pct(pSL) + " hält"
+                    array.push(LB, label.new(xLbl, f_price(j, side, firstSL), t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cSL, 80), textcolor = cSL, size = size.small))
 
 // ═══════════════════════════════ TARGET ZURÜCK ZUR IB (nach 09:30) ═══════════════════════════════
 // nur IBs, die bis 09:30 fertig sind: Eröffnung über dem IB-Hoch / unter dem IB-Tief → Rücklauf zum IB-Rand
-if done and relE <= rel930 and relNow >= rel930 and relNow < relEnd
-    if na(rtLn) and rtSide < 0 and not rtHit
-        rtSide := open > ibH ? 0 : open < ibL ? 1 : -1
-        rtHit  := rtSide < 0
-        if rtSide >= 0
-            float lvl = rtSide == 0 ? ibH : ibL
-            rtLn := line.new(time, lvl, time, lvl, xloc = xloc.bar_time, color = color.new(cTP, 100), width = 2)
-    if rtSide >= 0 and not rtHit
-        line.set_x2(rtLn, time)
-        bool back = rtSide == 0 ? low <= ibH : high >= ibL
-        if back
-            rtHit := true
-        else
-            float d  = rtSide == 0 ? (close - ibH) / R : (ibL - close) / R
-            float qR = (relNow - rel930 + 1) / float(relEnd - rel930)   // Zeit ab 09:30
-            float p  = f_rt(rtSide, qR, d) - f_corr(DR, qR)
-            bool  ok = not na(p) and p >= thrTP / 100.0
-            line.set_color(rtLn, ok ? cTP : color.new(cTP, 100))
-            if drawLbl and ok
-                string t = "Target " + (rtSide == 0 ? "IB-Hoch" : "IB-Tief") + " (zurück) · " + f_pct(p)
-                array.push(LB, label.new(xLbl, rtSide == 0 ? ibH : ibL, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cTP, 80), textcolor = cTP, size = size.small))
+for j = 0 to NI - 1
+    if array.get(aDone, j) and f_relE(j) <= rel930 and relNow >= rel930 and relNow < relEnd
+        float H = array.get(aH, j)
+        float L = array.get(aL, j)
+        if not array.get(aRtSet, j)
+            array.set(aRtSet, j, true)
+            int s0 = open > H ? 0 : open < L ? 1 : -1
+            array.set(aRtS, j, s0)
+            if s0 >= 0
+                float lvl = s0 == 0 ? H : L
+                array.set(aRtLn, j, line.new(time, lvl, time, lvl, xloc = xloc.bar_time, color = color.new(cTP, 100), width = 2))
+        int sd = array.get(aRtS, j)
+        if sd >= 0 and not array.get(aRtHit, j)
+            line ln = array.get(aRtLn, j)
+            line.set_x2(ln, time)
+            bool back = sd == 0 ? low <= H : high >= L
+            if back
+                array.set(aRtHit, j, true)
+            else
+                float d  = sd == 0 ? (close - H) / f_R(j) : (L - close) / f_R(j)
+                float qR = (relNow - rel930 + 1) / float(relEnd - rel930)   // Zeit ab 09:30
+                float p  = f_rt(j, sd, qR, d) - f_corr(DR, qR)
+                bool  ok = not na(p) and p >= thrTP / 100.0
+                line.set_color(ln, ok ? cTP : color.new(cTP, 100))
+                if drawLbl and ok
+                    string t = str.tostring(array.get(LENS, j)) + "m Target " + (sd == 0 ? "IB-Hoch" : "IB-Tief") + " (zurück) · " + f_pct(p)
+                    array.push(LB, label.new(xLbl, sd == 0 ? H : L, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cTP, 80), textcolor = cTP, size = size.small))
 
 // ═══════════════════════════════ INFO ═══════════════════════════════
-var table tb = table.new(position.top_right, 2, 6, bgcolor = color.new(color.black, 80))
+var table tb = table.new(position.top_right, 5, NI + 2, bgcolor = color.new(color.black, 80))
 if showTab and barstate.islast
-    string szTxt = cls == 1 ? "klein" : cls == 2 ? "normal" : cls == 3 ? "groß" : "unbekannt"
-    table.cell(tb, 0, 0, "IB", text_color = color.gray, text_size = size.small)
-    table.cell(tb, 1, 0, mk != "{{MARKET}}" ? "nur für {{MARKET}}-Charts" : mk + " · " + startIn + " · " + str.tostring(lenIn) + " Min", text_color = color.white, text_size = size.small)
-    table.cell(tb, 0, 1, "Statistik", text_color = color.gray, text_size = size.small)
-    table.cell(tb, 1, 1, hasData ? str.tostring(NDAYS) + " Tage · {{YEARS}} J" : "keine Daten für dieses Fenster", text_color = color.white, text_size = size.small)
-    table.cell(tb, 0, 2, "IB-Größe", text_color = color.gray, text_size = size.small)
-    table.cell(tb, 1, 2, done ? szTxt + (na(rsz) ? "" : " · " + str.replace(str.tostring(rsz, "0.0"), ".", ",") + "× normal") : "–", text_color = color.white, text_size = size.small)
-    table.cell(tb, 0, 3, "Zuerst", text_color = color.gray, text_size = size.small)
-    table.cell(tb, 1, 3, not done ? "IB läuft" : ffDay == 1 ? "IB-Hoch" : ffDay == 2 ? "IB-Tief" : "gleich", text_color = color.white, text_size = size.small)
-    table.cell(tb, 0, 4, "Erreicht", text_color = color.gray, text_size = size.small)
-    table.cell(tb, 1, 4, done ? "oben " + (upMax < 0 ? "–" : "+" + f_fmt(upMax)) + " · unten " + (dnMax < 0 ? "–" : "−" + f_fmt(dnMax)) : "–", text_color = color.white, text_size = size.small)
-    table.cell(tb, 0, 5, "Restzeit", text_color = color.gray, text_size = size.small)
-    table.cell(tb, 1, 5, done and relNow < relEnd ? str.tostring(math.round((1 - qNow) * 100)) + " % · Ende " + str.format_time(tEnd, "HH:mm", TZ) : "–", text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 0, mk != "{{MARKET}}" ? "nur für {{MARKET}}-Charts" : mk + " · Start " + startIn, text_color = color.white, text_size = size.small)
+    table.cell(tb, 1, 0, "Größe", text_color = color.gray, text_size = size.small)
+    table.cell(tb, 2, 0, "Zuerst", text_color = color.gray, text_size = size.small)
+    table.cell(tb, 3, 0, "Erreicht", text_color = color.gray, text_size = size.small)
+    table.cell(tb, 4, 0, "Tage", text_color = color.gray, text_size = size.small)
+    for j = 0 to NI - 1
+        bool   dn  = array.get(aDone, j)
+        int    c   = array.get(aCls, j)
+        float  rs  = array.get(aRsz, j)
+        int    ff  = array.get(aFF, j)
+        int    u   = array.get(aUp, j)
+        int    d   = array.get(aDn, j)
+        string sz  = not dn ? "–" : (c == 1 ? "klein" : c == 2 ? "normal" : c == 3 ? "groß" : "?") + (na(rs) ? "" : " " + str.replace(str.tostring(rs, "0.0"), ".", ",") + "×")
+        string fst = not dn ? (f_on(j) ? "läuft" : "aus") : ff == 1 ? "Hoch" : ff == 2 ? "Tief" : "gleich"
+        string er  = not dn ? "–" : (u < 0 ? "–" : "+" + f_fmt(u)) + " / " + (d < 0 ? "–" : "−" + f_fmt(d))
+        table.cell(tb, 0, j + 1, str.tostring(array.get(LENS, j)) + " Min", text_color = color.white, text_size = size.small)
+        table.cell(tb, 1, j + 1, sz, text_color = color.white, text_size = size.small)
+        table.cell(tb, 2, j + 1, fst, text_color = color.white, text_size = size.small)
+        table.cell(tb, 3, j + 1, er, text_color = color.white, text_size = size.small)
+        table.cell(tb, 4, j + 1, array.get(HAS, j) ? str.tostring(array.get(NDAYS, j)) : "–", text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, NI + 1, "Statistik {{YEARS}} J · Ende " + (relS < 930 ? "17:00" : "16:00"), text_color = color.gray, text_size = size.small)

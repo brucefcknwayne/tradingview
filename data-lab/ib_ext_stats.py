@@ -367,7 +367,9 @@ print("\n".join(md))
 # 3) Eigenständige Indikatoren je Markt
 tpl = (ROOT / "gotham-zones/IB-Expansion_template.pine").read_text()
 for root in MARKETS:
-    loads = [f'if barstate.isfirst and mk == "{root}" and wkey == "{w}"\n    DATA := "{n}|{t[0]:.3f}|{t[1]:.3f}|{d}"'
+    # je Fenster eine Anweisung: Startzeit wählt, Länge bestimmt den Platz (15/30/45/60 → 0–3)
+    loads = [f'if barstate.isfirst and skey == "{w.split("-")[0]}"\n'
+             f'    array.set(DATAS, {LENGTHS.index(int(w.split("-")[1]))}, "{n}|{t[0]:.3f}|{t[1]:.3f}|{d}")'
              for w, (d, n, t) in data[root].items()]
     dl = lambda art: ", ".join(f"{d_fin.get((root, art, q), 0.0):.3f}" for q in range(NQB))
     out = (tpl.replace("{{MARKET}}", root).replace("{{YEARS}}", str(YEARS)).replace("{{END}}", str(end.date()))
