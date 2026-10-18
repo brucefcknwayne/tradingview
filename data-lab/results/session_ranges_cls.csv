@@ -1,0 +1,109 @@
+Markt,Session,Zeitraum,Größe,Tage,Range ggü. 20 Tage,Hoch genommen %,Tief genommen %,beide %,eine Seite ≥1x %,eine Seite ≥2x %
+NQ,Asia,1J,klein,86,≤ 0.83×,58.1,50.0,14.0,20.9,2.3
+NQ,Asia,1J,normal,86,dazwischen,55.8,41.9,10.5,7.0,1.2
+NQ,Asia,1J,groß,86,≥ 1.30×,39.5,31.4,1.2,3.5,0.0
+NQ,Asia,3J,klein,259,≤ 0.81×,61.8,57.5,24.3,27.4,6.2
+NQ,Asia,3J,normal,257,dazwischen,58.8,42.8,12.5,15.2,2.7
+NQ,Asia,3J,groß,259,≥ 1.28×,49.0,32.0,3.9,5.8,1.5
+NQ,Asia,Alles,klein,1043,≤ 0.80×,63.8,55.9,23.9,32.4,7.9
+NQ,Asia,Alles,normal,1043,dazwischen,57.4,45.2,13.5,16.3,3.1
+NQ,Asia,Alles,groß,1042,≥ 1.24×,49.2,34.8,6.2,6.7,0.9
+NQ,London,1J,klein,85,≤ 0.85×,78.8,64.7,43.5,72.9,36.5
+NQ,London,1J,normal,86,dazwischen,65.1,72.1,38.4,68.6,24.4
+NQ,London,1J,groß,86,≥ 1.25×,68.6,62.8,32.6,31.4,9.3
+NQ,London,3J,klein,258,≤ 0.83×,81.0,69.8,50.8,79.8,45.0
+NQ,London,3J,normal,256,dazwischen,70.3,67.2,37.9,69.5,27.3
+NQ,London,3J,groß,259,≥ 1.22×,67.6,62.5,31.7,41.7,13.1
+NQ,London,Alles,klein,1378,≤ 0.82×,78.8,72.6,52.0,79.2,43.8
+NQ,London,Alles,normal,1383,dazwischen,74.0,67.5,42.4,64.4,27.5
+NQ,London,Alles,groß,1390,≥ 1.22×,66.4,63.4,31.2,41.0,12.6
+NQ,New York,1J,klein,83,≤ 0.82×,33.7,37.3,0.0,10.8,0.0
+NQ,New York,1J,normal,83,dazwischen,37.3,20.5,0.0,1.2,0.0
+NQ,New York,1J,groß,82,≥ 1.19×,30.5,25.6,0.0,3.7,0.0
+NQ,New York,3J,klein,249,≤ 0.83×,32.5,24.9,0.0,7.6,1.2
+NQ,New York,3J,normal,248,dazwischen,35.9,16.9,0.4,2.8,0.4
+NQ,New York,3J,groß,248,≥ 1.18×,22.6,22.6,0.0,2.4,0.4
+NQ,New York,Alles,klein,1341,≤ 0.83×,35.0,21.6,0.8,4.3,0.7
+NQ,New York,Alles,normal,1353,dazwischen,31.0,16.6,0.3,1.6,0.1
+NQ,New York,Alles,groß,1351,≥ 1.20×,24.3,20.7,0.2,0.9,0.2
+ES,Asia,1J,klein,86,≤ 0.83×,66.3,50.0,23.3,22.1,5.8
+ES,Asia,1J,normal,85,dazwischen,56.5,34.1,7.1,15.3,1.2
+ES,Asia,1J,groß,87,≥ 1.33×,44.8,36.8,4.6,3.4,1.1
+ES,Asia,3J,klein,259,≤ 0.80×,64.9,56.4,25.5,28.2,9.3
+ES,Asia,3J,normal,257,dazwischen,59.5,43.2,12.1,13.6,3.5
+ES,Asia,3J,groß,259,≥ 1.29×,51.4,35.5,5.0,6.2,1.2
+ES,Asia,Alles,klein,1402,≤ 0.80×,66.5,57.2,26.8,37.7,10.7
+ES,Asia,Alles,normal,1387,dazwischen,57.9,47.8,15.1,20.0,3.5
+ES,Asia,Alles,groß,1395,≥ 1.23×,51.8,38.5,7.9,10.2,1.5
+ES,London,1J,klein,85,≤ 0.81×,71.8,67.1,41.2,81.2,42.4
+ES,London,1J,normal,86,dazwischen,76.7,64.0,40.7,64.0,24.4
+ES,London,1J,groß,86,≥ 1.25×,60.5,61.6,24.4,37.2,9.3
+ES,London,3J,klein,258,≤ 0.81×,79.5,70.2,50.4,80.6,44.6
+ES,London,3J,normal,256,dazwischen,74.2,63.7,39.1,68.8,29.3
+ES,London,3J,groß,259,≥ 1.22×,64.5,60.6,29.0,45.6,14.3
+ES,London,Alles,klein,1387,≤ 0.82×,75.7,68.4,44.9,71.8,35.9
+ES,London,Alles,normal,1383,dazwischen,70.6,64.5,36.3,56.0,22.2
+ES,London,Alles,groß,1398,≥ 1.22×,63.2,57.9,25.1,37.4,9.4
+ES,New York,1J,klein,83,≤ 0.80×,32.5,25.3,1.2,8.4,2.4
+ES,New York,1J,normal,83,dazwischen,21.7,27.7,0.0,3.6,1.2
+ES,New York,1J,groß,82,≥ 1.22×,26.8,23.2,0.0,1.2,0.0
+ES,New York,3J,klein,249,≤ 0.81×,32.1,22.5,1.2,6.0,1.6
+ES,New York,3J,normal,248,dazwischen,26.6,22.2,0.4,1.6,0.4
+ES,New York,3J,groß,248,≥ 1.21×,24.6,19.0,0.0,3.6,0.0
+ES,New York,Alles,klein,1351,≤ 0.81×,35.5,22.6,0.9,4.8,0.8
+ES,New York,Alles,normal,1354,dazwischen,29.4,19.0,0.5,1.8,0.5
+ES,New York,Alles,groß,1352,≥ 1.21×,23.4,21.3,0.4,1.0,0.1
+RTY,Asia,1J,klein,86,≤ 0.81×,69.8,59.3,29.1,31.4,8.1
+RTY,Asia,1J,normal,85,dazwischen,57.6,47.1,14.1,15.3,3.5
+RTY,Asia,1J,groß,86,≥ 1.29×,45.3,39.5,5.8,5.8,2.3
+RTY,Asia,3J,klein,249,≤ 0.81×,66.7,64.7,31.7,37.3,8.4
+RTY,Asia,3J,normal,247,dazwischen,59.9,51.4,17.8,20.2,4.9
+RTY,Asia,3J,groß,249,≥ 1.24×,50.6,36.5,6.0,12.4,2.0
+RTY,Asia,Alles,klein,644,≤ 0.81×,65.7,60.6,28.6,34.5,7.3
+RTY,Asia,Alles,normal,643,dazwischen,57.1,50.9,14.8,19.1,4.7
+RTY,Asia,Alles,groß,643,≥ 1.22×,52.4,39.7,8.1,11.2,1.6
+RTY,London,1J,klein,85,≤ 0.83×,75.3,83.5,58.8,82.4,52.9
+RTY,London,1J,normal,86,dazwischen,73.3,66.3,40.7,79.1,36.0
+RTY,London,1J,groß,86,≥ 1.21×,66.3,61.6,30.2,45.3,9.3
+RTY,London,3J,klein,258,≤ 0.83×,73.6,77.5,51.6,87.6,50.4
+RTY,London,3J,normal,256,dazwischen,71.5,68.0,39.8,73.0,29.3
+RTY,London,3J,groß,259,≥ 1.21×,64.5,65.3,32.4,45.9,10.4
+RTY,London,Alles,klein,756,≤ 0.81×,77.2,75.9,53.7,83.7,53.4
+RTY,London,Alles,normal,758,dazwischen,73.0,69.0,42.5,71.1,30.7
+RTY,London,Alles,groß,759,≥ 1.23×,67.2,65.5,34.5,46.0,11.1
+RTY,New York,1J,klein,83,≤ 0.85×,20.5,32.5,0.0,7.2,1.2
+RTY,New York,1J,normal,83,dazwischen,22.9,26.5,0.0,1.2,1.2
+RTY,New York,1J,groß,82,≥ 1.18×,20.7,22.0,0.0,0.0,0.0
+RTY,New York,3J,klein,249,≤ 0.85×,22.9,20.5,0.0,3.6,0.8
+RTY,New York,3J,normal,248,dazwischen,23.0,19.8,0.4,1.2,0.4
+RTY,New York,3J,groß,248,≥ 1.18×,21.0,21.0,0.0,1.6,0.0
+RTY,New York,Alles,klein,718,≤ 0.84×,29.2,19.5,0.6,2.1,0.3
+RTY,New York,Alles,normal,733,dazwischen,24.6,17.5,0.4,0.5,0.3
+RTY,New York,Alles,groß,738,≥ 1.18×,20.5,22.6,0.1,0.9,0.0
+GC,Asia,1J,klein,86,≤ 0.81×,40.7,41.9,3.5,12.8,1.2
+GC,Asia,1J,normal,85,dazwischen,37.6,31.8,1.2,5.9,2.4
+GC,Asia,1J,groß,86,≥ 1.19×,36.0,23.3,0.0,1.2,0.0
+GC,Asia,3J,klein,258,≤ 0.82×,52.7,46.1,10.5,23.3,3.9
+GC,Asia,3J,normal,258,dazwischen,52.7,35.7,5.0,11.6,1.2
+GC,Asia,3J,groß,258,≥ 1.21×,39.1,33.3,2.7,1.2,0.4
+GC,Asia,Alles,klein,1394,≤ 0.82×,58.3,58.5,22.0,32.1,6.7
+GC,Asia,Alles,normal,1394,dazwischen,51.6,51.4,12.2,17.2,2.4
+GC,Asia,Alles,groß,1394,≥ 1.18×,43.3,36.9,3.2,6.0,0.7
+GC,London,1J,klein,86,≤ 0.83×,61.6,64.0,26.7,54.7,23.3
+GC,London,1J,normal,85,dazwischen,65.9,57.6,24.7,47.1,14.1
+GC,London,1J,groß,86,≥ 1.23×,47.7,51.2,8.1,19.8,7.0
+GC,London,3J,klein,259,≤ 0.85×,62.2,60.6,24.3,59.1,25.1
+GC,London,3J,normal,257,dazwischen,63.4,54.9,21.4,39.7,13.2
+GC,London,3J,groß,258,≥ 1.23×,48.8,46.1,6.6,17.4,3.5
+GC,London,Alles,klein,1398,≤ 0.84×,59.7,63.4,25.8,56.8,25.5
+GC,London,Alles,normal,1398,dazwischen,57.2,55.6,17.4,38.3,12.4
+GC,London,Alles,groß,1398,≥ 1.19×,46.0,48.0,7.9,18.8,3.8
+GC,New York,1J,klein,83,≤ 0.83×,60.2,51.8,19.3,26.5,8.4
+GC,New York,1J,normal,82,dazwischen,42.7,52.4,7.3,18.3,2.4
+GC,New York,1J,groß,83,≥ 1.20×,38.6,34.9,2.4,3.6,0.0
+GC,New York,3J,klein,250,≤ 0.84×,53.6,46.4,12.0,22.4,7.6
+GC,New York,3J,normal,249,dazwischen,45.8,34.1,4.8,10.4,1.2
+GC,New York,3J,groß,250,≥ 1.21×,35.2,27.6,1.6,3.6,0.4
+GC,New York,Alles,klein,1360,≤ 0.83×,46.8,36.9,6.5,11.8,2.8
+GC,New York,Alles,normal,1355,dazwischen,36.9,29.4,2.1,5.3,0.9
+GC,New York,Alles,groß,1358,≥ 1.22×,28.4,22.5,0.5,2.7,0.5
