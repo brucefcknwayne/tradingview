@@ -13,13 +13,14 @@ Gotham Zones (±0.5/1/1.5/2σ um das Daily Open, σ aus VIX1D/VIX9D/VXN) – Aus
   15/30/45/60 Min), Linien als „geschützt“ / „bricht“ mit Wahrscheinlichkeit (NQ, ES, RTY, GC, 1J/3J/5J).
   Wird von `data-lab/ib_levels_stats.py` aus `IB-Levels_template.pine` gebaut – nicht von Hand ändern, sondern das Template.
 
-- `IB-Expansion_ALL.pine` – **ein** Indikator für NQ, ES, RTY und GC (Markt wird automatisch erkannt), ~69.000 Zeichen, 490 Zeilen.
+- `IB-Expansion_ALL.pine` – **ein** Indikator für NQ, ES, RTY und GC (Markt wird automatisch erkannt), ~71.000 Zeichen, 509 Zeilen.
   Gleiche Anzeige wie die Einzel-Versionen, aber die Statistik steckt als kleine Formel (logistische Regression je
   IB-Fenster, Größenklasse und Seite) statt als Tabelle im Skript – rund 30× kleiner, im Prüfjahr gleich gut kalibriert.
   Einstufung bleibt: Ein Level, das einmal ≥ 70 % hat, bleibt Target/Protect (mit % beim Erscheinen) bis Treffer oder Tagesende
   (Prüfung: `data-lab/results/ib_ext_lock_check.md`). Alarme für Treffer/Brüche und neue Levels.
   Wochentag geht in die Formel ein (Zuschlag je Seite und Wochentag, gedämpft; Vergleich mit/ohne in `ib_ext_model.md`).
   Optional eine 2. Startzeit gleichzeitig (z. B. 08:30 + 09:30) mit eigenen Farben.
+  Linien standardmäßig nur als Grenzen (je IB und Seite weitestes offenes Target, erstes Protect), Vortage gelöscht.
   Gesperrt, weil im Test nicht verlässlich: neue Targets in den letzten 10 % der Restzeit, späte Rückläufe.
   Wird von `data-lab/ib_ext_model.py` aus `IB-Expansion-ALL_template.pine` gebaut (`--pine`: nur neu bauen aus
   `results/ib_ext_coefs.json`). Prüfung: `data-lab/results/ib_ext_model.md`.
