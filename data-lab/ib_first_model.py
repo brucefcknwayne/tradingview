@@ -11,7 +11,7 @@ sonst 16:00; Tage, an denen Hoch und Tief im selben Bar entstehen, fallen raus):
   Ziele
     ext   P(Gegenseite + x IB erreicht), x = 0 … 2 IB (x = 0: Gegenseite überhaupt geholt) – EIN Modell mit u = ln(x + 0,05), u²
     zuerst P(Gegenseite wird geholt, BEVOR die Erstseite noch einmal bricht)   („Ziel vor Stop“)
-    erst  P(Erstseite wird noch einmal gebrochen)
+    erst  P(Erstseite wird ZUERST gebrochen, also vor der Gegenseite)   (zusammen mit „zuerst“: welche Seite bricht zuerst)
   Modell: logistische Regression mit Ridge-Dämpfung (Achsenabschnitt und side ungedämpft).
 
 Auswahl (nur Validierung, Testjahr unberührt):
@@ -106,9 +106,9 @@ def window_days(G, dts, s, L, e):
         mx, mn = np.nanmax(Hp, 1), np.nanmin(Lp, 1)
     opp = np.where(lf, mx > H, mn < Lo)
     ext = np.where(lf, (mx - H) / R, (Lo - mn) / R)
-    same = np.where(lf, mn < Lo, mx > H)
     t_o, t_s = np.where(lf, tu, td), np.where(lf, td, tu)
     first = np.isfinite(t_o) & (t_o < t_s)
+    same = np.isfinite(t_s) & (t_s < t_o)          # Erstseite bricht zuerst (gleicher Bar = keiner zuerst)
     wd = dts.weekday.to_numpy()
     F = pd.DataFrame({"side": lf.astype(float), "z": z, "z2": z * z, "pos": pos, "pos2": pos * pos,
                       **{f"w{k}": (wd == k).astype(float) for k in range(1, 5)}})
@@ -266,7 +266,7 @@ for (mk, st, L), D in cache.items():
     po = np.array([p_ext(be, f, 0.0) for f in Fx])
     calib += [pd.DataFrame({"Ziel": "Gegenseite", "p": po, "y": D["opp"][ix]}),
               pd.DataFrame({"Ziel": "Ziel vor Stop", "p": pz, "y": D["first"][ix]}),
-              pd.DataFrame({"Ziel": "Erstseite nochmal", "p": ps, "y": D["same"][ix]})]
+              pd.DataFrame({"Ziel": "Erstseite zuerst", "p": ps, "y": D["same"][ix]})]
     # große IBs (oberstes Zehntel der Größe im Trainingsfenster)
     zq = np.quantile(D["z"][it], 0.9)
     big = D["z"][ix] >= zq

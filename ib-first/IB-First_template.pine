@@ -1,17 +1,21 @@
 //@version=6
 indicator("IB First", shorttitle = "IB-First", overlay = true, max_lines_count = 200, max_labels_count = 200)
 // 🦇 IB FIRST · by @Brucefcknwayne – NQ, ES, RTY, GC (+ MNQ, MES, M2K, MGC) · context, not a strategy
-// If the Initial Balance makes its LOW first, price usually goes on to take the IB HIGH – and vice versa.
-// When the IB is done:  "Low first" / "High first"  ·  line at the other IB side with how often it got taken that day
-//                       ·  optional extension line beyond it with how often it was reached.
-// Lines run until reached (✓) or session end. Built for 1m charts.
+// Which side of the Initial Balance breaks first after the IB is done?
+// If the IB makes its LOW first, the IB HIGH usually breaks first afterwards – and vice versa.
+// When the IB is done:  line at the side that broke first most often, e.g. "15m · High breaks first 76%"
+//                       ✓ = that side broke first · ✗ = the other side broke first (line ends)
+//                       optional extension beyond it, e.g. "+0.4 IB 81%" (reached by session end)
+// Also other IB lengths (15/30/45/60) as dotted lines if their side broke first at least "from %" often.
+// The % depend on market, start time, IB length, which extreme formed first, IB size vs. the 20 previous days (e.g. news)
+// and where price sits at the end of the IB. Built for 1m charts.
 // Data: CME 1m until {{END}}, model: {{MODEL}}. Tested on an unseen year (data-lab/results/ib_first_model.md).
 // Alerts: create alert → condition "IB-First" → "Any alert() function call".
 
 const string TZ    = "America/New_York"
 const string ALPHA = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 const string KEYS  = "{{KEYS}}"
-const int    NCF   = 32      // numbers per IB: extension 12, before stop 10, stop side 10
+const int    NCF   = 32      // numbers per IB: extension 12, other side breaks first 10, first side breaks first 10
 const int    KPB   = {{KPB}}      // start times per data block
 const float  ZMAX  = {{ZMAX}}
 const string G_I   = "Initial Balance"
@@ -19,21 +23,21 @@ const string G_A   = "Display"
 
 string startIn  = input.string("09:30", "IB start (New York time)", options = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "12:00", "13:00", "14:00", "15:00"], group = G_I)
 string lenIn    = input.string("Auto", "IB length (minutes)", options = ["Auto", "15", "30", "45", "60"], group = G_I, tooltip = "Auto = the best length for this market and start time.")
-int    minIn    = input.int(70, "Show from (min %)", minval = 50, maxval = 95, group = G_I, tooltip = "Only draw the IB side line if it got taken at least this often.")
-string tpIn     = input.string("80%", "Extension", options = ["Off", "60%", "70%", "80%", "90%"], group = G_I, tooltip = "Shows the farthest level beyond the IB side that was reached at least this often. Lower % = further away.")
+int    minIn    = input.int(65, "Show from (min %)", minval = 50, maxval = 95, group = G_I, tooltip = "Only draw the line if that side broke first at least this often.")
+string tpIn     = input.string("80%", "Extension", options = ["Off", "60%", "70%", "80%", "90%"], group = G_I, tooltip = "Farthest level beyond the IB side that was reached by session end at least this often. Lower % = further away.")
+bool   showOth  = input.bool(true, "Also show other IB lengths", inline = "o", group = G_I, tooltip = "Dotted line for every other IB length (15/30/45/60) whose side broke first at least this often.")
+int    othMin   = input.int(75, "from %", minval = 50, maxval = 95, inline = "o", group = G_I)
 bool   showIB   = input.bool(true, "Show IB while forming", group = G_A)
-bool   showOth  = input.bool(true, "Also show other IB lengths", inline = "o", group = G_I, tooltip = "Adds a thinner line for every other IB length (15/30/45/60) whose other side got taken at least this often.")
-int    othMin   = input.int(80, "from %", minval = 50, maxval = 95, inline = "o", group = G_I)
 bool   delOld   = input.bool(true, "Today only", group = G_A)
 color  cUp      = input.color(#26a69a, "Above", inline = "c", group = G_A)
 color  cDn      = input.color(#ef5350, "Below", inline = "c", group = G_A)
-color  cGray    = input.color(#9598a1, "Text / IB", inline = "c", group = G_A)
+color  cGray    = input.color(#9598a1, "Done / IB", inline = "c", group = G_A)
 string txtSize  = input.string("Normal", "Text size", options = ["Small", "Normal", "Large"], group = G_A)
 bool   alOn     = input.bool(true, "Alerts", group = "Alerts")
 
-bool  tp2On = tpIn != "Off"
+bool  extOn = tpIn != "Off"
 float thrTP = str.startswith(tpIn, "60") ? 0.6 : str.startswith(tpIn, "70") ? 0.7 : str.startswith(tpIn, "80") ? 0.8 : 0.9
-// correction per mode: the farthest target at the threshold edge is otherwise slightly optimistic (from validation)
+// correction per mode: the farthest level at the threshold edge is otherwise slightly optimistic (from validation)
 float dTP   = thrTP == 0.6 ? {{D60}} : thrTP == 0.7 ? {{D70}} : thrTP == 0.8 ? {{D80}} : {{D90}}
 
 // ═══ DATA: per market 2 blocks (start times x 4 lengths x 32 numbers of 2 chars) + best length per start time ═══
@@ -45,7 +49,7 @@ var string BL = ""
 {{LOADS}}
 
 int ki  = int(str.pos(KEYS, startIn) / 6)
-int wdI = dayofweek(time_tradingday, "UTC") - dayofweek.monday          // Wochentag des Handelstags: 0 = Mo … 4 = Fr
+int wdI = dayofweek(time_tradingday, "UTC") - dayofweek.monday          // weekday of the trading day: 0 = Mon … 4 = Fri
 int lAuto = str.length(BL) >= ki + 1 ? int(str.tonumber(str.substring(BL, ki, ki + 1))) - 1 : 1
 int li    = lenIn == "Auto" ? lAuto : int(str.tonumber(lenIn) / 15) - 1
 int L     = (li + 1) * 15
@@ -65,7 +69,7 @@ f_coefs(int l) =>
             array.set(c, i, f_dec(src, p0 + i * 2))
     c
 
-// Merkmale: [1, side, z, z², pos, pos², Di, Mi, Do, Fr]
+// features: [1, side, z, z², pos, pos², Tue, Wed, Thu, Fri]
 f_lin(array<float> c, int o, array<float> x) =>
     float s = 0.0
     for i = 0 to 9
@@ -75,7 +79,7 @@ f_lin(array<float> c, int o, array<float> x) =>
 f_sig(float z) =>
     1 / (1 + math.exp(-z))
 
-// P(Gegenseite + x IB wird erreicht)
+// P(other IB side + x IB gets reached by session end)
 f_pext(array<float> c, array<float> x, float xx) =>
     float u = math.log(xx + 0.05)
     f_sig(f_lin(c, 0, x) + array.get(c, 10) * u + array.get(c, 11) * u * u)
@@ -118,207 +122,158 @@ float m15 = request.security(syminfo.tickerid, "15", f_ibMedian(relS, 15))
 float m30 = request.security(syminfo.tickerid, "15", f_ibMedian(relS, 30))
 float m45 = request.security(syminfo.tickerid, "15", f_ibMedian(relS, 45))
 float m60 = request.security(syminfo.tickerid, "15", f_ibMedian(relS, 60))
-float med = li == 0 ? m15 : li == 1 ? m30 : li == 2 ? m45 : m60
+f_med(int l) =>
+    l == 0 ? m15 : l == 1 ? m30 : l == 2 ? m45 : m60
 
-// ═══ TAGES-STATUS ═══
-var float H    = na
-var float Lo   = na
-var int   tH   = na
-var int   tL   = na
-var bool  done = false
-var line  ibH  = na
-var line  ibL  = na
-var label lbF  = na
-// lines after the IB: 0 target (opposite side), 1 TP, 2 stop side
-var array<line>   RL = array.new<line>(3)
-var array<label>  RB = array.new<label>(3)
-var array<float>  RY = array.new<float>(3, na)
-var array<int>    RD = array.new<int>(3, 0)        // 1 = hit when high above level, −1 = when low below level
-var array<bool>   RS = array.new<bool>(3, false)   // strict (IB extreme must be exceeded)
-var array<bool>   RH = array.new<bool>(3, false)
-var array<string> RX = array.new<string>(3, "")
+// ═══ STATE per IB length (0 = 15m … 3 = 60m) ═══
+var array<float>  AH  = array.new<float>(4, na)
+var array<float>  AL  = array.new<float>(4, na)
+var array<int>    ATH = array.new<int>(4, na)
+var array<int>    ATL = array.new<int>(4, na)
+var array<bool>   ADN = array.new<bool>(4, false)
+var array<line>   LN  = array.new<line>(4)        // line at the side that breaks first
+var array<label>  LB  = array.new<label>(4)
+var array<float>  FY  = array.new<float>(4, na)   // that side
+var array<float>  OY  = array.new<float>(4, na)   // the other side
+var array<int>    FD  = array.new<int>(4, 0)      // 1 = favoured side above, −1 = below
+var array<bool>   FR  = array.new<bool>(4, false) // resolved (one side broke)
+var array<string> FT  = array.new<string>(4, "")
+var line   eLn = na                               // extension (main IB only)
+var label  eLb = na
+var float  eY  = na
+var int    eD  = 0
+var bool   eHit = false
+var string eTx = ""
+var line   ibH = na
+var line   ibL = na
+var label  lbF = na
 
 if timeframe.isintraday and timeframe.change("D")
     if delOld
         line.delete(ibH)
         line.delete(ibL)
         label.delete(lbF)
-        for i = 0 to 2
-            line.delete(array.get(RL, i))
-            label.delete(array.get(RB, i))
+        line.delete(eLn)
+        label.delete(eLb)
+        for l = 0 to 3
+            line.delete(array.get(LN, l))
+            label.delete(array.get(LB, l))
     ibH := na
     ibL := na
     lbF := na
-    for i = 0 to 2
-        array.set(RL, i, na)
-        array.set(RB, i, na)
-    array.fill(RY, na)
-    array.fill(RH, false)
-    H    := na
-    Lo   := na
-    tH   := na
-    tL   := na
-    done := false
-
-// build the IB (first occurrence of high and low counts)
-if timeframe.isintraday and relNow >= relS and relNow < relE
-    if na(H) or high > H
-        H  := high
-        tH := time
-    if na(Lo) or low < Lo
-        Lo := low
-        tL := time
-    if showIB
-        if na(ibH)
-            ibH := line.new(time, H, time, H, xloc = xloc.bar_time, color = color.new(cGray, 40))
-            ibL := line.new(time, Lo, time, Lo, xloc = xloc.bar_time, color = color.new(cGray, 40))
-        line.set_y1(ibH, H)
-        line.set_y2(ibH, H)
-        line.set_y1(ibL, Lo)
-        line.set_y2(ibL, Lo)
-        line.set_x2(ibH, time)
-        line.set_x2(ibL, time)
-
-f_add(int i, float y, int dir, bool strict, string t, color c, int w, string st) =>
-    array.set(RY, i, y)
-    array.set(RD, i, dir)
-    array.set(RS, i, strict)
-    array.set(RX, i, t)
-    array.set(RL, i, line.new(time, y, time, y, xloc = xloc.bar_time, color = c, width = w, style = st))
-    array.set(RB, i, label.new(time, y, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(c, 10), textcolor = color.white, size = f_size()))
-
-// IB done: which came first, how big, where is price → probabilities
-string msg = ""
-if not done and mk != "" and not na(H) and H > Lo and relNow >= relE and relNow < relEnd
-    done := true
-    int f = tL < tH ? 0 : tH < tL ? 1 : -1
-    array<float> c = f_coefs(li)
-    if f >= 0 and not na(array.get(c, 0))
-        bool  lf  = f == 0
-        float R   = H - Lo
-        float z   = na(med) or med <= 0 ? 0.0 : math.max(-ZMAX, math.min(ZMAX, math.log(R / med)))
-        float pr  = (close[1] - Lo) / R
-        float pos = math.max(0.0, math.min(1.0, lf ? pr : 1 - pr))
-        array<float> x = array.from(1.0, lf ? 1.0 : 0.0, z, z * z, pos, pos * pos, wdI == 1 ? 1.0 : 0.0, wdI == 2 ? 1.0 : 0.0, wdI == 3 ? 1.0 : 0.0, wdI == 4 ? 1.0 : 0.0)
-        float pO  = f_pext(c, x, 0.0)
-        float pOT = pO - dTP                                    // as TP (with correction)
-        float oy  = lf ? H : Lo
-        int   dir = lf ? 1 : -1
-        color cc  = lf ? cUp : cDn
-        // extension: farthest x (0.1 … 2.0 IB) with P ≥ threshold, from inside out until the first miss
-        float xTP = na
-        float pTP = na
-        if tp2On and pOT >= thrTP
-            for k = 1 to 20
-                float pk = f_pext(c, x, k / 10.0) - dTP
-                if pk < thrTP
-                    break
-                xTP := k / 10.0
-                pTP := pk
-        string first = lf ? "Low first" : "High first"
-        lbF := label.new(lf ? tL : tH, lf ? Lo : H, first, xloc = xloc.bar_time, style = lf ? label.style_label_up : label.style_label_down, color = color.new(cGray, 25), textcolor = color.white, size = size.small)
-        if pO >= minIn / 100.0
-            f_add(0, oy, dir, true, str.tostring(L) + "m " + (lf ? "IB High " : "IB Low ") + f_pct(pO), cc, 2, line.style_solid)
-            msg := first + " → " + (lf ? "IB High " : "IB Low ") + f_pct(pO) + " @ " + str.tostring(oy, format.mintick)
-            if not na(xTP)
-                float ey = oy + dir * xTP * R
-                f_add(1, ey, dir, false, "+" + str.tostring(xTP, "0.0") + " IB " + f_pct(pTP), cc, 1, line.style_dashed)
-                msg += "\n+" + str.tostring(xTP, "0.0") + " IB " + f_pct(pTP) + " @ " + str.tostring(ey, format.mintick)
-if alOn and msg != ""
-    alert("IB-First " + mk + " · " + startIn + "\n" + msg, alert.freq_once_per_bar)
-
-// lines run until reached (✓) or session end
-string msgHit = ""
-if done and relNow < relEnd
-    for i = 0 to 1
-        float y = array.get(RY, i)
-        if not na(y) and not array.get(RH, i)
-            line.set_x2(array.get(RL, i), time)
-            label.set_x(array.get(RB, i), time)
-            bool st  = array.get(RS, i)
-            bool hit = array.get(RD, i) == 1 ? (st ? high > y : high >= y) : (st ? low < y : low <= y)
-            if hit
-                array.set(RH, i, true)
-                label.set_text(array.get(RB, i), array.get(RX, i) + " ✓")
-                label.set_color(array.get(RB, i), color.new(cGray, 25))       // reached: grey box
-                msgHit += array.get(RX, i) + " ✓\n"
-if alOn and msgHit != ""
-    alert("IB-First " + mk + "\n" + msgHit, alert.freq_once_per_bar)
-
-// ═══ OTHER IB LENGTHS (context): thinner line at the other side if it got taken ≥ "from %" ═══
-var array<float>  OH  = array.new<float>(4, na)
-var array<float>  OL  = array.new<float>(4, na)
-var array<int>    OTH = array.new<int>(4, na)
-var array<int>    OTL = array.new<int>(4, na)
-var array<bool>   ODN = array.new<bool>(4, false)
-var array<line>   OLN = array.new<line>(4)
-var array<label>  OLB = array.new<label>(4)
-var array<float>  OY  = array.new<float>(4, na)
-var array<int>    ODR = array.new<int>(4, 0)
-var array<bool>   OHT = array.new<bool>(4, false)
-var array<string> OTX = array.new<string>(4, "")
-
-if timeframe.isintraday and timeframe.change("D")
+    eLn := na
+    eLb := na
+    eY  := na
+    eHit := false
     for l = 0 to 3
-        if delOld
-            line.delete(array.get(OLN, l))
-            label.delete(array.get(OLB, l))
-        array.set(OLN, l, na)
-        array.set(OLB, l, na)
-        array.set(OH, l, na)
-        array.set(OL, l, na)
-        array.set(OTH, l, na)
-        array.set(OTL, l, na)
-    array.fill(ODN, false)
+        array.set(LN, l, na)
+        array.set(LB, l, na)
+        array.set(AH, l, na)
+        array.set(AL, l, na)
+        array.set(ATH, l, na)
+        array.set(ATL, l, na)
+    array.fill(ADN, false)
+    array.fill(FY, na)
     array.fill(OY, na)
-    array.fill(OHT, false)
+    array.fill(FR, false)
 
-string msgOth = ""
+string msg = ""
 for l = 0 to 3
-    int e = relS + (l + 1) * 15
+    int  e    = relS + (l + 1) * 15
+    bool main = l == li
+    // build the IB (first occurrence of high and low counts)
     if timeframe.isintraday and relNow >= relS and relNow < e
-        if na(array.get(OH, l)) or high > array.get(OH, l)
-            array.set(OH, l, high)
-            array.set(OTH, l, time)
-        if na(array.get(OL, l)) or low < array.get(OL, l)
-            array.set(OL, l, low)
-            array.set(OTL, l, time)
-    float oh = array.get(OH, l)
-    float ol = array.get(OL, l)
-    if showOth and l != li and mk != "" and not array.get(ODN, l) and relNow >= e and relNow < relEnd and not na(oh) and oh > ol
-        array.set(ODN, l, true)
-        int f = array.get(OTL, l) < array.get(OTH, l) ? 0 : array.get(OTH, l) < array.get(OTL, l) ? 1 : -1
+        if na(array.get(AH, l)) or high > array.get(AH, l)
+            array.set(AH, l, high)
+            array.set(ATH, l, time)
+        if na(array.get(AL, l)) or low < array.get(AL, l)
+            array.set(AL, l, low)
+            array.set(ATL, l, time)
+        if main and showIB
+            if na(ibH)
+                ibH := line.new(time, high, time, high, xloc = xloc.bar_time, color = color.new(cGray, 40))
+                ibL := line.new(time, low, time, low, xloc = xloc.bar_time, color = color.new(cGray, 40))
+            line.set_xy1(ibH, line.get_x1(ibH), array.get(AH, l))
+            line.set_xy2(ibH, time, array.get(AH, l))
+            line.set_xy1(ibL, line.get_x1(ibL), array.get(AL, l))
+            line.set_xy2(ibL, time, array.get(AL, l))
+    float H  = array.get(AH, l)
+    float Lo = array.get(AL, l)
+    // IB done: which side breaks first?
+    if (main or showOth) and mk != "" and not array.get(ADN, l) and relNow >= e and relNow < relEnd and not na(H) and H > Lo
+        array.set(ADN, l, true)
+        int f = array.get(ATL, l) < array.get(ATH, l) ? 0 : array.get(ATH, l) < array.get(ATL, l) ? 1 : -1
         array<float> c = f_coefs(l)
         if f >= 0 and not na(array.get(c, 0))
             bool  lf  = f == 0
-            float R   = oh - ol
-            float ml  = l == 0 ? m15 : l == 1 ? m30 : l == 2 ? m45 : m60
-            float z   = na(ml) or ml <= 0 ? 0.0 : math.max(-ZMAX, math.min(ZMAX, math.log(R / ml)))
-            float pr  = (close[1] - ol) / R
+            float R   = H - Lo
+            float md  = f_med(l)
+            float z   = na(md) or md <= 0 ? 0.0 : math.max(-ZMAX, math.min(ZMAX, math.log(R / md)))
+            float pr  = (close[1] - Lo) / R
             float pos = math.max(0.0, math.min(1.0, lf ? pr : 1 - pr))
             array<float> x = array.from(1.0, lf ? 1.0 : 0.0, z, z * z, pos, pos * pos, wdI == 1 ? 1.0 : 0.0, wdI == 2 ? 1.0 : 0.0, wdI == 3 ? 1.0 : 0.0, wdI == 4 ? 1.0 : 0.0)
-            float pO  = f_pext(c, x, 0.0)
-            float y   = lf ? oh : ol
-            float y0  = array.get(RY, 0)
-            // skip if it sits on the main line (same price)
-            if pO >= othMin / 100.0 and (na(y0) or math.abs(y - y0) > syminfo.mintick / 2)
-                color  cc = lf ? cUp : cDn
-                string t  = str.tostring((l + 1) * 15) + "m " + (lf ? "IB High " : "IB Low ") + f_pct(pO)
-                array.set(OY, l, y)
-                array.set(ODR, l, lf ? 1 : -1)
-                array.set(OTX, l, t)
-                array.set(OLN, l, line.new(time, y, time, y, xloc = xloc.bar_time, color = cc, width = 2, style = line.style_dotted))
-                array.set(OLB, l, label.new(time, y, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cc, 10), textcolor = color.white, size = f_size()))
-                msgOth += t + " @ " + str.tostring(y, format.mintick) + "\n"
-    // run until reached (✓) or session end
-    float y1 = array.get(OY, l)
-    if not na(y1) and not array.get(OHT, l) and relNow < relEnd
-        line.set_x2(array.get(OLN, l), time)
-        label.set_x(array.get(OLB, l), time)
-        if array.get(ODR, l) == 1 ? high > y1 : low < y1
-            array.set(OHT, l, true)
-            label.set_text(array.get(OLB, l), array.get(OTX, l) + " ✓")
-            label.set_color(array.get(OLB, l), color.new(cGray, 25))
-            msgOth += array.get(OTX, l) + " ✓\n"
-if alOn and msgOth != ""
-    alert("IB-First " + mk + "\n" + msgOth, alert.freq_once_per_bar)
+            float pOpp = f_sig(f_lin(c, 12, x))           // other side breaks first
+            float pSam = f_sig(f_lin(c, 22, x))           // first-formed side breaks first
+            bool  opp  = pOpp >= pSam
+            float p    = opp ? pOpp : pSam
+            bool  up   = opp == lf                        // favoured side is the IB high
+            float y    = up ? H : Lo
+            if main
+                lbF := label.new(lf ? array.get(ATL, l) : array.get(ATH, l), lf ? Lo : H, lf ? "low formed first" : "high formed first", xloc = xloc.bar_time, style = lf ? label.style_label_up : label.style_label_down, color = color.new(cGray, 25), textcolor = color.white, size = size.small)
+            if p >= (main ? minIn : othMin) / 100.0
+                color  cc = up ? cUp : cDn
+                string t  = str.tostring((l + 1) * 15) + "m · " + (up ? "High" : "Low") + " breaks first " + f_pct(p)
+                array.set(FY, l, y)
+                array.set(OY, l, up ? Lo : H)
+                array.set(FD, l, up ? 1 : -1)
+                array.set(FT, l, t)
+                array.set(LN, l, line.new(time, y, time, y, xloc = xloc.bar_time, color = cc, width = 2, style = main ? line.style_solid : line.style_dotted))
+                array.set(LB, l, label.new(time, y, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cc, 10), textcolor = color.white, size = f_size()))
+                msg += t + " @ " + str.tostring(y, format.mintick) + "\n"
+                // extension beyond the other IB side (main IB only, only when that side is the favoured one)
+                if main and extOn and opp and f_pext(c, x, 0.0) - dTP >= thrTP
+                    float xE = na
+                    float pE = na
+                    for k = 1 to 20
+                        float pk = f_pext(c, x, k / 10.0) - dTP
+                        if pk < thrTP
+                            break
+                        xE := k / 10.0
+                        pE := pk
+                    if not na(xE)
+                        eY  := y + (up ? 1 : -1) * xE * R
+                        eD  := up ? 1 : -1
+                        eTx := "+" + str.tostring(xE, "0.0") + " IB " + f_pct(pE)
+                        eLn := line.new(time, eY, time, eY, xloc = xloc.bar_time, color = cc, width = 1, style = line.style_dashed)
+                        eLb := label.new(time, eY, eTx, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cc, 10), textcolor = color.white, size = f_size())
+                        msg += eTx + " @ " + str.tostring(eY, format.mintick) + "\n"
+    // run until one side breaks: ✓ favoured side first, ✗ other side first (same bar = ✗, like the stats)
+    float fy = array.get(FY, l)
+    if not na(fy) and not array.get(FR, l) and relNow < relEnd
+        line.set_x2(array.get(LN, l), time)
+        label.set_x(array.get(LB, l), time)
+        int  d    = array.get(FD, l)
+        float oy  = array.get(OY, l)
+        bool fHit = d == 1 ? high > fy : low < fy
+        bool oHit = d == 1 ? low < oy : high > oy
+        if fHit or oHit
+            array.set(FR, l, true)
+            string t = array.get(FT, l) + (fHit and not oHit ? " ✓" : " ✗")
+            label.set_text(array.get(LB, l), t)
+            label.set_color(array.get(LB, l), color.new(cGray, 25))
+            if not (fHit and not oHit)
+                line.set_color(array.get(LN, l), color.new(cGray, 40))
+            msg += t + "\n"
+
+// extension runs until reached (✓) or session end
+if not na(eY) and not eHit and relNow < relEnd
+    line.set_x2(eLn, time)
+    label.set_x(eLb, time)
+    if eD == 1 ? high >= eY : low <= eY
+        eHit := true
+        label.set_text(eLb, eTx + " ✓")
+        label.set_color(eLb, color.new(cGray, 25))
+        msg += eTx + " ✓\n"
+
+if alOn and msg != ""
+    alert("IB-First " + mk + " · " + startIn + "\n" + msg, alert.freq_once_per_bar)
