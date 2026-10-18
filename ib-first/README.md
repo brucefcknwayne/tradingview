@@ -4,13 +4,26 @@ Eigenständiges Projekt (unabhängig von `gotham-zones/IB-Expansion`).
 
 **Idee:** Entsteht in der Initial Balance zuerst das Tief, wird danach meist das IB-Hoch geholt – und umgekehrt.
 
-- `IB-First.pine` – Indikator für NQ, ES, RTY, GC (+ Micros), Markt wird erkannt. Eine IB (Startzeit + 15/30/45/60 Min).
-  Am IB-Ende: Linie an der Gegenseite („Hoch wird geholt 85%“), optional +0,5 / +1 IB darüber hinaus und
-  „Tief nochmal x%“ an der Erstseite. Linien laufen bis Berührung (✓) oder Tagesende. Alarme für IB-Ende und Treffer.
-  Gebaut von `data-lab/ib_first_build.py` aus `IB-First_template.pine` (letzte 3 Jahre, Werte in `data-lab/results/ib_first_build.md`).
+## Indikator `IB-First.pine`
+NQ, ES, RTY, GC (+ Micros), Markt wird erkannt. Eine IB je Tag: Startzeit + Länge (Auto = beste Länge je Markt und Start).
+Am IB-Ende:
+- **Gegenseite**: „Hoch wird geholt 89% · vor Stop 89%“ (vor Stop = bevor das zuerst gebildete Extrem noch einmal bricht)
+- **TP**: weitestes Ziel über der Gegenseite mit mindestens der gewählten Sicherheit (TP-Modus 60 / 70 / 80 / 90 %)
+- **Stop-Seite**: „Tief nochmal 58%“
+Linien bis Berührung (✓) oder Tagesende, Alarme für IB-Ende und Treffer.
 
-**Prüfung** (`data-lab/ib_first_side.py` → `data-lab/results/ib_first_side.md`): 3 Jahre Statistik vs. ungesehenes letztes Jahr.
-Beispiel NQ 09:30, Tief zuerst → Hoch geholt: 15m 87 % (Test 92 %), 30m 85 % (85 %), 45m 86 % (82 %), 60m 84 % (81 %);
-an allen Tagen wird das Hoch nur zu 78 / 71 / 66 / 63 % geholt. Über alle Märkte, Starts und Längen weicht das Testjahr
-im Median 0,5 Pkt. ab. Hinweis: Teilweise mechanisch (das zuletzt gebildete Extrem liegt näher am Kurs); ein
-Trade-Test (Einstieg/Stop) steht noch aus.
+Die % hängen ab von Markt, Startzeit, IB-Länge, was zuerst kam, **IB-Größe ggü. den 20 Tagen davor** (News-IB!) und
+**Lage des Kurses am IB-Ende**. Logistische Modelle, Koeffizienten im Skript.
+Gebaut: `python data-lab/ib_first_model.py` (Analyse, ~8 Min) → `python data-lab/ib_first_build.py` (Pine aus `IB-First_template.pine`).
+
+## Analyse (`data-lab/results/ib_first_model.md`)
+Auswahl nur auf der Validierung (vorletztes Jahr), Test im letzten Jahr (ungesehen):
+- Lage des Kurses bringt am meisten, IB-Größe etwas; **Wochentag bringt nichts** (Modell mit Wochentag minimal schlechter).
+- **Beste Länge je Wochentag bringt nichts**: Testjahr „Ziel vor Stop“ 68,9 % (je Wochentag) = 68,9 % (feste beste Länge),
+  immer 30 Min 68,1 % → Auto nimmt die feste beste Länge je Markt und Start.
+- Kalibrierung im Test gut (Gegenseite, Ziel vor Stop, Stop-Seite je Band ±2 Pkt.).
+- TP-Modus im Test: 60 % → 65 % erreicht (98 % der Tage mit TP, Ø +1,35 IB), 70 % → 71 % (94 %, +1,18), 80 % → 79 % (84 %, +0,92),
+  90 % → 89 % (63 %, +0,48). Angezeigt jeweils 2–3 Pkt. über eingetreten.
+- Große IBs (oberstes Zehntel): Modell eher vorsichtig (z. B. NQ 84 % angezeigt, 88 % eingetreten).
+
+Ältere einfache Auswertung: `data-lab/ib_first_side.py` → `results/ib_first_side.md`.

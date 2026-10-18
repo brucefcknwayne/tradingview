@@ -163,6 +163,16 @@ def p_ext(be_full, F_row, x):
     return sigmoid(xr @ be_full[:-2] + be_full[-2] * u + be_full[-1] * u * u)
 
 
+def tp_pick(be, Fx, thr, delta):
+    """Weitestes x mit P − δ ≥ Schwelle (von 0 aufwärts bis zum ersten Unterschreiten); gibt (hat, x, angezeigt) zurück."""
+    PX = np.array([[p_ext(be, f, x) for x in XG] for f in Fx]) - delta
+    okm = PX >= thr
+    stop = np.where(okm.all(1), len(XG), np.argmin(okm, 1))
+    has = stop > 0
+    k = np.maximum(stop - 1, 0)
+    return has, XG[k], PX[np.arange(len(Fx)), k]
+
+
 # ═══ Daten laden ═══
 cache = {}
 for mk in MARKETS:
@@ -220,6 +230,23 @@ WIN, LEV, LAM = tot.idxmin()
 COLS = LEVELS[LEV]
 print("gemeinsam:", WIN, LEV, LAM, flush=True)
 
+# TP-Modus-Korrektur: das weiteste Ziel mit P ≥ Schwelle ist systematisch etwas zu optimistisch (Auswahl am Rand).
+# δ je Modus = angezeigt − eingetreten auf der Validierung (Training bis 2 Jahre vor Ende), danach im Test angewendet.
+tpv = {thr: [] for thr in TP_MODES}
+for (mk, st, L), D in cache.items():
+    yrs, v = D["yrs"], D["v"]
+    it, iv = np.flatnonzero(v & yrs(2 + WIN, 2)), np.flatnonzero(v & yrs(2, 1))
+    if len(it) < 150 or len(iv) < 60:
+        continue
+    be = to_full(fit_all(D, it, COLS, LAM)[0], COLS, 2)
+    Fx = np.column_stack([D["F"][c].to_numpy()[iv] for c in FULL])
+    for thr in TP_MODES:
+        has, xs, pp = tp_pick(be, Fx, thr, 0.0)
+        hit = np.where(xs == 0, D["opp"][iv], D["ext"][iv] >= xs)
+        tpv[thr].append(pd.DataFrame({"p": pp[has], "hit": hit[has]}))
+DTP = {thr: round(float(max(0.0, pd.concat(tpv[thr])["p"].mean() - pd.concat(tpv[thr])["hit"].mean())), 3) for thr in TP_MODES}
+print("TP-Korrektur:", DTP, flush=True)
+
 # ═══ 2) Test im letzten Jahr ═══
 test_ll, calib, tpm, bigiv, rows_first = [], [], [], [], []
 for (mk, st, L), D in cache.items():
@@ -245,16 +272,12 @@ for (mk, st, L), D in cache.items():
     big = D["z"][ix] >= zq
     bigiv.append(pd.DataFrame({"Markt": mk, "p": po[big], "y": D["opp"][ix][big]}))
     # TP-Modus: weitestes x mit P ≥ Schwelle (von 0 aufwärts, bis zum ersten Unterschreiten)
-    PX = np.array([[p_ext(be, f, x) for x in XG] for f in Fx])
     for thr in TP_MODES:
-        okm = PX >= thr
-        stop = np.where(okm.all(1), len(XG), np.argmin(okm, 1))       # erster Index unter der Schwelle
-        has = stop > 0
-        k = np.maximum(stop - 1, 0)
-        xs = XG[k]
-        hit = np.where(xs == 0, D["opp"][ix], D["ext"][ix] >= xs)
-        tpm.append(pd.DataFrame({"Markt": mk, "Start": st, "IB": L, "Modus": f"≥ {thr:.0%}", "hat": has,
-                                 "x": np.where(has, xs, np.nan), "p": np.where(has, PX[np.arange(len(ix)), k], np.nan), "hit": hit}))
+        for corr_name, dlt in (("ohne Korrektur", 0.0), ("mit Korrektur", DTP[thr])):
+            has, xs, pp = tp_pick(be, Fx, thr, dlt)
+            hit = np.where(xs == 0, D["opp"][ix], D["ext"][ix] >= xs)
+            tpm.append(pd.DataFrame({"Markt": mk, "Start": st, "IB": L, "Modus": f"≥ {thr:.0%}", "Korrektur": corr_name, "hat": has,
+                                     "x": np.where(has, xs, np.nan), "p": np.where(has, pp, np.nan), "hit": hit}))
     # für die beste Länge je Wochentag: Quote „Ziel vor Stop“ je Tag
     rows_first.append(pd.DataFrame({"Markt": mk, "Start": st, "IB": L, "Tag": D["wd"][np.concatenate([it, ix])],
                                     "Zeitraum": ["Training"] * len(it) + ["Test"] * len(ix),
@@ -267,7 +290,7 @@ C = pd.concat(calib, ignore_index=True)
 C["Band"] = pd.cut(C["p"], [0, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], labels=["< 50", "50–60", "60–70", "70–80", "80–90", "90–100"])
 CAL = C.groupby(["Ziel", "Band"], observed=True).agg(Tage=("y", "size"), angezeigt=("p", "mean"), eingetreten=("y", "mean")).round(3)
 TP = pd.concat(tpm, ignore_index=True)
-TPS = TP.groupby("Modus").apply(lambda g: pd.Series({"Tage mit TP": f"{g['hat'].mean():.0%}",
+TPS = TP.groupby(["Modus", "Korrektur"]).apply(lambda g: pd.Series({"Tage mit TP": f"{g['hat'].mean():.0%}",
                                                     "Ø Ausdehnung (IB)": round(g.loc[g["hat"], "x"].mean(), 2),
                                                     "angezeigt": round(g.loc[g["hat"], "p"].mean(), 3),
                                                     "eingetreten": round(g.loc[g["hat"], "hit"].mean(), 3)}))
@@ -312,14 +335,17 @@ for (mk, st, L), D in cache.items():
     if len(it) >= 150:
         RFF.append(pd.DataFrame({"Markt": mk, "Start": st, "IB": L, "Tag": D["wd"][it], "zuerst": D["first"][it]}))
 RFF = pd.concat(RFF, ignore_index=True)
+bestLall = {}
 for (mk, st), g in RFF.groupby(["Markt", "Start"]):
     rL = g.groupby("IB")["zuerst"].mean()
+    bestLall[f"{mk}|{st}"] = int(rL.idxmax())
     for d in range(5):
         rr = g[g["Tag"] == d].groupby("IB")["zuerst"].agg(["sum", "count"])
         shr = (rr["sum"] + 30 * rL.reindex(rr.index)) / (rr["count"] + 30)
         bestL[f"{mk}|{st}|{d}"] = int(shr.idxmax()) if len(shr) else 30
 (HERE / "results/ib_first_model.json").write_text(json.dumps({"end": END, "window": int(WIN), "level": LEV, "lam": LAM, "cols": COLS,
-                                                               "full": FULL, "xg": XG.tolist(), "zmax": ZMAX, "coef": final, "bestL": bestL}))
+                                                               "full": FULL, "xg": XG.tolist(), "zmax": ZMAX, "coef": final, "bestL": bestL,
+                                                               "bestLall": bestLall, "dtp": {f"{t:.1f}": d for t, d in DTP.items()}}))
 
 BL = pd.DataFrame([dict(Markt=k.split("|")[0], Start=k.split("|")[1], Tag=WDN[int(k.split("|")[2])], IB=v) for k, v in bestL.items()])
 md = ["# IB First – stabile Analyse (Tief zuerst → Hoch wird geholt)", "",
@@ -337,7 +363,10 @@ md = ["# IB First – stabile Analyse (Tief zuerst → Hoch wird geholt)", "",
       "### Beste IB-Länge je Wochentag – Quote „Ziel vor Stop“ im Testjahr", "",
       "je_Tag = Länge je Wochentag im Training gewählt · feste_beste = eine Länge für alle Tage · immer_30 = immer 30 Min", "",
       CMPS.to_markdown(), "", f"Alle Tage: je_Tag {CMPA['je_Tag']:.3f} · feste_beste {CMPA['feste_beste']:.3f} · immer_30 {CMPA['immer_30']:.3f}", "",
-      "## 3) Beste IB-Länge je Wochentag im Indikator (jüngstes Fenster)", "",
-      BL[BL["Start"].isin(["03:00", "08:30", "09:30", "10:00"])].pivot_table(index=["Markt", "Start"], columns="Tag", values="IB").reindex(columns=WDN).to_markdown(), ""]
+      "Ergebnis: Die Wahl je Wochentag bringt im Testjahr nichts gegenüber einer festen besten Länge (Unterschiede = Zufall).",
+      "Im Indikator wählt „Auto“ deshalb die über alle Tage beste Länge je Markt und Startzeit.", "",
+      f"TP-Korrektur je Modus (aus der Validierung): " + ", ".join(f"≥ {t:.0%}: −{d:.3f}" for t, d in DTP.items()), "",
+      "## 3) Auto-Länge im Indikator (jüngstes Fenster, beste Quote „Ziel vor Stop“ über alle Tage)", "",
+      pd.Series(bestLall).rename("IB").rename_axis("Markt|Start").to_frame().T.to_markdown(), ""]
 (HERE / "results/ib_first_model.md").write_text("\n".join(md))
 print("\n".join(md))

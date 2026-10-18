@@ -5,7 +5,7 @@ Projekt ib-first: baut ib-first/IB-First.pine aus ib-first/IB-First_template.pin
 Je Markt:
   B0/B1  Koeffizienten je Startzeit × IB-Länge: Ausdehnung (12), Ziel vor Stop (10), Stop-Seite (10) = 32 Zahlen,
          je Zahl 2 Zeichen (Basis 62, Schritt 0,01, ±19,2); fehlend = „~“
-  BL     beste IB-Länge je Startzeit × Wochentag (Mo–Fr) als Ziffer 1–4 (= 15/30/45/60 Min)
+  BL     beste IB-Länge je Startzeit (über alle Tage; je Wochentag brachte im Test nichts) als Ziffer 1–4 (= 15/30/45/60 Min)
 
 Aufruf: python data-lab/ib_first_build.py
 """
@@ -43,14 +43,15 @@ for mk in MARKETS:
         blk = "".join(per_key[b * KPB:(b + 1) * KPB])
         assert len(blk) < 4096
         loads.append(f'B{b} := barstate.isfirst and mk == "{mk}" ? "{blk}" : B{b}')
-    bl = "".join(str(LENGTHS.index(J["bestL"].get(f"{mk}|{st}|{d}", 30)) + 1) for st in STARTS for d in range(5))
+    bl = "".join(str(LENGTHS.index(J["bestLall"].get(f"{mk}|{st}", 30)) + 1) for st in STARTS)
     loads.append(f'BL := barstate.isfirst and mk == "{mk}" ? "{bl}" : BL')
     assert all(len(J["coef"][k]["ext"]) == 12 and len(J["coef"][k]["zuerst"]) == 10 for k in J["coef"] if k.startswith(mk))
 
 tpl = (ROOT / "ib-first/IB-First_template.pine").read_text()
 pine = (tpl.replace("{{LOADS}}", "\n".join(loads)).replace("{{KEYS}}", " ".join(STARTS)).replace("{{KPB}}", str(KPB))
            .replace("{{ZMAX}}", str(J["zmax"])).replace("{{END}}", J["end"])
-           .replace("{{WDTXT}}", " und Wochentag" if "w1" in J["cols"] else "")
+           .replace("{{D60}}", str(J["dtp"]["0.6"])).replace("{{D70}}", str(J["dtp"]["0.7"]))
+           .replace("{{D80}}", str(J["dtp"]["0.8"])).replace("{{D90}}", str(J["dtp"]["0.9"]))
            .replace("{{MODEL}}", f"{LEVEL_TXT[J['level']]}, letzte {J['window']} Jahre, Dämpfung {J['lam']:g}"))
 assert "{{" not in pine
 (ROOT / "ib-first/IB-First.pine").write_text(pine)

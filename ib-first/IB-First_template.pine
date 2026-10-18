@@ -2,12 +2,12 @@
 indicator("IB First · Tief zuerst → Hoch wird geholt", shorttitle = "IB-First", overlay = true, max_lines_count = 200, max_labels_count = 200)
 // 🦇 IB FIRST · by @Brucefcknwayne – NQ, ES, RTY, GC (+ MNQ, MES, M2K, MGC), erkennt den Markt selbst.
 // Idee: Entsteht in der IB zuerst das Tief, wird danach meist das IB-Hoch geholt – und umgekehrt.
-// Am Ende der IB (Länge automatisch die beste für den Wochentag, oder fest gewählt) zeigt der Indikator:
+// Am Ende der IB (Länge automatisch die beste für Markt und Startzeit, oder fest gewählt) zeigt der Indikator:
 //   Gegenseite = „Hoch wird geholt 86% · vor Stop 76%“ (vor Stop = bevor das zuerst gebildete Extrem noch einmal bricht)
 //   TP         = die weiteste Ausdehnung über die Gegenseite, die mindestens die gewählte Sicherheit hat (TP-Modus)
 //   Stop-Seite = „Tief nochmal 35%“ – wie oft das zuerst gebildete Extrem noch einmal gebrochen wird
-// Die % hängen ab von: Markt, Startzeit, IB-Länge, was zuerst kam, IB-Größe ggü. den 20 Tagen davor (z. B. News-IB),
-// Lage des Kurses am IB-Ende{{WDTXT}}. Modell: {{MODEL}}.
+// Die % hängen ab von: Markt, Startzeit, IB-Länge, was zuerst kam, IB-Größe ggü. den 20 Tagen davor (z. B. News-IB) und
+// Lage des Kurses am IB-Ende. Modell: {{MODEL}}. Wochentag geprüft: im Test kein Vorteil, daher nicht drin.
 // Jede Linie läuft bis zur Berührung (✓) oder bis Tagesende (17:00 für IBs vor 09:30, sonst 16:00).
 // Daten: Databento CME 1m bis {{END}}. Analyse und Test im ungesehenen Jahr: data-lab/results/ib_first_model.md
 // Für 1m-Charts gedacht (Reihenfolge von Hoch und Tief in der IB).
@@ -23,7 +23,7 @@ const string G_I   = "Initial Balance"
 const string G_A   = "Anzeige"
 
 string startIn  = input.string("09:30", "IB-Start (NY)", options = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "12:00", "13:00", "14:00", "15:00"], group = G_I)
-string lenIn    = input.string("Auto", "IB-Länge", options = ["Auto", "15", "30", "45", "60"], group = G_I, tooltip = "Auto: je Wochentag die Länge mit der besten Quote „Ziel vor Stop“ (aus den Daten).")
+string lenIn    = input.string("Auto", "IB-Länge", options = ["Auto", "15", "30", "45", "60"], group = G_I, tooltip = "Auto: die Länge mit der besten Quote „Ziel vor Stop“ für Markt und Startzeit (aus den Daten).")
 string tpIn     = input.string("80 %", "TP-Modus", options = ["60 % (mehr Weg, mehr Risiko)", "70 %", "80 %", "90 % (sicher, kurz)"], group = G_I, tooltip = "Zeigt das weiteste Ziel über der Gegenseite, das mindestens diese Wahrscheinlichkeit hat.")
 bool   showStop = input.bool(true, "Stop-Seite (Erstseite nochmal) zeigen", group = G_A)
 bool   showIB   = input.bool(true, "IB während der Bildung zeigen", group = G_A)
@@ -35,8 +35,10 @@ string txtSize  = input.string("Normal", "Textgröße", options = ["Klein", "Nor
 bool   alOn     = input.bool(true, "Alarme (IB fertig, Ziel erreicht)", group = "Alarme")
 
 float thrTP = str.startswith(tpIn, "60") ? 0.6 : str.startswith(tpIn, "70") ? 0.7 : str.startswith(tpIn, "80") ? 0.8 : 0.9
+// Korrektur je Modus: das weiteste Ziel am Rand der Schwelle ist sonst leicht zu optimistisch (aus der Validierung)
+float dTP   = thrTP == 0.6 ? {{D60}} : thrTP == 0.7 ? {{D70}} : thrTP == 0.8 ? {{D80}} : {{D90}}
 
-// ═══ DATEN: je Markt 2 Blöcke (Startzeiten x 4 Längen x 32 Zahlen à 2 Zeichen) + beste Länge je Start und Wochentag ═══
+// ═══ DATEN: je Markt 2 Blöcke (Startzeiten x 4 Längen x 32 Zahlen à 2 Zeichen) + beste Länge je Startzeit ═══
 string root = syminfo.root
 string mk   = root == "NQ" or root == "MNQ" ? "NQ" : root == "ES" or root == "MES" ? "ES" : root == "RTY" or root == "M2K" ? "RTY" : root == "GC" or root == "MGC" ? "GC" : ""
 var string B0 = ""
@@ -46,7 +48,7 @@ var string BL = ""
 
 int ki  = int(str.pos(KEYS, startIn) / 6)
 int wdI = dayofweek(time_tradingday, "UTC") - dayofweek.monday          // Wochentag des Handelstags: 0 = Mo … 4 = Fr
-int lAuto = wdI >= 0 and wdI <= 4 and str.length(BL) >= (ki * 5 + wdI + 1) ? int(str.tonumber(str.substring(BL, ki * 5 + wdI, ki * 5 + wdI + 1))) - 1 : 1
+int lAuto = str.length(BL) >= ki + 1 ? int(str.tonumber(str.substring(BL, ki, ki + 1))) - 1 : 1
 int li    = lenIn == "Auto" ? lAuto : int(str.tonumber(lenIn) / 15) - 1
 int L     = (li + 1) * 15
 
@@ -204,6 +206,7 @@ if not done and mk != "" and not na(H) and H > Lo and relNow >= relE and relNow 
         float pos = math.max(0.0, math.min(1.0, lf ? pr : 1 - pr))
         array<float> x = array.from(1.0, lf ? 1.0 : 0.0, z, z * z, pos, pos * pos, wdI == 1 ? 1.0 : 0.0, wdI == 2 ? 1.0 : 0.0, wdI == 3 ? 1.0 : 0.0, wdI == 4 ? 1.0 : 0.0)
         float pO  = f_pext(c, x, 0.0)
+        float pOT = pO - dTP                                    // als TP (mit Korrektur)
         float pZ  = f_sig(f_lin(c, 12, x))
         float pS  = f_sig(f_lin(c, 22, x))
         float oy  = lf ? H : Lo
@@ -212,20 +215,20 @@ if not done and mk != "" and not na(H) and H > Lo and relNow >= relE and relNow 
         // TP: weitestes x (0,1 … 2,0 IB) mit P ≥ Schwelle, von innen nach außen bis zum ersten Unterschreiten
         float xTP = na
         float pTP = na
-        if pO >= thrTP
+        if pOT >= thrTP
             for k = 1 to 20
-                float pk = f_pext(c, x, k / 10.0)
+                float pk = f_pext(c, x, k / 10.0) - dTP
                 if pk < thrTP
                     break
                 xTP := k / 10.0
                 pTP := pk
         string head = (lf ? "Hoch" : "Tief") + " wird geholt " + f_pct(pO) + " · vor Stop " + f_pct(pZ)
-        f_add(0, oy, dir, true, (pO >= thrTP and na(xTP) ? "TP · " : "") + head, cc, 2, line.style_solid)
+        f_add(0, oy, dir, true, (pOT >= thrTP and na(xTP) ? "TP · " : "") + head, cc, 2, line.style_solid)
         if not na(xTP)
             f_add(1, oy + dir * xTP * R, dir, false, "TP +" + f_fmt(xTP) + " IB · " + f_pct(pTP), cc, 1, line.style_dashed)
         if showStop
             f_add(2, lf ? Lo : H, -dir, true, (lf ? "Tief" : "Hoch") + " nochmal " + f_pct(pS), cGray, 1, line.style_dotted)
-        string info = (lf ? "Tief zuerst" : "Hoch zuerst") + " · " + str.tostring(L) + "m" + (wdI >= 0 and wdI <= 4 ? " · " + array.get(array.from("Mo", "Di", "Mi", "Do", "Fr"), wdI) : "") + (na(med) ? "" : " · IB " + f_fmt(R / med) + "×")
+        string info = (lf ? "Tief zuerst" : "Hoch zuerst") + " · " + str.tostring(L) + "m" + (na(med) ? "" : " · IB " + f_fmt(R / med) + "×")
         lbF := label.new(lf ? tL : tH, lf ? Lo : H, info, xloc = xloc.bar_time, style = lf ? label.style_label_up : label.style_label_down, color = color.new(cGray, 100), textcolor = cGray, size = size.small)
         msg := info + "\n" + head + (na(xTP) ? "" : "\nTP +" + f_fmt(xTP) + " IB " + f_pct(pTP) + " @ " + str.tostring(oy + dir * xTP * R, format.mintick))
 if alOn and msg != ""
