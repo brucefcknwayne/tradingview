@@ -1,0 +1,168 @@
+//@version=6
+indicator("IB First · Tief zuerst → Hoch wird geholt", shorttitle = "IB-First", overlay = true, max_lines_count = 200, max_labels_count = 200)
+// 🦇 IB FIRST · by @Brucefcknwayne – NQ, ES, RTY, GC (+ MNQ, MES, M2K, MGC), erkennt den Markt selbst.
+// Idee: Entsteht in der IB zuerst das Tief, wird danach meist das IB-Hoch geholt – und umgekehrt.
+// Am Ende der IB zeigt der Indikator:
+//   Gegenseite  = „Hoch wird geholt 84%“ (bzw. „Tief wird geholt“) – das andere IB-Extrem bis Tagesende
+//   +0,5 IB     = Ausdehnung über die Gegenseite hinaus (optional +1 IB)
+//   Erstseite   = „Tief nochmal 38%“ – wie oft das zuerst gebildete Extrem noch einmal gebrochen wird
+// Jede Linie läuft bis zur Berührung (✓) oder bis Tagesende (17:00 für IBs vor 09:30, sonst 16:00).
+// Statistik: Databento CME 1m, letzte {{YEARS}} Jahre bis {{END}} (data-lab/ib_first_build.py).
+// Prüfung im ungesehenen letzten Jahr: data-lab/results/ib_first_side.md. Für 1m-Charts gedacht (Reihenfolge der Extreme).
+// Alarme: Alarm anlegen → Bedingung „IB-First“ → „Jeder alert()-Funktionsaufruf“.
+
+const string TZ   = "America/New_York"
+const string KEYS = "{{KEYS}}"
+const string G_I  = "Initial Balance"
+const string G_A  = "Anzeige"
+
+string startIn  = input.string("09:30", "IB-Start (NY)", options = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "12:00", "13:00", "14:00", "15:00"], group = G_I)
+string lenIn    = input.string("30", "IB-Länge (Min)", options = ["15", "30", "45", "60"], group = G_I)
+bool   showE05  = input.bool(true, "+0,5 IB zeigen", group = G_A)
+bool   showE10  = input.bool(false, "+1 IB zeigen", group = G_A)
+bool   showSame = input.bool(true, "Erstseite nochmal zeigen", group = G_A)
+bool   showIB   = input.bool(true, "IB während der Bildung zeigen", group = G_A)
+bool   delOld   = input.bool(true, "Nur heute zeigen", group = G_A)
+color  cUp      = input.color(#26a69a, "Ziel oben", inline = "c", group = G_A)
+color  cDn      = input.color(#ef5350, "Ziel unten", inline = "c", group = G_A)
+color  cGray    = input.color(#9598a1, "Erstseite / IB", inline = "c", group = G_A)
+string txtSize  = input.string("Normal", "Textgröße", options = ["Klein", "Normal", "Groß"], group = G_A)
+bool   alOn     = input.bool(true, "Alarme (IB fertig, Ziel erreicht)", group = "Alarme")
+
+// ═══ DATEN: je Markt 25 Starts x 4 Längen x 2 (Tief zuerst, Hoch zuerst) x 4 Werte (Gegenseite, +0,5, +1, Erstseite) ═══
+string root = syminfo.root
+string mk   = root == "NQ" or root == "MNQ" ? "NQ" : root == "ES" or root == "MES" ? "ES" : root == "RTY" or root == "M2K" ? "RTY" : root == "GC" or root == "MGC" ? "GC" : ""
+var string D = ""
+{{LOADS}}
+
+int L  = int(str.tonumber(lenIn))
+int ki = int(str.pos(KEYS, startIn) / 6)
+int li = int(L / 15) - 1
+
+// Wahrscheinlichkeit: f = 0 Tief zuerst / 1 Hoch zuerst, n = 0 Gegenseite / 1 +0,5 IB / 2 +1 IB / 3 Erstseite nochmal
+f_val(int f, int n) =>
+    int p = ((ki * 4 + li) * 2 + f) * 8 + n * 2
+    str.length(D) >= p + 2 ? str.tonumber(str.substring(D, p, p + 2)) / 100.0 : na
+
+f_pct(float p) =>
+    str.tostring(math.round(p * 100)) + "%"
+
+f_size() =>
+    txtSize == "Klein" ? size.small : txtSize == "Groß" ? size.large : size.normal
+
+// ═══ ZEIT ═══
+f_rel(int t) =>
+    (hour(t, TZ) * 60 + minute(t, TZ) - 1080 + 1440) % 1440
+
+int relS   = (int(str.tonumber(str.substring(startIn, 0, 2))) * 60 + int(str.tonumber(str.substring(startIn, 3, 5))) - 1080 + 1440) % 1440
+int relE   = relS + L
+int relEnd = relS < 930 ? 1380 : 1320
+int relNow = f_rel(time)
+
+// ═══ TAGES-STATUS ═══
+var float H     = na
+var float Lo    = na
+var int   tH    = na
+var int   tL    = na
+var bool  done  = false
+var line  ibH   = na
+var line  ibL   = na
+var label lbF   = na
+// Linien nach der IB: 0 Gegenseite, 1 +0,5 IB, 2 +1 IB, 3 Erstseite nochmal
+var array<line>   RL = array.new<line>(4)
+var array<label>  RB = array.new<label>(4)
+var array<float>  RY = array.new<float>(4, na)
+var array<int>    RD = array.new<int>(4, 0)        // 1 = gilt bei Hoch ≥ Level, −1 = bei Tief ≤ Level
+var array<bool>   RH = array.new<bool>(4, false)
+var array<string> RX = array.new<string>(4, "")
+
+if timeframe.isintraday and timeframe.change("D")
+    if delOld
+        line.delete(ibH)
+        line.delete(ibL)
+        label.delete(lbF)
+        for i = 0 to 3
+            line.delete(array.get(RL, i))
+            label.delete(array.get(RB, i))
+    ibH := na
+    ibL := na
+    lbF := na
+    for i = 0 to 3
+        array.set(RL, i, na)
+        array.set(RB, i, na)
+    array.fill(RY, na)
+    array.fill(RH, false)
+    H    := na
+    Lo   := na
+    tH   := na
+    tL   := na
+    done := false
+
+// IB bilden (erstes Auftreten von Hoch und Tief zählt)
+if timeframe.isintraday and relNow >= relS and relNow < relE
+    if na(H) or high > H
+        H  := high
+        tH := time
+    if na(Lo) or low < Lo
+        Lo := low
+        tL := time
+    if showIB
+        if na(ibH)
+            ibH := line.new(time, H, time, H, xloc = xloc.bar_time, color = color.new(cGray, 40))
+            ibL := line.new(time, Lo, time, Lo, xloc = xloc.bar_time, color = color.new(cGray, 40))
+        line.set_y1(ibH, H)
+        line.set_y2(ibH, H)
+        line.set_y1(ibL, Lo)
+        line.set_y2(ibL, Lo)
+        line.set_x2(ibH, time)
+        line.set_x2(ibL, time)
+
+f_add(int i, float y, int dir, string t, color c, int w, string st) =>
+    array.set(RY, i, y)
+    array.set(RD, i, dir)
+    array.set(RX, i, t)
+    array.set(RL, i, line.new(time, y, time, y, xloc = xloc.bar_time, color = c, width = w, style = st))
+    array.set(RB, i, label.new(time, y, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(c, 100), textcolor = c, size = f_size()))
+
+// IB fertig: was kam zuerst?
+string msg = ""
+if not done and mk != "" and not na(H) and H > Lo and relNow >= relE and relNow < relEnd
+    done := true
+    int f = tL < tH ? 0 : tH < tL ? 1 : -1
+    if f >= 0
+        bool  lf  = f == 0
+        float R   = H - Lo
+        float oy  = lf ? H : Lo
+        int   dir = lf ? 1 : -1
+        color c   = lf ? cUp : cDn
+        float pO  = f_val(f, 0)
+        if not na(pO)
+            f_add(0, oy, dir, (lf ? "Hoch" : "Tief") + " wird geholt " + f_pct(pO), c, 2, line.style_solid)
+            msg := (lf ? "Tief zuerst → Hoch wird geholt " : "Hoch zuerst → Tief wird geholt ") + f_pct(pO) + " @ " + str.tostring(oy, format.mintick)
+        if showE05 and not na(f_val(f, 1))
+            f_add(1, oy + dir * 0.5 * R, dir, "+0,5 IB " + f_pct(f_val(f, 1)), c, 1, line.style_dashed)
+        if showE10 and not na(f_val(f, 2))
+            f_add(2, oy + dir * 1.0 * R, dir, "+1 IB " + f_pct(f_val(f, 2)), c, 1, line.style_dashed)
+        if showSame and not na(f_val(f, 3))
+            f_add(3, lf ? Lo : H, -dir, (lf ? "Tief" : "Hoch") + " nochmal " + f_pct(f_val(f, 3)), cGray, 1, line.style_dotted)
+        lbF := label.new(lf ? tL : tH, lf ? Lo : H, lf ? "Tief zuerst" : "Hoch zuerst", xloc = xloc.bar_time, style = lf ? label.style_label_up : label.style_label_down, color = color.new(cGray, 100), textcolor = cGray, size = size.small)
+if alOn and msg != ""
+    alert("IB-First " + mk + " · " + startIn + " " + lenIn + "m\n" + msg, alert.freq_once_per_bar)
+
+// Linien laufen bis zur Berührung (✓) oder Tagesende
+string msgHit = ""
+if done and relNow < relEnd
+    for i = 0 to 3
+        float y = array.get(RY, i)
+        if not na(y) and not array.get(RH, i)
+            line.set_x2(array.get(RL, i), time)
+            label.set_x(array.get(RB, i), time)
+            bool strict = i == 0 or i == 3                  // IB-Extrem: muss überschritten werden
+            bool hit    = array.get(RD, i) == 1 ? (strict ? high > y : high >= y) : (strict ? low < y : low <= y)
+            if hit
+                array.set(RH, i, true)
+                string t = array.get(RX, i) + " ✓"
+                label.set_text(array.get(RB, i), t)
+                msgHit += t + "\n"
+if alOn and msgHit != ""
+    alert("IB-First " + mk + "\n" + msgHit, alert.freq_once_per_bar)

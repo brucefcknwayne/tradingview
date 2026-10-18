@@ -1,0 +1,171 @@
+//@version=6
+indicator("IB First · Tief zuerst → Hoch wird geholt", shorttitle = "IB-First", overlay = true, max_lines_count = 200, max_labels_count = 200)
+// 🦇 IB FIRST · by @Brucefcknwayne – NQ, ES, RTY, GC (+ MNQ, MES, M2K, MGC), erkennt den Markt selbst.
+// Idee: Entsteht in der IB zuerst das Tief, wird danach meist das IB-Hoch geholt – und umgekehrt.
+// Am Ende der IB zeigt der Indikator:
+//   Gegenseite  = „Hoch wird geholt 84%“ (bzw. „Tief wird geholt“) – das andere IB-Extrem bis Tagesende
+//   +0,5 IB     = Ausdehnung über die Gegenseite hinaus (optional +1 IB)
+//   Erstseite   = „Tief nochmal 38%“ – wie oft das zuerst gebildete Extrem noch einmal gebrochen wird
+// Jede Linie läuft bis zur Berührung (✓) oder bis Tagesende (17:00 für IBs vor 09:30, sonst 16:00).
+// Statistik: Databento CME 1m, letzte 3 Jahre bis 2026-10-16 (data-lab/ib_first_build.py).
+// Prüfung im ungesehenen letzten Jahr: data-lab/results/ib_first_side.md. Für 1m-Charts gedacht (Reihenfolge der Extreme).
+// Alarme: Alarm anlegen → Bedingung „IB-First“ → „Jeder alert()-Funktionsaufruf“.
+
+const string TZ   = "America/New_York"
+const string KEYS = "18:00 19:00 20:00 21:00 22:00 23:00 00:00 01:00 02:00 03:00 04:00 05:00 06:00 07:00 08:00 09:00 10:00 11:00 12:00 13:00 14:00 15:00 08:30 09:30 10:30"
+const string G_I  = "Initial Balance"
+const string G_A  = "Anzeige"
+
+string startIn  = input.string("09:30", "IB-Start (NY)", options = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "12:00", "13:00", "14:00", "15:00"], group = G_I)
+string lenIn    = input.string("30", "IB-Länge (Min)", options = ["15", "30", "45", "60"], group = G_I)
+bool   showE05  = input.bool(true, "+0,5 IB zeigen", group = G_A)
+bool   showE10  = input.bool(false, "+1 IB zeigen", group = G_A)
+bool   showSame = input.bool(true, "Erstseite nochmal zeigen", group = G_A)
+bool   showIB   = input.bool(true, "IB während der Bildung zeigen", group = G_A)
+bool   delOld   = input.bool(true, "Nur heute zeigen", group = G_A)
+color  cUp      = input.color(#26a69a, "Ziel oben", inline = "c", group = G_A)
+color  cDn      = input.color(#ef5350, "Ziel unten", inline = "c", group = G_A)
+color  cGray    = input.color(#9598a1, "Erstseite / IB", inline = "c", group = G_A)
+string txtSize  = input.string("Normal", "Textgröße", options = ["Klein", "Normal", "Groß"], group = G_A)
+bool   alOn     = input.bool(true, "Alarme (IB fertig, Ziel erreicht)", group = "Alarme")
+
+// ═══ DATEN: je Markt 25 Starts x 4 Längen x 2 (Tief zuerst, Hoch zuerst) x 4 Werte (Gegenseite, +0,5, +1, Erstseite) ═══
+string root = syminfo.root
+string mk   = root == "NQ" or root == "MNQ" ? "NQ" : root == "ES" or root == "MES" ? "ES" : root == "RTY" or root == "M2K" ? "RTY" : root == "GC" or root == "MGC" ? "GC" : ""
+var string D = ""
+D := barstate.isfirst and mk == "NQ" ? "97928486938879909791848394877889979183829587778897898280948676879995919397928996979287919692869597918490968980939690818895887992969389929691839496918489948879919790838793857588978983849385758698959294959289959893899097928693979287899588819196898388968680909792919698949096979287949691879496908692958985929591859095898491989694979895909599979295979489939895909497918692979488939590839299969395969491959894919396928994989289909691879398938989969085929895939397918794989390909691869397918688958983929691858694888191989489939793869597918691968981939789848993867792958983879386769196888291978883929687768991827489958576859283758594847583928474849791868896878288958981869384768796897783928273859687758193817083989387939690839596898290938580939687808695847992958678859281769098959292959288949692858995908292969083879387819095888085928375899791858996878290968879869586788794857883948473859483748292827082979288909791839095887986948375869176617792786280897156749072597896898188948882889283728294857184906748618559476385552952775234559374506685645070886034577953346186482550744525558245194373382050927859698868537389644159825943658655315275523159844724457646265391755872907255788762416385614168835430557649326284492146734327528968527087675277845534607749346782492249774525547637184472382147886342668560446785492751805030537738174269401844702910356433133783533058815229587032134468311443--------------------------------958469819584728793766378907766849072617490746180876756718871577890694866856147658556325478543556854922427645284885431636724121419170537187685476896340588052386586553049764931588548254475452751" : D
+D := barstate.isfirst and mk == "ES" ? "98918586948679909791848394857889979183839385768896907981928475889895919498928796979387929691859597918691958982939790859094877892989487919791879696918589948781949790858793837692968783859282759199969394979389969895909197908495969287909586799496918689948577929793929797929096989388969490849498938892948881939792859195878093989693959793899698959193979487959794899296898393979387919488819298969395969391959895919396918894989490919590849398948789959081929895919497938695979288929588839397928790958781929690848992867791999590929592869496918690959083939690838794877990968982869486788998928691949184909490828792857688948780849382728693867582948068859891849096898491968978889285748896877585918271869687758292827184989488929690829696918490928679939689798693857991968778859282768997949093959186959690859194888292948880879385799194867985938273889792869095888292968882879486788894857484948374869382708291796884979285929691849196887888928675879176637890776279927257758872577797898287948679929485738094817187906953668765497186664157805940639575576785675270886441578357436386533151795234568448244475482652917660738772587489684860866345648858355378543959865028477850325492755874887460818763446484634672865636567853356486512947764529589073547184654977865738607552346583472550754629568042204273402247876444648663446985543052785133567741164468402247703113366431143981523160795535597136184471401742--------------------------------958271839383738694766378917865849171597787726081907154738870557790715972867055748767446079624464865632497953335582472445774927499173577387725875896447628161446684593953805738598354304678503354" : D
+D := barstate.isfirst and mk == "RTY" ? "96898289968984919487808895878190968879869486798896877884948679879996929598948995989488939691849497918491978982949790848897898193999692929894889497918590958982939790838895888092979081879485789198969296979492979794919497938895979286929588829397918590958880919996949598959396989489959793889597948793958984959894879196898394999592969895929798939194969288969792899296908695969188919791879498969295989692969995919398959194989390929692879398928891969185939996939699959197989388949791869697918693958984949790879393888193999593939592889596928990979388949590848995908492959082879588819096918790979185919589808895877988948777859383748794857685918168859791859095918690978981869689828696867884958676839483748394857284979387919994889396888390979182909586788996877888958679889584758596908594969287969589839194888392958779899487798893847787938374869690848997928592948579879690808794807386958978849280708494827081968879919793888794847387948778838768547792786274856549749275607295877891968881909180688693817184805234608557325678482950814825479066476386654962845128538453325480411945794725477536144175391842917558688975577285603960846242628552294982543454824623458048275190735671896953798759406087604369805132547851306282482446754625538866496987654974855531587651306380462548764727527537194470381945856746628860466783492850774630547636164173382241692812356728123282523154845735517034134174351435--------------------------------917667809486748289746478937966798668577592756278836752719073577483573664856137598050305182512949764219427742184073361336753414368767496989694972835536618056365983493051805131488043244577432344" : D
+D := barstate.isfirst and mk == "GC" ? "98898386938677919486818591837390948577829284718993847581918269879794919096918594979186889388829196888086938578909585778394857789948680869486799194847683908171869181707990766783927866758976658093877782928576879284727893817081918172739076647892796671887461769587818793857789938680839485758593857978948372819384777592806880989388909790839296898387938777899486798493837388948676849281728697948891979288929793868992847990968881859184778895877981918474869791878897938990969084869590828595877883918171829483748089756479968980869589818994847481938373859582717893817082958169759378668094868086958880899283748391797084928069799177678092796575897666779690818796888188958576849485748593837181937967829280667991776681969082899691849293827485968474899080678190786787927866798977638497918588958681929686758491827388948169819177648592776678887663839589828792868289938373829182768493806776928273799278637392816975938071879485748790735980867158768359386683604264825536618053355992766477887562758769536988715267835334578151325578452648744326498363466480584465845432497852335181462342704020437742183769331436866750668666466883553357805533578044255273422448753718466734184288695470846450728458336078533362794722497443255474391745703720488563466985654766784930527748295475391843693718446830143863341640835942588357396174432346724327457132153470381832632709276326112772412546724025466124082559250825--------------------------------897256759074597487634767856548678456376377553760835233577652345687664569846648718255335678523659744122466739244971371738643617438766486981644772835636578153315979482746754221497739203973381742" : D
+
+int L  = int(str.tonumber(lenIn))
+int ki = int(str.pos(KEYS, startIn) / 6)
+int li = int(L / 15) - 1
+
+// Wahrscheinlichkeit: f = 0 Tief zuerst / 1 Hoch zuerst, n = 0 Gegenseite / 1 +0,5 IB / 2 +1 IB / 3 Erstseite nochmal
+f_val(int f, int n) =>
+    int p = ((ki * 4 + li) * 2 + f) * 8 + n * 2
+    str.length(D) >= p + 2 ? str.tonumber(str.substring(D, p, p + 2)) / 100.0 : na
+
+f_pct(float p) =>
+    str.tostring(math.round(p * 100)) + "%"
+
+f_size() =>
+    txtSize == "Klein" ? size.small : txtSize == "Groß" ? size.large : size.normal
+
+// ═══ ZEIT ═══
+f_rel(int t) =>
+    (hour(t, TZ) * 60 + minute(t, TZ) - 1080 + 1440) % 1440
+
+int relS   = (int(str.tonumber(str.substring(startIn, 0, 2))) * 60 + int(str.tonumber(str.substring(startIn, 3, 5))) - 1080 + 1440) % 1440
+int relE   = relS + L
+int relEnd = relS < 930 ? 1380 : 1320
+int relNow = f_rel(time)
+
+// ═══ TAGES-STATUS ═══
+var float H     = na
+var float Lo    = na
+var int   tH    = na
+var int   tL    = na
+var bool  done  = false
+var line  ibH   = na
+var line  ibL   = na
+var label lbF   = na
+// Linien nach der IB: 0 Gegenseite, 1 +0,5 IB, 2 +1 IB, 3 Erstseite nochmal
+var array<line>   RL = array.new<line>(4)
+var array<label>  RB = array.new<label>(4)
+var array<float>  RY = array.new<float>(4, na)
+var array<int>    RD = array.new<int>(4, 0)        // 1 = gilt bei Hoch ≥ Level, −1 = bei Tief ≤ Level
+var array<bool>   RH = array.new<bool>(4, false)
+var array<string> RX = array.new<string>(4, "")
+
+if timeframe.isintraday and timeframe.change("D")
+    if delOld
+        line.delete(ibH)
+        line.delete(ibL)
+        label.delete(lbF)
+        for i = 0 to 3
+            line.delete(array.get(RL, i))
+            label.delete(array.get(RB, i))
+    ibH := na
+    ibL := na
+    lbF := na
+    for i = 0 to 3
+        array.set(RL, i, na)
+        array.set(RB, i, na)
+    array.fill(RY, na)
+    array.fill(RH, false)
+    H    := na
+    Lo   := na
+    tH   := na
+    tL   := na
+    done := false
+
+// IB bilden (erstes Auftreten von Hoch und Tief zählt)
+if timeframe.isintraday and relNow >= relS and relNow < relE
+    if na(H) or high > H
+        H  := high
+        tH := time
+    if na(Lo) or low < Lo
+        Lo := low
+        tL := time
+    if showIB
+        if na(ibH)
+            ibH := line.new(time, H, time, H, xloc = xloc.bar_time, color = color.new(cGray, 40))
+            ibL := line.new(time, Lo, time, Lo, xloc = xloc.bar_time, color = color.new(cGray, 40))
+        line.set_y1(ibH, H)
+        line.set_y2(ibH, H)
+        line.set_y1(ibL, Lo)
+        line.set_y2(ibL, Lo)
+        line.set_x2(ibH, time)
+        line.set_x2(ibL, time)
+
+f_add(int i, float y, int dir, string t, color c, int w, string st) =>
+    array.set(RY, i, y)
+    array.set(RD, i, dir)
+    array.set(RX, i, t)
+    array.set(RL, i, line.new(time, y, time, y, xloc = xloc.bar_time, color = c, width = w, style = st))
+    array.set(RB, i, label.new(time, y, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(c, 100), textcolor = c, size = f_size()))
+
+// IB fertig: was kam zuerst?
+string msg = ""
+if not done and mk != "" and not na(H) and H > Lo and relNow >= relE and relNow < relEnd
+    done := true
+    int f = tL < tH ? 0 : tH < tL ? 1 : -1
+    if f >= 0
+        bool  lf  = f == 0
+        float R   = H - Lo
+        float oy  = lf ? H : Lo
+        int   dir = lf ? 1 : -1
+        color c   = lf ? cUp : cDn
+        float pO  = f_val(f, 0)
+        if not na(pO)
+            f_add(0, oy, dir, (lf ? "Hoch" : "Tief") + " wird geholt " + f_pct(pO), c, 2, line.style_solid)
+            msg := (lf ? "Tief zuerst → Hoch wird geholt " : "Hoch zuerst → Tief wird geholt ") + f_pct(pO) + " @ " + str.tostring(oy, format.mintick)
+        if showE05 and not na(f_val(f, 1))
+            f_add(1, oy + dir * 0.5 * R, dir, "+0,5 IB " + f_pct(f_val(f, 1)), c, 1, line.style_dashed)
+        if showE10 and not na(f_val(f, 2))
+            f_add(2, oy + dir * 1.0 * R, dir, "+1 IB " + f_pct(f_val(f, 2)), c, 1, line.style_dashed)
+        if showSame and not na(f_val(f, 3))
+            f_add(3, lf ? Lo : H, -dir, (lf ? "Tief" : "Hoch") + " nochmal " + f_pct(f_val(f, 3)), cGray, 1, line.style_dotted)
+        lbF := label.new(lf ? tL : tH, lf ? Lo : H, lf ? "Tief zuerst" : "Hoch zuerst", xloc = xloc.bar_time, style = lf ? label.style_label_up : label.style_label_down, color = color.new(cGray, 100), textcolor = cGray, size = size.small)
+if alOn and msg != ""
+    alert("IB-First " + mk + " · " + startIn + " " + lenIn + "m\n" + msg, alert.freq_once_per_bar)
+
+// Linien laufen bis zur Berührung (✓) oder Tagesende
+string msgHit = ""
+if done and relNow < relEnd
+    for i = 0 to 3
+        float y = array.get(RY, i)
+        if not na(y) and not array.get(RH, i)
+            line.set_x2(array.get(RL, i), time)
+            label.set_x(array.get(RB, i), time)
+            bool strict = i == 0 or i == 3                  // IB-Extrem: muss überschritten werden
+            bool hit    = array.get(RD, i) == 1 ? (strict ? high > y : high >= y) : (strict ? low < y : low <= y)
+            if hit
+                array.set(RH, i, true)
+                string t = array.get(RX, i) + " ✓"
+                label.set_text(array.get(RB, i), t)
+                msgHit += t + "\n"
+if alOn and msgHit != ""
+    alert("IB-First " + mk + "\n" + msgHit, alert.freq_once_per_bar)
