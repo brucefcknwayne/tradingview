@@ -31,7 +31,7 @@ bool   showIB   = input.bool(true, "Show IB while forming", group = G_A)
 bool   delOld   = input.bool(true, "Today only", group = G_A)
 color  cUp      = input.color(#26a69a, "Above", inline = "c", group = G_A)
 color  cDn      = input.color(#ef5350, "Below", inline = "c", group = G_A)
-color  cGray    = input.color(#9598a1, "Done / IB", inline = "c", group = G_A)
+color  cGray    = input.color(#9598a1, "Info / IB", inline = "c", group = G_A)
 string txtSize  = input.string("Normal", "Text size", options = ["Small", "Normal", "Large"], group = G_A)
 bool   alOn     = input.bool(true, "Alerts", group = "Alerts")
 
@@ -271,9 +271,6 @@ for l = 0 to 3
             array.set(FR, l, true)
             string t = array.get(FT, l) + (fHit and not oHit ? " ✓" : " ✗")
             label.set_text(array.get(LB, l), t)
-            label.set_color(array.get(LB, l), color.new(cGray, 25))
-            if not (fHit and not oHit)
-                line.set_color(array.get(LN, l), color.new(cGray, 40))
             msg += t + "\n"
 
 // extension runs until reached (✓) or session end
@@ -283,7 +280,6 @@ if not na(eY) and not eHit and relNow < relEnd
     if eD == 1 ? high >= eY : low <= eY
         eHit := true
         label.set_text(eLb, eTx + " ✓")
-        label.set_color(eLb, color.new(cGray, 25))
         msg += eTx + " ✓\n"
 
 if alOn and msg != ""
