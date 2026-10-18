@@ -1,0 +1,541 @@
+//@version=6
+indicator("Gotham Zones @Brucefcknwayne", shorttitle = "Gotham Zones", overlay = true, max_boxes_count = 500, max_lines_count = 500, max_labels_count = 500, max_bars_back = 5000)
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  🦇  GOTHAM ZONES  ·  by @Brucefcknwayne
+//
+//  Zones at ±0.5σ / ±1σ / ±1.5σ / ±2σ around the Daily Open (18:00 ET).
+//  Upper zones magenta, lower zones cyan. Fixed at the open, no repaint.
+//  Previous days stay on the chart.
+//  Optional: auto scale, measured touch/hold rates, regime light,
+//  live Z + range used, weekly zones, event days.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const string S_1D  = "1D"
+const string S_9D  = "9D"
+const string S_30D = "30D"
+const float  YEAR_DAYS = 252.0
+const float  PARK      = 1.6651      // sqrt(4·ln2): high/low range → 1σ
+const float  MED_FIX   = 0.9         // median of range/1.6651 is ~0.9σ for a fair market → divide it out
+const float  RANGE_SIG = 1.6         // expected high-low range in σ
+const float  C_LO      = 0.5
+const float  C_HI      = 1.5
+const int    CAL_MIN   = 20          // min. sessions before the daily scale is used
+const int    STAT_MIN  = 20          // min. sessions before rates are shown
+const int    W_N       = 26          // weeks for weekly scale + rates
+const int    W_MIN     = 10          // min. weeks before weekly scale / rates are used
+const int    DAY_MS    = 86400000
+
+// Gotham palette
+color C_FILL   = color.new(#9598a1, 80)
+color C_BORDER = color.new(#b2b5be, 45)
+
+// ═══════════════════════════════ INPUTS ═══════════════════════════════
+string srcMode = input.string(S_1D, "Mode", options = [S_1D, S_9D, S_30D], group = "General")
+
+bool  show05  = input.bool(true, "±0.5σ", inline = "z", group = "Zones")
+bool  show10  = input.bool(true, "±1σ",   inline = "z", group = "Zones")
+bool  show15  = input.bool(true, "±1.5σ", inline = "z", group = "Zones")
+bool  show20  = input.bool(true, "±2σ",   inline = "z", group = "Zones")
+float zonePct = input.float(5.0, "Zone Height (± % of 1σ)", minval = 0, step = 0.5, group = "Zones", tooltip = "Half the box height as a percentage of 1σ. 0 = line only.")
+int   maxDays = input.int(15, "Days", minval = 1, maxval = 40, group = "Zones")
+
+bool  autoCal = input.bool(true, "Auto Calibration", group = "Calibration", tooltip = "Scales the zones to how far the market really moved in recent completed sessions (median of the last N sessions, limited to 0.5–1.5). Off = original zones.")
+int   calDays = input.int(60, "Calibration Days", minval = 20, maxval = 250, group = "Calibration")
+
+bool  showStats = input.bool(true, "Show Stats", group = "Stats", tooltip = "T = how often the level was reached, H = how often price closed back inside after reaching it. Completed sessions only, fixed at the open.")
+int   statDays  = input.int(60, "Stats Days", minval = 20, maxval = 250, group = "Stats")
+
+bool  showReg  = input.bool(true, "Show Regime", group = "Regime")
+int   heatLen  = input.int(120, "Heat Lookback (days)", minval = 30, maxval = 250, group = "Regime")
+float thHeatS  = input.float(2.0,  "Stress: Heat above",   step = 0.1,  inline = "s", group = "Regime")
+float thCurveS = input.float(1.00, "or Curve above",       step = 0.01, inline = "s", group = "Regime")
+float thHeatE  = input.float(1.0,  "Elevated: Heat above", step = 0.1,  inline = "e", group = "Regime")
+float thCurveE = input.float(0.95, "or Curve above",       step = 0.01, inline = "e", group = "Regime")
+bool  showDet  = input.bool(false, "Show Details", group = "Regime")
+
+bool  showLive = input.bool(true, "Show Z + Range Used", group = "Live")
+float wOvn     = input.float(40, "Weight Overnight 18:00–09:30 (%)", minval = 0, group = "Live")
+float wRth     = input.float(55, "Weight Day 09:30–16:00 (%)",       minval = 0, group = "Live")
+float wPost    = input.float(5,  "Weight Late 16:00–17:00 (%)",      minval = 0, group = "Live")
+
+bool  showW    = input.bool(true, "Show Weekly Zones", group = "Weekly")
+bool  showW1   = input.bool(true, "W ±1σ", inline = "w", group = "Weekly")
+bool  showW2   = input.bool(true, "W ±2σ", inline = "w", group = "Weekly")
+int   maxWeeks = input.int(4, "Weeks", minval = 0, maxval = 12, group = "Weekly")
+bool  wHoliday = input.bool(false, "Holiday week (4 days)", group = "Weekly", tooltip = "Manual override for the current week. Full closures (New Year, Good Friday, Christmas) are detected automatically.")
+
+string evDates  = input.string("", "Event dates", group = "Events", tooltip = "Format: YYYY-MM-DD,YYYY-MM-DD,... (trading date of the session)")
+bool   evManual = input.bool(false, "Event day (manual)", group = "Events", tooltip = "Marks the current session as an event day.")
+float  evFac    = input.float(1.3, "Event Factor", minval = 1, step = 0.05, group = "Events", tooltip = "Widens the zones on event days. Not applied in 1D mode (already included).")
+bool   evShow   = input.bool(true, "Mark event day in table", group = "Events")
+
+color C_UP  = input.color(#e535f5, "Upper",   inline = "c", group = "Colors")
+color C_DN  = input.color(#6ff3f5, "Lower",   inline = "c", group = "Colors")
+color C_WUP = input.color(#9c27b0, "W Upper", inline = "w", group = "Colors")
+color C_WDN = input.color(#00838f, "W Lower", inline = "w", group = "Colors")
+
+// ═══════════════════════════════ DATA ═══════════════════════════════
+string srcTF = timeframe.in_seconds() < 900 ? "15" : timeframe.period
+string calTF = timeframe.in_seconds() <= 3600 ? "60" : timeframe.period
+
+string r    = syminfo.root
+bool   isNQ = r == "NQ" or r == "MNQ"
+bool   isGC = r == "GC" or r == "MGC"
+
+// Event widening only where the source does not already cover the event
+bool evApplies = isGC or srcMode != S_1D
+
+// Source value for a mode + 30-day value + curve, in the context it is called from
+f_level(string tf, string mode) =>
+    float a1  = request.security("CBOE:VIX1D", tf, close, ignore_invalid_symbol = true)
+    float a9  = request.security("CBOE:VIX9D", tf, close, ignore_invalid_symbol = true)
+    float a30 = request.security("CBOE:VIX",   tf, close, ignore_invalid_symbol = true)
+    float an  = request.security("CBOE:VXN",   tf, close, ignore_invalid_symbol = true)
+    float ag  = request.security("CBOE:GVZ",   tf, close, ignore_invalid_symbol = true)
+    float sc  = not na(an) and not na(a30) and a30 > 0 ? an / a30 : na
+    float b30 = isGC ? ag : isNQ ? an : a30
+    float v   = na
+    if isGC
+        v := ag
+    else if mode == S_30D
+        v := b30
+    else
+        float b = mode == S_1D ? a1 : a9
+        v := na(b) ? b30 : isNQ ? b * sc : b
+    float crv = not isGC and not na(a9) and not na(a30) and a30 > 0 ? a9 / a30 : na
+    [v, b30, crv]
+
+f_isEvent(int td) =>
+    string s = str.replace_all(evDates, " ", "")
+    str.length(s) >= 10 and str.contains(s, str.format_time(td, "yyyy-MM-dd", "UTC"))
+
+// Good Friday (UTC midnight timestamp)
+f_goodFriday(int y) =>
+    int a = y % 19
+    int b = math.floor(y / 100)
+    int c = y % 100
+    int d = math.floor(b / 4)
+    int e = b % 4
+    int f = math.floor((b + 8) / 25)
+    int g = math.floor((b - f + 1) / 3)
+    int h = (19 * a + b - d - g + 15) % 30
+    int i = math.floor(c / 4)
+    int k = c % 4
+    int l = (32 + 2 * e + 2 * i - h - k) % 7
+    int m = math.floor((a + 11 * h + 22 * l) / 451)
+    int mo = math.floor((h + l - 7 * m + 114) / 31)
+    int dd = (h + l - 7 * m + 114) % 31 + 1
+    timestamp("UTC", y, mo, dd) - 2 * DAY_MS
+
+// Trading days Mon–Fri of the week that opens at t (Sunday 18:00 ET)
+f_tradeDays(int t) =>
+    int closed = 0
+    for i = 1 to 5
+        int ti = t + i * DAY_MS
+        int yy = year(ti, "America/New_York")
+        int mo = month(ti, "America/New_York")
+        int dd = dayofmonth(ti, "America/New_York")
+        int dw = dayofweek(ti, "America/New_York")
+        bool newYear = (mo == 1 and dd == 1) or (mo == 1 and dd == 2 and dw == dayofweek.monday)
+        bool xmas    = (mo == 12 and dd == 25) or (mo == 12 and dd == 24 and dw == dayofweek.friday) or (mo == 12 and dd == 26 and dw == dayofweek.monday)
+        bool gf      = timestamp("UTC", yy, mo, dd) == f_goodFriday(yy)
+        if newYear or xmas or gf
+            closed += 1
+    math.max(5 - closed, 1)
+
+// Median scale from recent ratios, limited; 1.0 until enough history
+f_scale(array<float> a, int n, int minN) =>
+    int   sz = array.size(a)
+    float c  = 1.0
+    if autoCal and sz >= minN
+        c := math.max(C_LO, math.min(C_HI, array.median(array.slice(a, math.max(sz - n, 0), sz))))
+    c
+
+// "T23% H61%" from a 0/1 matrix (touch column, hold column) over the last n rows
+f_rate(matrix<int> mx, int n, int minN, int cT, int cH) =>
+    int    rows = matrix.rows(mx)
+    int    use  = math.min(n, rows)
+    string s    = "n/a"
+    if use >= minN
+        int t = 0
+        int h = 0
+        for j = rows - use to rows - 1
+            t += matrix.get(mx, j, cT)
+            h += matrix.get(mx, j, cH)
+        s := "T" + str.tostring(math.round(100.0 * t / use)) + "% H" + (t > 0 ? str.tostring(math.round(100.0 * h / t)) + "%" : "–")
+    s
+
+f_sums(array<float> a, int n) =>
+    int   sz  = array.size(a)
+    int   use = math.min(n, sz)
+    float s   = 0.0
+    float q   = 0.0
+    if use > 0
+        for j = sz - use to sz - 1
+            float x = array.get(a, j)
+            s += x
+            q += x * x
+    [s, q, float(use)]
+
+f_k(int i) =>
+    i == 0 ? 0.5 : i == 1 ? 1.0 : i == 2 ? 1.5 : 2.0
+
+// ─── Statistics of completed sessions / weeks (runs on 60m bars) ───
+// Each session is closed at the next open. Values handed to the chart come from the
+// previous 60m bar, so the chart only ever sees completed sessions (no lookahead).
+f_stats() =>
+    [v, v30, crv] = f_level(timeframe.period, srcMode)
+    [w9, w30, wcrv] = f_level(timeframe.period, S_9D)
+    float prevC = close[1]
+    bool  dNew  = timeframe.change("D")
+    bool  wNew  = timeframe.change("W")
+
+    var float dO = na
+    var float dH = na
+    var float dL = na
+    var float dE = na              // expected 1σ as a fraction (unscaled)
+    var float dS = na              // 1σ in price, scaled, as drawn that session
+    var array<float> dRat = array.new<float>()
+    var matrix<int>  dMx  = matrix.new<int>(0, 16)
+    var array<float> hArr = array.new<float>()
+    var float  oC   = 1.0
+    var string o05u = "n/a"
+    var string o05d = "n/a"
+    var string o10u = "n/a"
+    var string o10d = "n/a"
+    var string o15u = "n/a"
+    var string o15d = "n/a"
+    var string o20u = "n/a"
+    var string o20d = "n/a"
+    var float  oS   = 0.0
+    var float  oQ   = 0.0
+    var float  oN   = 0.0
+
+    var float wO = na
+    var float wH = na
+    var float wL = na
+    var float wE = na
+    var float wS = na
+    var array<float> wRat = array.new<float>()
+    var matrix<int>  wMx  = matrix.new<int>(0, 8)
+    var float  oCW  = 1.0
+    var string ow1u = "n/a"
+    var string ow1d = "n/a"
+    var string ow2u = "n/a"
+    var string ow2d = "n/a"
+
+    // ── daily ──
+    if dNew
+        float cToday = f_scale(dRat, calDays, CAL_MIN)
+        if not na(dO) and not na(dE) and dE > 0 and dL > 0 and dH > 0
+            array.push(dRat, math.log(dH / dL) / PARK / MED_FIX / dE)
+            if array.size(dRat) > 400
+                array.shift(dRat)
+            if not na(dS) and dS > 0
+                array<int> row = array.new<int>(16, 0)
+                for i = 0 to 3
+                    float up = dO + f_k(i) * dS
+                    float dn = dO - f_k(i) * dS
+                    bool  tu = dH >= up
+                    bool  td = dL <= dn
+                    array.set(row, i,      tu ? 1 : 0)
+                    array.set(row, 4 + i,  td ? 1 : 0)
+                    array.set(row, 8 + i,  tu and prevC < up ? 1 : 0)
+                    array.set(row, 12 + i, td and prevC > dn ? 1 : 0)
+                matrix.add_row(dMx, matrix.rows(dMx), row)
+                if matrix.rows(dMx) > 400
+                    matrix.remove_row(dMx, 0)
+        // new session, drawn exactly like on the chart
+        dO := open
+        dH := high
+        dL := low
+        dE := not na(v) and v > 0 ? v / 100 / math.sqrt(YEAR_DAYS) : na
+        bool ev = evApplies and f_isEvent(time_tradingday)
+        dS := na(dE) ? na : dO * dE * cToday * (ev ? evFac : 1.0)
+        if not na(v30) and v30 > 0
+            array.push(hArr, math.log(v30))
+            if array.size(hArr) > 400
+                array.shift(hArr)
+        // values for the next session
+        oC   := f_scale(dRat, calDays, CAL_MIN)
+        o05u := f_rate(dMx, statDays, STAT_MIN, 0, 8)
+        o05d := f_rate(dMx, statDays, STAT_MIN, 4, 12)
+        o10u := f_rate(dMx, statDays, STAT_MIN, 1, 9)
+        o10d := f_rate(dMx, statDays, STAT_MIN, 5, 13)
+        o15u := f_rate(dMx, statDays, STAT_MIN, 2, 10)
+        o15d := f_rate(dMx, statDays, STAT_MIN, 6, 14)
+        o20u := f_rate(dMx, statDays, STAT_MIN, 3, 11)
+        o20d := f_rate(dMx, statDays, STAT_MIN, 7, 15)
+        [s_, q_, n_] = f_sums(hArr, heatLen - 1)
+        oS := s_
+        oQ := q_
+        oN := n_
+    else
+        dH := math.max(dH, high)
+        dL := math.min(dL, low)
+
+    // ── weekly ──
+    if wNew
+        float cWeek = f_scale(wRat, W_N, W_MIN)
+        if not na(wO) and not na(wE) and wE > 0 and wL > 0 and wH > 0
+            array.push(wRat, math.log(wH / wL) / PARK / MED_FIX / wE)
+            if array.size(wRat) > 100
+                array.shift(wRat)
+            if not na(wS) and wS > 0
+                array<int> row = array.new<int>(8, 0)
+                for j = 0 to 1
+                    float up = wO + (j + 1) * wS
+                    float dn = wO - (j + 1) * wS
+                    bool  tu = wH >= up
+                    bool  td = wL <= dn
+                    array.set(row, j,     tu ? 1 : 0)
+                    array.set(row, 2 + j, td ? 1 : 0)
+                    array.set(row, 4 + j, tu and prevC < up ? 1 : 0)
+                    array.set(row, 6 + j, td and prevC > dn ? 1 : 0)
+                matrix.add_row(wMx, matrix.rows(wMx), row)
+                if matrix.rows(wMx) > 100
+                    matrix.remove_row(wMx, 0)
+        wO := open
+        wH := high
+        wL := low
+        wE := not na(w9) and w9 > 0 ? w9 / 100 * math.sqrt(f_tradeDays(time) / YEAR_DAYS) : na
+        wS := na(wE) ? na : wO * wE * cWeek
+        oCW  := f_scale(wRat, W_N, W_MIN)
+        ow1u := f_rate(wMx, W_N, W_MIN, 0, 4)
+        ow1d := f_rate(wMx, W_N, W_MIN, 2, 6)
+        ow2u := f_rate(wMx, W_N, W_MIN, 1, 5)
+        ow2d := f_rate(wMx, W_N, W_MIN, 3, 7)
+    else
+        wH := math.max(wH, high)
+        wL := math.min(wL, low)
+
+    [oC[1], o05u[1], o05d[1], o10u[1], o10d[1], o15u[1], o15d[1], o20u[1], o20d[1], oS[1], oQ[1], oN[1], oCW[1], ow1u[1], ow1d[1], ow2u[1], ow2d[1]]
+
+[srcNow, src30, curveNow] = f_level(srcTF, srcMode)
+[srcW, srcW30, curveW]    = f_level(srcTF, S_9D)
+
+[cX, s05u, s05d, s10u, s10d, s15u, s15d, s20u, s20d, hS, hQ, hN, cWX, w1u, w1d, w2u, w2d] = request.security(syminfo.tickerid, calTF, f_stats(), lookahead = barmerge.lookahead_on)
+
+// ═══════════════════════════════ ANCHOR ═══════════════════════════════
+// Daily Open: new trading day (CME: 18:00 ET)
+bool anchor  = timeframe.isintraday and timeframe.change("D")
+bool wAnchor = timeframe.isintraday and timeframe.change("W")
+
+// ═══════════════════════════════ DRAWING ═══════════════════════════════
+// Half a CME session (23 h): labels of the current day sit in the middle of the day
+const int HALF_DAY_MS = 41400000
+
+var array<box>   allB = array.new<box>()
+var array<line>  allL = array.new<line>()
+var array<label> allT = array.new<label>()
+var array<box>   curB = array.new<box>()
+var array<line>  curL = array.new<line>()
+var array<label> curT = array.new<label>()
+var int          dayStart = na
+
+var array<line>  allWL = array.new<line>()
+var array<label> allWT = array.new<label>()
+var array<line>  curWL = array.new<line>()
+var array<label> curWT = array.new<label>()
+var int          wkStart = na
+
+// Session state (fixed at the open)
+var float  dayO    = na
+var float  dayH    = na
+var float  dayL    = na
+var float  daySig  = na
+var float  dayC    = 1.0
+var bool   dayEv   = false
+var float  heatZ   = na
+var float  curve   = na
+var string regime  = ""
+var float  weekC   = 1.0
+
+int perDay  = (show05 ? 2 : 0) + (show10 ? 2 : 0) + (show15 ? 2 : 0) + (show20 ? 2 : 0)
+int maxKeep = math.max(perDay, 1) * maxDays
+int perWeek = (showW1 ? 2 : 0) + (showW2 ? 2 : 0)
+int wKeep   = math.max(perWeek, 1) * (maxWeeks + 1)
+
+f_zone(float p, string txt, bool isUp, color lc, float hh, int t0) =>
+    if hh > 0
+        box b = box.new(t0, p + hh, t0 + 60000, p - hh, xloc = xloc.bar_time, extend = extend.none, border_color = C_BORDER, border_width = 1, bgcolor = C_FILL)
+        array.push(curB, b)
+        array.push(allB, b)
+    line l = line.new(t0, p, t0 + 60000, p, xloc = xloc.bar_time, extend = extend.none, color = lc, width = 1)
+    array.push(curL, l)
+    array.push(allL, l)
+    // Level text: above upper boxes, below lower boxes, centered
+    float ly = isUp ? p + hh : p - hh
+    label t = label.new(t0 + HALF_DAY_MS, ly, txt, xloc = xloc.bar_time, style = isUp ? label.style_label_down : label.style_label_up, color = color.new(lc, 100), textcolor = lc, size = size.small)
+    array.push(curT, t)
+    array.push(allT, t)
+
+f_wline(float p, string txt, bool isUp, color lc, int t0) =>
+    line l = line.new(t0, p, t0 + 60000, p, xloc = xloc.bar_time, extend = extend.none, color = lc, width = 1, style = line.style_dashed)
+    array.push(curWL, l)
+    array.push(allWL, l)
+    label t = label.new(t0, p, txt, xloc = xloc.bar_time, style = isUp ? label.style_label_down : label.style_label_up, color = color.new(lc, 100), textcolor = lc, size = size.small)
+    array.push(curWT, t)
+    array.push(allWT, t)
+
+f_txt(string name, string stat) =>
+    showStats ? name + " · " + stat : name
+
+if anchor
+    // Close the previous day
+    int tEnd = time_close[1]
+    for b in curB
+        box.set_extend(b, extend.none)
+        box.set_right(b, tEnd)
+    for l in curL
+        line.set_extend(l, extend.none)
+        line.set_x2(l, tEnd)
+    if not na(dayStart)
+        int mid = dayStart + int((tEnd - dayStart) / 2)
+        for t in curT
+            label.set_x(t, mid)
+    array.clear(curB)
+    array.clear(curL)
+    array.clear(curT)
+
+    // Remove old days
+    while array.size(allB) > maxKeep
+        box.delete(array.shift(allB))
+    while array.size(allL) > maxKeep
+        line.delete(array.shift(allL))
+    while array.size(allT) > maxKeep
+        label.delete(array.shift(allT))
+
+    // New day
+    dayStart := time
+    float ref = open
+    dayO   := open
+    dayH   := high
+    dayL   := low
+    dayC   := autoCal ? nz(cX, 1.0) : 1.0
+    dayEv  := evApplies and (f_isEvent(time_tradingday) or (evManual and time >= timenow - DAY_MS))
+    float sig = not na(srcNow) and srcNow > 0 ? ref * (srcNow / 100) / math.sqrt(YEAR_DAYS) : na
+    daySig := na(sig) ? na : sig * dayC * (dayEv ? evFac : 1.0)
+
+    // Regime, fixed for the session
+    heatZ := na
+    if not na(src30) and src30 > 0 and nz(hN) + 1 >= 20
+        float x  = math.log(src30)
+        float n  = nz(hN) + 1
+        float mu = (nz(hS) + x) / n
+        float sd = math.sqrt(math.max((nz(hQ) + x * x) / n - mu * mu, 0))
+        heatZ := sd > 0 ? (x - mu) / sd : na
+    curve := curveNow
+    bool stress   = (not na(curve) and curve > thCurveS) or (not na(heatZ) and heatZ > thHeatS)
+    bool elevated = (not na(heatZ) and heatZ > thHeatE) or (not na(curve) and curve > thCurveE)
+    regime := na(heatZ) and na(curve) ? "" : stress ? "STRESS" : elevated ? "ELEVATED" : "CALM"
+
+    if not na(daySig) and daySig > 0
+        int   t0 = time
+        float hh = daySig * zonePct / 100
+        if show05
+            f_zone(ref + 0.5 * daySig, f_txt("+0.5σ", s05u), true,  C_UP, hh, t0)
+            f_zone(ref - 0.5 * daySig, f_txt("−0.5σ", s05d), false, C_DN, hh, t0)
+        if show10
+            f_zone(ref + daySig, f_txt("+1σ", s10u), true,  C_UP, hh, t0)
+            f_zone(ref - daySig, f_txt("−1σ", s10d), false, C_DN, hh, t0)
+        if show15
+            f_zone(ref + 1.5 * daySig, f_txt("+1.5σ", s15u), true,  C_UP, hh, t0)
+            f_zone(ref - 1.5 * daySig, f_txt("−1.5σ", s15d), false, C_DN, hh, t0)
+        if show20
+            f_zone(ref + 2 * daySig, f_txt("+2σ", s20u), true,  C_UP, hh, t0)
+            f_zone(ref - 2 * daySig, f_txt("−2σ", s20d), false, C_DN, hh, t0)
+else
+    dayH := math.max(dayH, high)
+    dayL := math.min(dayL, low)
+
+// ─── Weekly zones: fixed once at the weekly open ───
+if wAnchor and showW
+    int tEnd = time_close[1]
+    for l in curWL
+        line.set_x2(l, tEnd)
+    if not na(wkStart)
+        int mid = wkStart + int((tEnd - wkStart) / 2)
+        for t in curWT
+            label.set_x(t, mid)
+    array.clear(curWL)
+    array.clear(curWT)
+    while array.size(allWL) > wKeep
+        line.delete(array.shift(allWL))
+    while array.size(allWT) > wKeep
+        label.delete(array.shift(allWT))
+
+    wkStart := time
+    weekC   := autoCal ? nz(cWX, 1.0) : 1.0
+    int   dW = wHoliday and time >= timenow - 7 * DAY_MS ? 4 : f_tradeDays(time)
+    float sW = not na(srcW) and srcW > 0 ? open * (srcW / 100) * math.sqrt(dW / YEAR_DAYS) * weekC : na
+    if not na(sW) and sW > 0
+        float wo = open
+        if showW1
+            f_wline(wo + sW, f_txt("W +1σ", w1u), true,  C_WUP, time)
+            f_wline(wo - sW, f_txt("W −1σ", w1d), false, C_WDN, time)
+        if showW2
+            f_wline(wo + 2 * sW, f_txt("W +2σ", w2u), true,  C_WUP, time)
+            f_wline(wo - 2 * sW, f_txt("W −2σ", w2d), false, C_WDN, time)
+
+// Current day / week: zones end 10 bars after the current candle, labels centered
+if barstate.islast
+    int barMs = timeframe.in_seconds() * 1000
+    int xEnd  = time + 10 * barMs
+    if array.size(curL) > 0
+        for b in curB
+            box.set_right(b, xEnd)
+        for l in curL
+            line.set_x2(l, xEnd)
+        if not na(dayStart)
+            int mid = dayStart + int((xEnd - dayStart) / 2)
+            for t in curT
+                label.set_x(t, mid)
+    if array.size(curWL) > 0
+        for l in curWL
+            line.set_x2(l, xEnd)
+        if not na(wkStart)
+            int mid = wkStart + int((xEnd - wkStart) / 2)
+            for t in curWT
+                label.set_x(t, mid)
+
+// ═══════════════════════════════ TABLE ═══════════════════════════════
+var table tb = table.new(position.top_right, 2, 10, bgcolor = color.new(#131722, 15), border_color = color.new(#363a45, 0), border_width = 1, frame_color = color.new(#363a45, 0), frame_width = 1)
+
+f_cell(int row, string a, string b, color tc, color bg) =>
+    table.cell(tb, 0, row, a, text_color = color.new(#d1d4dc, 0), text_size = size.small, text_halign = text.align_left)
+    table.cell(tb, 1, row, b, text_color = tc, bgcolor = bg, text_size = size.small, text_halign = text.align_right)
+
+if barstate.islast and (showReg or showLive or (evShow and dayEv))
+    table.clear(tb, 0, 0, 1, 9)
+    int rw = 0
+    if showReg and regime != ""
+        color rc = regime == "STRESS" ? #ef5350 : regime == "ELEVATED" ? #ff9800 : #26a69a
+        f_cell(rw, "Regime", regime, color.white, color.new(rc, 20))
+        rw += 1
+        string rt = regime == "STRESS" ? "Stress – zones break more often, favor trend" : regime == "ELEVATED" ? "Elevated – be selective" : "Calm – zones hold more often, favor fades"
+        f_cell(rw, "", rt, rc, na)
+        rw += 1
+    if showLive and not na(daySig) and daySig > 0 and not na(dayStart)
+        float mins = (time_close - dayStart) / 60000.0
+        float wSum = math.max(wOvn + wRth + wPost, 1e-9)
+        float f    = (wOvn * math.min(mins, 930) / 930 + wRth * math.max(0, math.min(mins - 930, 390)) / 390 + wPost * math.max(0, math.min(mins - 1320, 60)) / 60) / wSum
+        f := math.max(f, 0.05)
+        float z  = (close - dayO) / (daySig * math.sqrt(f))
+        float ru = (dayH - dayL) / (RANGE_SIG * daySig) * 100
+        color zc = math.abs(z) > 2 ? #ef5350 : math.abs(z) >= 1 ? #ffeb3b : #d1d4dc
+        f_cell(rw, "Z", (z >= 0 ? "+" : "") + str.tostring(z, "0.0"), zc, na)
+        rw += 1
+        f_cell(rw, "Range used", str.tostring(math.round(ru)) + "%", #d1d4dc, na)
+        rw += 1
+    if evShow and dayEv
+        f_cell(rw, "Event day", "Yes", #ff9800, na)
+        rw += 1
+    if showReg and showDet
+        f_cell(rw, "Heat", na(heatZ) ? "n/a" : str.tostring(heatZ, "0.00"), #d1d4dc, na)
+        rw += 1
+        f_cell(rw, "Curve", na(curve) ? "n/a" : str.tostring(curve, "0.00"), #d1d4dc, na)
+        rw += 1
+        f_cell(rw, "Scale D / W", str.tostring(dayC, "0.00") + " / " + str.tostring(weekC, "0.00"), #d1d4dc, na)
+        rw += 1
