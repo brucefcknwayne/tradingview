@@ -23,10 +23,10 @@ const string G_A   = "Display"
 
 string startIn  = input.string("09:30", "IB start (New York time)", options = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "12:00", "13:00", "14:00", "15:00"], group = G_I)
 string lenIn    = input.string("Auto", "IB length (minutes)", options = ["Auto", "15", "30", "45", "60"], group = G_I, tooltip = "Auto = the best length for this market and start time.")
-int    minIn    = input.int(65, "Show from (min %)", minval = 50, maxval = 95, group = G_I, tooltip = "Only draw the line if that side broke first at least this often.")
+int    minIn    = input.int(70, "Show from (min %)", minval = 50, maxval = 95, group = G_I, tooltip = "Only draw the line if that side broke first at least this often.")
 string tpIn     = input.string("80%", "Extension", options = ["Off", "60%", "70%", "80%", "90%"], group = G_I, tooltip = "Farthest level beyond the IB side that was reached by session end at least this often. Lower % = further away.")
 bool   showOth  = input.bool(true, "Also show other IB lengths", inline = "o", group = G_I, tooltip = "Dotted line for every other IB length (15/30/45/60) whose side broke first at least this often.")
-int    othMin   = input.int(75, "from %", minval = 50, maxval = 95, inline = "o", group = G_I)
+int    othMin   = input.int(80, "from %", minval = 50, maxval = 95, inline = "o", group = G_I)
 bool   showIB   = input.bool(true, "Show IB while forming", group = G_A)
 bool   delOld   = input.bool(true, "Today only", group = G_A)
 color  cUp      = input.color(#26a69a, "Above", inline = "c", group = G_A)

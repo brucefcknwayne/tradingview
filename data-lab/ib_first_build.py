@@ -22,7 +22,7 @@ STARTS = [f"{(18 + i) % 24:02d}:00" for i in range(22)] + ["08:30", "09:30", "10
 LENGTHS = [15, 30, 45, 60]
 ALPHA = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 NCF, KPB, CMAX = 32, 13, 19.2
-LEVEL_TXT = {"A": "which extreme came first", "B": "first + IB size", "C": "first + IB size + price location",
+LEVEL_TXT = {"A": "which extreme formed first", "B": "first + IB size", "C": "first + IB size + price location",
              "D": "first + IB size + price location + weekday"}
 
 

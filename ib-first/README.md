@@ -5,14 +5,15 @@ Eigenständiges Projekt (unabhängig von `gotham-zones/IB-Expansion`).
 **Idee:** Entsteht in der Initial Balance zuerst das Tief, wird danach meist das IB-Hoch geholt – und umgekehrt.
 
 ## Indikator `IB-First.pine` (Englisch, reiner Kontext – keine Strategie)
-NQ, ES, RTY, GC (+ Micros), Markt wird erkannt. Eine IB je Tag: Startzeit + Länge (Auto = beste Länge je Markt und Start).
-Am IB-Ende:
-- klein grau „Low first“ / „High first“ am Extrem, das zuerst kam
-- Linie an der anderen IB-Seite: „IB High 86%“ = so oft wurde sie an solchen Tagen geholt (ab „Show from“, Standard 70 %)
-- optional „+0.4 IB 81%“ = weiteste Ausdehnung mit mindestens der gewählten % (Off / 60 / 70 / 80 / 90)
-- zusätzlich: andere IB-Längen (15/30/45/60) als dünne Linie, wenn ihre andere Seite ≥ 80 % hat (z. B. „30m IB High 84%“),
-  nicht doppelt auf dem Preis der Hauptlinie
-- erreicht → ✓. Kein SL, kein Long/Short.
+Frage: **Welche IB-Seite bricht nach dem IB-Ende zuerst?** NQ, ES, RTY, GC (+ Micros), Markt wird erkannt.
+Eine Haupt-IB (Startzeit + Länge, Auto = beste Länge je Markt und Start), am IB-Ende:
+- klein grau „low formed first“ / „high formed first“
+- Linie an der Seite, die laut Statistik zuerst bricht: „15m · High breaks first 76%“ (ab 70 %, einstellbar)
+  ✓ = diese Seite brach zuerst · ✗ = die andere Seite brach zuerst (gleicher Bar = ✗), Linie endet
+- optional Ausdehnung über diese Seite: „+0.4 IB 81%“ (bis Sitzungsende erreicht, 60–90 % wählbar)
+- andere IB-Längen (15/30/45/60) gepunktet, wenn ihre Seite zu ≥ 80 % zuerst brach
+Test letztes Jahr (Kalibrierung): „Gegenseite zuerst“ und „Erstseite zuerst“ je Band ±1–4 Pkt. (hohe Bänder eher vorsichtig);
+bei 70 %: Linie an grob 60 % der Tage, davon ~84 % richtig (aus den Kalibrierungsbändern abgeleitet).
 
 Die % hängen ab von Markt, Startzeit, IB-Länge, was zuerst kam, **IB-Größe ggü. den 20 Tagen davor** (News-IB!) und
 **Lage des Kurses am IB-Ende**. Logistische Modelle, Koeffizienten im Skript.
