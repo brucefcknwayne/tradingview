@@ -30,3 +30,10 @@ Auswahl nur auf der Validierung (vorletztes Jahr), Test im letzten Jahr (ungeseh
 - Große IBs (oberstes Zehntel): Modell eher vorsichtig (z. B. NQ 84 % angezeigt, 88 % eingetreten).
 
 Ältere einfache Auswertung: `data-lab/ib_first_side.py` → `results/ib_first_side.md`.
+
+## Edge-Prüfung (`data-lab/ib_first_edge.py` → `results/ib_first_edge.md`)
+Letztes Jahr ungesehen, Einstieg am IB-Ende Richtung „bricht zuerst“, Ziel diese Seite, Stop andere Seite, minus 2 Ticks:
+**kein Edge.** Die Trefferquote (~84–86 %) entspricht fast genau der reinen Geometrie (Kurs steht näher an dieser Seite,
+~85 %). Kleine Gewinne, große Verluste, im Schnitt ±0 R; Profit-Faktor netto ES 0,69 · GC 0,94 · NQ 1,05 · RTY 0,66.
+Einzelne gute Zellen (z. B. NQ 09:30 PF 1,37 bei 179 Signalen) sind bei 20 geprüften Zellen im Bereich des Zufalls.
+Die % im Indikator stimmen, sagen aber kaum mehr als der Abstand des Kurses zu den IB-Seiten.
