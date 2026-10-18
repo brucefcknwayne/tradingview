@@ -266,7 +266,7 @@ def deltas(P):
 
 
 # Pine: ein Indikator für alle Märkte; je Markt Datenblöcke mit KPB Startzeiten (je 4 Längen x 104 Zeichen, < 4096 Zeichen)
-# und eine Korrektur-Zeile (3 Arten x 10 Zeitstufen + Plan-Korrektur Protected je Startzeit, 2 Zeichen, Auflösung 0,001)
+# und eine Korrektur-Zeile (3 Arten x 10 Zeitstufen + Plan-Korrektur Protected und TP je Startzeit, 2 Zeichen, Auflösung 0,001)
 KPB = 9
 COEF = HERE / "results/ib_ext_coefs.json"
 
@@ -281,7 +281,7 @@ def write_pine(data, dfin, end_date):
             loads.append(f'B{b // KPB} := barstate.isfirst and mk == "{root}" ? "{"".join(bodies[b:b + KPB])}" : B{b // KPB}')
         cor = "".join(enc2(dfin.get(f"{root}|{art}|{q}", 0.0) * 10) for art in ("Target", "Protect", "Rücklauf") for q in range(NQB))
         dplan = json.loads(COEF.read_text()).get("dplan", {}) if COEF.exists() else {}     # aus ib_ext_plan_check.py
-        cor += "".join(enc2(dplan.get(f"{root}|{st}|Protected", 0.0) * 10) for st in STARTS)
+        cor += "".join(enc2(dplan.get(f"{root}|{st}|{art}", 0.0) * 10) for art in ("Protected", "TP") for st in STARTS)
         loads.append(f'COR := barstate.isfirst and mk == "{root}" ? "{cor}" : COR')
     out = (tpl.replace("{{YEARS}}", str(YEARS)).replace("{{END}}", end_date).replace("{{KEYS}}", " ".join(STARTS))
               .replace("{{KPB}}", str(KPB)).replace("{{LOADS}}", "\n".join(loads)))
