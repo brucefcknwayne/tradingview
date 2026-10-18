@@ -1,47 +1,47 @@
 //@version=6
-indicator("IB First · Tief zuerst → Hoch wird geholt", shorttitle = "IB-First", overlay = true, max_lines_count = 200, max_labels_count = 200)
-// 🦇 IB FIRST · by @Brucefcknwayne – NQ, ES, RTY, GC (+ MNQ, MES, M2K, MGC), erkennt den Markt selbst.
-// Idee: Entsteht in der IB zuerst das Tief, wird danach meist das IB-Hoch geholt – und umgekehrt.
-// Am Ende der IB (Länge automatisch die beste für Markt und Startzeit, oder fest gewählt) zeigt der Indikator:
-//   Gegenseite = „Hoch wird geholt 86% · vor Stop 76%“ (vor Stop = bevor das zuerst gebildete Extrem noch einmal bricht)
-//   TP         = die weiteste Ausdehnung über die Gegenseite, die mindestens die gewählte Sicherheit hat (TP-Modus)
-//   Stop-Seite = „Stop · Tief nochmal 35%“ – wie oft das zuerst gebildete Extrem bis Tagesende noch einmal gebrochen wird
-// Linien nur bei Signal (Ziel vor Stop ≥ Einstellung, Standard 70 %), sonst grau „kein Signal“.
-// Kommt der Stop zuerst: Ziel und TP enden grau mit „Stop zuerst ✗“. Kommt das Ziel zuerst: ✓, Stop-Linie endet.
-// Die % hängen ab von: Markt, Startzeit, IB-Länge, was zuerst kam, IB-Größe ggü. den 20 Tagen davor (z. B. News-IB) und
-// Lage des Kurses am IB-Ende. Modell: zuerst + IB-Größe + Lage des Kurses, letzte 5 Jahre, Dämpfung 1. Wochentag geprüft: im Test kein Vorteil, daher nicht drin.
-// Jede Linie läuft bis zur Berührung (✓) oder bis Tagesende (17:00 für IBs vor 09:30, sonst 16:00).
-// Daten: Databento CME 1m bis 2026-10-16. Analyse und Test im ungesehenen Jahr: data-lab/results/ib_first_model.md
-// Für 1m-Charts gedacht (Reihenfolge von Hoch und Tief in der IB).
-// Alarme: Alarm anlegen → Bedingung „IB-First“ → „Jeder alert()-Funktionsaufruf“.
+indicator("IB First · Low first → High gets taken", shorttitle = "IB-First", overlay = true, max_lines_count = 200, max_labels_count = 200)
+// 🦇 IB FIRST · by @Brucefcknwayne – NQ, ES, RTY, GC (+ MNQ, MES, M2K, MGC), detects the market automatically.
+// Idea: if the IB low forms first, the IB high usually gets taken afterwards – and vice versa.
+// At the end of the IB (length: best for market and start time, or fixed) the indicator shows:
+//   Target    = "IB High taken 86% · before stop 76%" (before stop = before the first-formed extreme breaks again)
+//   TP        = the farthest extension beyond the target that still has at least the chosen probability (TP mode)
+//   Stop side = "Stop · Low retaken 35%" – how often the first-formed extreme breaks again until session end
+// Lines only on a signal (before stop ≥ setting, default 70 %), otherwise grey "no signal".
+// Stop first: target and TP end grey with "stop first ✗". Target first: ✓ and the stop line ends.
+// Probabilities depend on: market, start time, IB length, which extreme came first, IB size vs. the 20 previous days
+// (e.g. news IB) and where price sits at the end of the IB. Model: first + IB size + price location, last 5 years, ridge 1. Weekday tested: no edge, not included.
+// Lines run until touched or until session end (17:00 for IBs before 09:30, otherwise 16:00).
+// Data: Databento CME 1m until 2026-10-16. Analysis and out-of-sample test: data-lab/results/ib_first_model.md
+// Built for 1m charts (order of high and low inside the IB).
+// Alerts: create alert → condition "IB-First" → "Any alert() function call".
 
 const string TZ    = "America/New_York"
 const string ALPHA = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 const string KEYS  = "18:00 19:00 20:00 21:00 22:00 23:00 00:00 01:00 02:00 03:00 04:00 05:00 06:00 07:00 08:00 09:00 10:00 11:00 12:00 13:00 14:00 15:00 08:30 09:30 10:30"
-const int    NCF   = 32      // Zahlen je IB: Ausdehnung 12, Ziel vor Stop 10, Stop-Seite 10
-const int    KPB   = 13      // Startzeiten je Datenblock
+const int    NCF   = 32      // numbers per IB: extension 12, before stop 10, stop side 10
+const int    KPB   = 13      // start times per data block
 const float  ZMAX  = 1.2
 const string G_I   = "Initial Balance"
-const string G_A   = "Anzeige"
+const string G_A   = "Display"
 
-string startIn  = input.string("09:30", "IB-Start (NY)", options = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "12:00", "13:00", "14:00", "15:00"], group = G_I)
-string lenIn    = input.string("Auto", "IB-Länge", options = ["Auto", "15", "30", "45", "60"], group = G_I, tooltip = "Auto: die Länge mit der besten Quote „Ziel vor Stop“ für Markt und Startzeit (aus den Daten).")
-int    sigIn    = input.int(70, "Signal ab (Ziel vor Stop %)", minval = 50, maxval = 95, group = G_I, tooltip = "Linien nur, wenn die Gegenseite mit mindestens dieser Wahrscheinlichkeit VOR der Stop-Seite kommt. Sonst: „kein Signal“. Test letztes Jahr bei 70 %: Signal an ~56 % der Tage, Ziel vor Stop ~85 %.")
-string tpIn     = input.string("80 %", "TP-Modus", options = ["60 % (mehr Weg, mehr Risiko)", "70 %", "80 %", "90 % (sicher, kurz)"], group = G_I, tooltip = "Zeigt das weiteste Ziel über der Gegenseite, das mindestens diese Wahrscheinlichkeit hat.")
-bool   showStop = input.bool(true, "Stop-Seite zeigen", group = G_A)
-bool   showIB   = input.bool(true, "IB während der Bildung zeigen", group = G_A)
-bool   delOld   = input.bool(true, "Nur heute zeigen", group = G_A)
-color  cUp      = input.color(#26a69a, "Ziel oben", inline = "c", group = G_A)
-color  cDn      = input.color(#ef5350, "Ziel unten", inline = "c", group = G_A)
-color  cGray    = input.color(#9598a1, "Stop-Seite / IB", inline = "c", group = G_A)
-string txtSize  = input.string("Normal", "Textgröße", options = ["Klein", "Normal", "Groß"], group = G_A)
-bool   alOn     = input.bool(true, "Alarme (IB fertig, Ziel erreicht)", group = "Alarme")
+string startIn  = input.string("09:30", "IB start (NY)", options = ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "12:00", "13:00", "14:00", "15:00"], group = G_I)
+string lenIn    = input.string("Auto", "IB length", options = ["Auto", "15", "30", "45", "60"], group = G_I, tooltip = "Auto: the length with the best 'target before stop' rate for this market and start time (from the data).")
+int    sigIn    = input.int(70, "Signal from (target before stop %)", minval = 50, maxval = 95, group = G_I, tooltip = "Lines only if the opposite IB side gets taken BEFORE the stop side with at least this probability. Otherwise: 'no signal'. Out-of-sample year at 70 %: signal on ~56 % of days, target before stop ~85 %.")
+string tpIn     = input.string("80 %", "TP mode", options = ["60 % (more room, more risk)", "70 %", "80 %", "90 % (safe, short)"], group = G_I, tooltip = "Shows the farthest target beyond the opposite IB side that still has at least this probability.")
+bool   showStop = input.bool(true, "Show stop side", group = G_A)
+bool   showIB   = input.bool(true, "Show IB while forming", group = G_A)
+bool   delOld   = input.bool(true, "Today only", group = G_A)
+color  cUp      = input.color(#26a69a, "Target up", inline = "c", group = G_A)
+color  cDn      = input.color(#ef5350, "Target down", inline = "c", group = G_A)
+color  cGray    = input.color(#9598a1, "Stop side / IB", inline = "c", group = G_A)
+string txtSize  = input.string("Normal", "Text size", options = ["Small", "Normal", "Large"], group = G_A)
+bool   alOn     = input.bool(true, "Alerts (IB done, target / stop hit)", group = "Alerts")
 
 float thrTP = str.startswith(tpIn, "60") ? 0.6 : str.startswith(tpIn, "70") ? 0.7 : str.startswith(tpIn, "80") ? 0.8 : 0.9
-// Korrektur je Modus: das weiteste Ziel am Rand der Schwelle ist sonst leicht zu optimistisch (aus der Validierung)
+// correction per mode: the farthest target at the threshold edge is otherwise slightly optimistic (from validation)
 float dTP   = thrTP == 0.6 ? 0.006 : thrTP == 0.7 ? 0.008 : thrTP == 0.8 ? 0.009 : 0.009
 
-// ═══ DATEN: je Markt 2 Blöcke (Startzeiten x 4 Längen x 32 Zahlen à 2 Zeichen) + beste Länge je Startzeit ═══
+// ═══ DATA: per market 2 blocks (start times x 4 lengths x 32 numbers of 2 chars) + best length per start time ═══
 string root = syminfo.root
 string mk   = root == "NQ" or root == "MNQ" ? "NQ" : root == "ES" or root == "MES" ? "ES" : root == "RTY" or root == "M2K" ? "RTY" : root == "GC" or root == "MGC" ? "GC" : ""
 var string B0 = ""
@@ -71,7 +71,7 @@ f_dec(string s, int p) =>
     int c2 = str.pos(ALPHA, str.substring(s, p + 1, p + 2))
     c1 >= 0 and c2 >= 0 ? (c1 * 62 + c2 - 1922) / 100.0 : na
 
-// Koeffizienten für Start ki und Länge li (einmal je Tag gelesen)
+// coefficients for start ki and length li
 f_coefs() =>
     string src = int(ki / KPB) == 0 ? B0 : B1
     int    p0  = ((ki % KPB) * 4 + li) * NCF * 2
@@ -100,12 +100,12 @@ f_pct(float p) =>
     str.tostring(math.round(p * 100)) + "%"
 
 f_fmt(float v) =>
-    str.replace(str.tostring(v, "0.0"), ".", ",")
+    str.tostring(v, "0.0")
 
 f_size() =>
-    txtSize == "Klein" ? size.small : txtSize == "Groß" ? size.large : size.normal
+    txtSize == "Small" ? size.small : txtSize == "Large" ? size.large : size.normal
 
-// ═══ ZEIT & IB-GRÖSSE ═══
+// ═══ TIME & IB SIZE ═══
 f_rel(int t) =>
     (hour(t, TZ) * 60 + minute(t, TZ) - 1080 + 1440) % 1440
 
@@ -114,7 +114,7 @@ int relE   = relS + L
 int relEnd = relS < 930 ? 1380 : 1320
 int relNow = f_rel(time)
 
-// Median der IB-Range derselben Uhrzeit und Länge an den 20 Tagen davor (aus 15-Min-Kerzen)
+// median IB range at the same time and length over the 20 previous days (from 15m bars)
 f_ibMedian(int rs, int len) =>
     var array<float> hist = array.new<float>()
     var float h = na
@@ -148,14 +148,14 @@ var bool  done = false
 var line  ibH  = na
 var line  ibL  = na
 var label lbF  = na
-var int   res  = 0      // 0 offen, 1 Ziel zuerst, −1 Stop zuerst
-var float stY  = na     // Stop-Level (zuerst gebildetes Extrem)
-// Linien nach der IB: 0 Gegenseite, 1 TP, 2 Stop-Seite
+var int   res  = 0      // 0 open, 1 target first, −1 stop first
+var float stY  = na     // stop level (first-formed extreme)
+// lines after the IB: 0 target (opposite side), 1 TP, 2 stop side
 var array<line>   RL = array.new<line>(3)
 var array<label>  RB = array.new<label>(3)
 var array<float>  RY = array.new<float>(3, na)
-var array<int>    RD = array.new<int>(3, 0)        // 1 = gilt bei Hoch über Level, −1 = bei Tief unter Level
-var array<bool>   RS = array.new<bool>(3, false)   // strikt (IB-Extrem muss überschritten werden)
+var array<int>    RD = array.new<int>(3, 0)        // 1 = hit when high above level, −1 = when low below level
+var array<bool>   RS = array.new<bool>(3, false)   // strict (IB extreme must be exceeded)
 var array<bool>   RH = array.new<bool>(3, false)
 var array<string> RX = array.new<string>(3, "")
 
@@ -183,7 +183,7 @@ if timeframe.isintraday and timeframe.change("D")
     res  := 0
     stY  := na
 
-// IB bilden (erstes Auftreten von Hoch und Tief zählt)
+// build the IB (first occurrence of high and low counts)
 if timeframe.isintraday and relNow >= relS and relNow < relE
     if na(H) or high > H
         H  := high
@@ -210,7 +210,7 @@ f_add(int i, float y, int dir, bool strict, string t, color c, int w, string st)
     array.set(RL, i, line.new(time, y, time, y, xloc = xloc.bar_time, color = c, width = w, style = st))
     array.set(RB, i, label.new(time, y, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(c, 100), textcolor = c, size = f_size()))
 
-// IB fertig: was kam zuerst, wie groß, wo steht der Kurs → Wahrscheinlichkeiten
+// IB done: which came first, how big, where is price → probabilities
 string msg = ""
 if not done and mk != "" and not na(H) and H > Lo and relNow >= relE and relNow < relEnd
     done := true
@@ -230,7 +230,7 @@ if not done and mk != "" and not na(H) and H > Lo and relNow >= relE and relNow 
         float oy  = lf ? H : Lo
         int   dir = lf ? 1 : -1
         color cc  = lf ? cUp : cDn
-        // TP: weitestes x (0,1 … 2,0 IB) mit P ≥ Schwelle, von innen nach außen bis zum ersten Unterschreiten
+        // TP: farthest x (0.1 … 2.0 IB) with P ≥ threshold, from inside out until the first miss
         float xTP = na
         float pTP = na
         if pOT >= thrTP
@@ -240,23 +240,23 @@ if not done and mk != "" and not na(H) and H > Lo and relNow >= relE and relNow 
                     break
                 xTP := k / 10.0
                 pTP := pk
-        string head = (lf ? "Hoch" : "Tief") + " wird geholt " + f_pct(pO) + " · vor Stop " + f_pct(pZ)
-        string info = (lf ? "Tief zuerst" : "Hoch zuerst") + " · " + str.tostring(L) + "m" + (na(med) ? "" : " · IB " + f_fmt(R / med) + "×")
+        string head = (lf ? "IB High" : "IB Low") + " taken " + f_pct(pO) + " · before stop " + f_pct(pZ)
+        string info = (lf ? "Low first" : "High first") + " · " + str.tostring(L) + "m" + (na(med) ? "" : " · IB " + f_fmt(R / med) + "×")
         if pZ >= sigIn / 100.0
             stY := lf ? Lo : H
             f_add(0, oy, dir, true, (pOT >= thrTP and na(xTP) ? "TP · " : "") + head, cc, 2, line.style_solid)
             if not na(xTP)
                 f_add(1, oy + dir * xTP * R, dir, false, "TP +" + f_fmt(xTP) + " IB · " + f_pct(pTP), cc, 1, line.style_dashed)
             if showStop
-                f_add(2, stY, -dir, true, "Stop · " + (lf ? "Tief" : "Hoch") + " nochmal " + f_pct(pS), cGray, 1, line.style_dotted)
+                f_add(2, stY, -dir, true, "Stop · " + (lf ? "Low" : "High") + " retaken " + f_pct(pS), cGray, 1, line.style_dotted)
             msg := info + "\n" + head + (na(xTP) ? "" : "\nTP +" + f_fmt(xTP) + " IB " + f_pct(pTP) + " @ " + str.tostring(oy + dir * xTP * R, format.mintick))
         else
-            info += " · kein Signal (vor Stop " + f_pct(pZ) + ")"
+            info += " · no signal (before stop " + f_pct(pZ) + ")"
         lbF := label.new(lf ? tL : tH, lf ? Lo : H, info, xloc = xloc.bar_time, style = lf ? label.style_label_up : label.style_label_down, color = color.new(cGray, 100), textcolor = cGray, size = size.small)
 if alOn and msg != ""
     alert("IB-First " + mk + " · " + startIn + "\n" + msg, alert.freq_once_per_bar)
 
-// Linien laufen bis Tagesende; was kommt zuerst: Ziel (Gegenseite) oder Stop (gleicher Bar zählt als Stop, wie in der Statistik)
+// lines run until session end; what comes first: target (opposite side) or stop (same bar counts as stop, like the stats)
 f_end(int i, string add, bool gray) =>
     if not na(array.get(RY, i)) and not array.get(RH, i)
         array.set(RH, i, true)
@@ -277,10 +277,10 @@ if done and relNow < relEnd and not na(array.get(RY, 0))
     bool  tHit = d == 1 ? high > ty : low < ty
     if res == 0 and sHit
         res := -1
-        f_end(0, " · Stop zuerst ✗", true)
-        f_end(1, " · Stop zuerst ✗", true)
+        f_end(0, " · stop first ✗", true)
+        f_end(1, " · stop first ✗", true)
         f_end(2, " ✗", false)
-        msgHit += "Stop zuerst ✗ @ " + str.tostring(stY, format.mintick)
+        msgHit += "Stop first ✗ @ " + str.tostring(stY, format.mintick)
     else if res == 0 and tHit
         res := 1
         f_end(0, " ✓", false)

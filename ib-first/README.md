@@ -1,4 +1,4 @@
-# IB First – Tief zuerst → Hoch wird geholt
+# IB First – Tief zuerst → Hoch wird geholt (Indikator auf Englisch: „Low first → High gets taken“)
 
 Eigenständiges Projekt (unabhängig von `gotham-zones/IB-Expansion`).
 

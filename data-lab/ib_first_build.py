@@ -22,8 +22,8 @@ STARTS = [f"{(18 + i) % 24:02d}:00" for i in range(22)] + ["08:30", "09:30", "10
 LENGTHS = [15, 30, 45, 60]
 ALPHA = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 NCF, KPB, CMAX = 32, 13, 19.2
-LEVEL_TXT = {"A": "nur was zuerst kam", "B": "zuerst + IB-Größe", "C": "zuerst + IB-Größe + Lage des Kurses",
-             "D": "zuerst + IB-Größe + Lage des Kurses + Wochentag"}
+LEVEL_TXT = {"A": "which extreme came first", "B": "first + IB size", "C": "first + IB size + price location",
+             "D": "first + IB size + price location + weekday"}
 
 
 def enc2(x):
@@ -52,7 +52,7 @@ pine = (tpl.replace("{{LOADS}}", "\n".join(loads)).replace("{{KEYS}}", " ".join(
            .replace("{{ZMAX}}", str(J["zmax"])).replace("{{END}}", J["end"])
            .replace("{{D60}}", str(J["dtp"]["0.6"])).replace("{{D70}}", str(J["dtp"]["0.7"]))
            .replace("{{D80}}", str(J["dtp"]["0.8"])).replace("{{D90}}", str(J["dtp"]["0.9"]))
-           .replace("{{MODEL}}", f"{LEVEL_TXT[J['level']]}, letzte {J['window']} Jahre, Dämpfung {J['lam']:g}"))
+           .replace("{{MODEL}}", f"{LEVEL_TXT[J['level']]}, last {J['window']} years, ridge {J['lam']:g}"))
 assert "{{" not in pine
 (ROOT / "ib-first/IB-First.pine").write_text(pine)
 print("Indikator:", len(pine.splitlines()), "Zeilen,", len(pine), "Zeichen, längste Zeile", max(map(len, pine.splitlines())))
