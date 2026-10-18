@@ -10,7 +10,7 @@ Tests aus der Literatur-Recherche (IV / Intraday) mit eigenen Daten: NQ, ES, RTY
    Range bis t schon gelaufen ist.
 3) IV-Prognose des Folgetags (Albers 2025): roh, mit Prämienkorrektur (σ × Median RV/σ der letzten 250 Tage),
    HAR-RV und HAR-RV+IV; Test = letztes Jahr (MSE der Vol, QLIKE). Dazu Aufteilung RV in Nacht (18:00–09:30) und RTH.
-4) Wochentag: RV/σ je Wochentag und danach, ob der IV-Wert über ein Wochenende/Feiertag reicht (Albers & Kestner 2024).
+4) Wochentag: RV/σ und Range je Wochentag (Albers & Kestner 2024: Montags-Effekt).
 5) Runde Zahlen (Osler 2000/2003): Abprall an Vielfachen von 100/500 (NQ), 25/100 (ES), 10/50 (RTY), 10/50 (GC) gegen
    um ein halbes Raster versetzte Kontroll-Levels; erste Berührung je Level und Tag in RTH, Rennen ±0,1σ (30D-σ).
 
@@ -120,16 +120,14 @@ for mk in MARKETS:
                            **{"MSE (Vol in %²)": round(np.mean((100 * (y - ft)) ** 2), 4),
                               "QLIKE": round(np.mean(y ** 2 / ft ** 2 - np.log(y ** 2 / ft ** 2) - 1), 4),
                               "Ø Prognose / Ist": round(np.mean(ft) / np.mean(y), 2)}))
-        # ═══ 4) Wochentag und Wochenend-IV ═══
+        # ═══ 4) Wochentag ═══
         if mode in ("1D", "30D"):
-            gap = (pd.to_datetime(dts.values) - pd.to_datetime(anchor_day)).days.to_numpy()   # Tage zwischen IV-Datum und Handelstag
             m3 = okm & np.asarray(dts > end - pd.DateOffset(years=3))
             rng = (np.nanmax(G["high"], 1) - np.nanmin(G["low"], 1)) / (ref * s_iv)
             for d in range(5):
                 mm = m3 & (wd == d)
                 wdr.append(dict(Markt=mk, Modus=mode, Tag=WDN[d], Tage=int(mm.sum()),
-                                **{"RV / IV": round(np.nanmedian(ratio[mm]), 2), "Range in σ": round(np.nanmedian(rng[mm]), 2),
-                                   "IV-Wert älter als 1 Tag %": round(100 * np.mean(gap[mm] > 1), 0)}))
+                                **{"RV / IV": round(np.nanmedian(ratio[mm]), 2), "Range in σ": round(np.nanmedian(rng[mm]), 2)}))
 
     # ═══ 2) Restbewegung je Uhrzeit (1D-σ, sonst 30D) ═══
     for mode in ("1D", "30D"):

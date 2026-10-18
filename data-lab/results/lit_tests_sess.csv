@@ -1,0 +1,21 @@
+Markt,Modus,Zeitraum,Tage,RV gesamt / IV,RV RTH / IV,RV Nacht / IV,Anteil Varianz Nacht %
+NQ,1D,letzte 3 Jahre,775,0.95,0.72,0.52,33.0
+NQ,1D,seit 2011,1144,0.92,0.72,0.5,32.0
+NQ,9D,letzte 3 Jahre,775,0.8,0.6,0.43,33.0
+NQ,9D,seit 2011,4046,0.78,0.6,0.42,32.0
+NQ,30D,letzte 3 Jahre,775,0.73,0.56,0.4,33.0
+NQ,30D,seit 2011,4050,0.74,0.57,0.4,32.0
+ES,1D,letzte 3 Jahre,754,0.84,0.65,0.47,34.0
+ES,1D,seit 2011,1112,0.85,0.65,0.47,34.0
+ES,9D,letzte 3 Jahre,754,0.71,0.54,0.39,34.0
+ES,9D,seit 2011,4020,0.74,0.55,0.44,38.0
+ES,30D,letzte 3 Jahre,775,0.65,0.5,0.36,34.0
+ES,30D,seit 2011,4054,0.69,0.52,0.41,38.0
+RTY,1D,letzte 3 Jahre,775,1.02,0.77,0.55,33.0
+RTY,1D,seit 2011,1143,0.98,0.75,0.53,31.0
+RTY,9D,letzte 3 Jahre,775,0.85,0.65,0.46,33.0
+RTY,9D,seit 2011,2336,0.85,0.67,0.45,30.0
+RTY,30D,letzte 3 Jahre,775,0.77,0.59,0.42,33.0
+RTY,30D,seit 2011,2336,0.79,0.62,0.42,30.0
+GC,30D,letzte 3 Jahre,774,0.81,0.47,0.61,62.0
+GC,30D,seit 2011,4057,0.79,0.47,0.59,61.0

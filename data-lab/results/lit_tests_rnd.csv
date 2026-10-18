@@ -1,0 +1,33 @@
+Markt,Raster,Art,Zeitraum,Berührungen,Abprall %
+NQ,100,rund,3J,2260,55.9
+NQ,100,rund,alle,5614,54.6
+NQ,100,Kontrolle (halbes Raster versetzt),3J,2322,57.1
+NQ,100,Kontrolle (halbes Raster versetzt),alle,5679,55.6
+NQ,500,rund,3J,440,50.7
+NQ,500,rund,alle,1082,51.8
+NQ,500,Kontrolle (halbes Raster versetzt),3J,475,56.6
+NQ,500,Kontrolle (halbes Raster versetzt),alle,1110,55.5
+ES,25,rund,3J,1829,54.1
+ES,25,rund,alle,5493,55.3
+ES,25,Kontrolle (halbes Raster versetzt),3J,1809,56.8
+ES,25,Kontrolle (halbes Raster versetzt),alle,5585,59.1
+ES,100,rund,3J,443,53.3
+ES,100,rund,alle,1337,55.1
+ES,100,Kontrolle (halbes Raster versetzt),3J,454,51.5
+ES,100,Kontrolle (halbes Raster versetzt),alle,1363,53.3
+RTY,10,rund,3J,2749,56.2
+RTY,10,rund,alle,7391,56.0
+RTY,10,Kontrolle (halbes Raster versetzt),3J,2768,58.7
+RTY,10,Kontrolle (halbes Raster versetzt),alle,7470,57.3
+RTY,50,rund,3J,551,57.9
+RTY,50,rund,alle,1487,57.3
+RTY,50,Kontrolle (halbes Raster versetzt),3J,535,59.6
+RTY,50,Kontrolle (halbes Raster versetzt),alle,1469,58.3
+GC,10,rund,3J,2951,57.6
+GC,10,rund,alle,7297,55.3
+GC,10,Kontrolle (halbes Raster versetzt),3J,2951,57.1
+GC,10,Kontrolle (halbes Raster versetzt),alle,7362,55.8
+GC,50,rund,3J,592,57.8
+GC,50,rund,alle,1454,55.1
+GC,50,Kontrolle (halbes Raster versetzt),3J,572,59.1
+GC,50,Kontrolle (halbes Raster versetzt),alle,1485,56.2
