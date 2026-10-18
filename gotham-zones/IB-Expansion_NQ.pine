@@ -12,6 +12,8 @@ indicator("IB Expansion NQ · Targets & Protects", shorttitle = "IB-Exp NQ", ove
 //                                IB-Rand wird zu ≥ 70 % noch einmal berührt
 //    Protect (orange, gestr.)  = wird zu ≥ 70 % NICHT erreicht → Stop dahinter
 //  Jede Linie läuft, bis das Level getroffen ist oder der Tag endet.
+//  Level-Tabelle: aktive Levels mit Status – Target grau = offen / grün = getroffen,
+//  Protect grau = hält / rot = gebrochen.
 //  Wahrscheinlichkeiten aus den Daten (Databento CME 1m, letzte 3 Jahre bis 2026-10-16):
 //    · IB-Größe: klein / normal / groß im Vergleich zu den 20 Tagen davor (gleiche Uhrzeit)
 //    · bei IB-Ende: zusätzlich ob IB-Hoch oder IB-Tief zuerst gebildet wurde
@@ -43,6 +45,12 @@ int    thrSL   = input.int(70, "Protect ab (% hält)", minval = 50, maxval = 95,
 string lblMode = input.string("Grenzen", "Beschriftung", options = ["Grenzen", "Alle Levels"], group = G_A, tooltip = "Grenzen: je IB und Seite das weiteste Target und das erste Protect.")
 bool   showIB  = input.bool(true, "IB-Hoch/-Tief immer zeigen", group = G_A, tooltip = "Als dünne Orientierung, auch unter der Schwelle.")
 bool   showTab = input.bool(true, "Info-Tabelle", group = G_A)
+bool   showLvl = input.bool(true, "Level-Tabelle", group = G_A)
+string lvlMode = input.string("Kompakt", "Level-Tabelle zeigt", options = ["Kompakt", "Alle"], group = G_A, tooltip = "Kompakt: je IB und Seite das weiteste Target und das erste Protect. Alle: jedes aktive Level.")
+string lvlPos  = input.string("Unten rechts", "Position Level-Tabelle", options = ["Unten rechts", "Unten links", "Oben links", "Mitte rechts"], group = G_A)
+color  cHit    = input.color(#00c853, "Target getroffen", inline = "s", group = G_A)
+color  cBrk    = input.color(#ff1744, "Protect gebrochen", inline = "s", group = G_A)
+color  cOpen   = input.color(#787b86, "Offen", inline = "s", group = G_A)
 color  cTP     = input.color(#2962ff, "Target", inline = "c", group = G_A)
 color  cSL     = input.color(#ff9800, "Protect", inline = "c", group = G_A)
 color  cIB     = input.color(#e535f5, "IB", inline = "c", group = G_A)
@@ -393,6 +401,17 @@ var array<line>  aRtLn  = array.new<line>(NI)
 var array<line>  LU     = array.new<line>(NI * NK)
 var array<line>  LD     = array.new<line>(NI * NK)
 var array<label> LB     = array.new<label>()
+// Level-Status je IB, Seite, Level: Art (0 nichts, 1 Target, 2 Protect), aktiv, getroffen, letzte Sicherheit
+var array<int>   ST     = array.new<int>(NI * 2 * NK, 0)
+var array<bool>  SA     = array.new<bool>(NI * 2 * NK, false)
+var array<bool>  SH     = array.new<bool>(NI * 2 * NK, false)
+var array<float> SP     = array.new<float>(NI * 2 * NK, na)
+var array<bool>  aRtAct = array.new<bool>(NI, false)
+var array<bool>  aRtOk  = array.new<bool>(NI, false)
+var array<float> aRtP   = array.new<float>(NI, na)
+
+f_si(int j, int side, int k) =>
+    (j * 2 + side) * NK + k
 
 if timeframe.isintraday and timeframe.change("D")
     for j = 0 to NI - 1
@@ -413,6 +432,13 @@ if timeframe.isintraday and timeframe.change("D")
     for lb in LB
         label.delete(lb)
     array.clear(LB)
+    array.fill(ST, 0)
+    array.fill(SA, false)
+    array.fill(SH, false)
+    array.fill(SP, na)
+    array.fill(aRtAct, false)
+    array.fill(aRtOk, false)
+    array.fill(aRtP, na)
 
 // IB aufbauen (erstes Auftreten von Hoch/Tief zählt)
 for j = 0 to NI - 1
@@ -530,6 +556,9 @@ for j = 0 to NI - 1
                 // läuft weiter, bis getroffen (dieser Bar ist dann der letzte) oder Tagesende
                 if k > reached and not na(ln)
                     line.set_x2(ln, time)
+                int si = f_si(j, side, k)
+                if k > reached and k <= nowMax and array.get(SA, si)
+                    array.set(SH, si, true)              // auf diesem Bar getroffen
                 if k > nowMax
                     float p  = f_prob(j, side, k)
                     float pT = p - f_corr(DT, q)          // Target: Sicherheit erreicht (korrigiert)
@@ -548,6 +577,10 @@ for j = 0 to NI - 1
                         line.set_color(ln, tp or sl ? c : isIB and showIB ? color.new(cIB, 40) : color.new(c, 100))
                         line.set_style(ln, sl ? line.style_dashed : line.style_solid)
                         line.set_width(ln, isIB and (tp or sl) ? 2 : 1)
+                    array.set(SA, si, tp or sl)
+                    if tp or sl
+                        array.set(ST, si, tp ? 1 : 2)
+                        array.set(SP, si, tp ? pT : pS)
                     if tp
                         bestTP := k
                         pTP    := pT
@@ -586,12 +619,18 @@ for j = 0 to NI - 1
             bool back = sd == 0 ? low <= H : high >= L
             if back
                 array.set(aRtHit, j, true)
+                if array.get(aRtOk, j)
+                    array.set(aRtAct, j, true)
             else
                 float d  = sd == 0 ? (close - H) / f_R(j) : (L - close) / f_R(j)
                 float qR = (relNow - rel930 + 1) / float(relEnd - rel930)   // Zeit ab 09:30
                 float p  = f_rt(j, sd, qR, d) - f_corr(DR, qR)
                 bool  ok = not na(p) and p >= thrTP / 100.0
                 line.set_color(ln, ok ? cTP : color.new(cTP, 100))
+                array.set(aRtOk, j, ok)
+                array.set(aRtAct, j, ok)
+                if ok
+                    array.set(aRtP, j, p)
                 if drawLbl and ok
                     string t = str.tostring(array.get(LENS, j)) + "m Target " + (sd == 0 ? "IB-Hoch" : "IB-Tief") + " (zurück) · " + f_pct(p)
                     array.push(LB, label.new(xLbl, sd == 0 ? H : L, t, xloc = xloc.bar_time, style = label.style_label_left, color = color.new(cTP, 80), textcolor = cTP, size = size.small))
@@ -620,3 +659,62 @@ if showTab and barstate.islast
         table.cell(tb, 3, j + 1, er, text_color = color.white, text_size = size.small)
         table.cell(tb, 4, j + 1, array.get(HAS, j) ? str.tostring(array.get(NDAYS, j)) : "–", text_color = color.white, text_size = size.small)
     table.cell(tb, 0, NI + 1, "Statistik 3 J · Ende " + (relS < 930 ? "17:00" : "16:00"), text_color = color.gray, text_size = size.small)
+
+// ═══════════════════════════════ LEVEL-TABELLE ═══════════════════════════════
+// Target: grau = offen, grün = getroffen · Protect: grau = hält, rot = gebrochen
+f_pos(string p) =>
+    p == "Unten links" ? position.bottom_left : p == "Oben links" ? position.top_left : p == "Mitte rechts" ? position.middle_right : position.bottom_right
+
+var table lt = table.new(f_pos(lvlPos), 5, 42, bgcolor = color.new(color.black, 80), border_width = 1, border_color = color.new(color.black, 100))
+
+f_lrow(int r, string ib, string art, string lvl, float price, float p, int typ, bool hit) =>
+    color bg = hit ? (typ == 1 ? cHit : cBrk) : cOpen
+    string st = hit ? (typ == 1 ? "getroffen ✓" : "gebrochen ✗") : (typ == 1 ? "offen" : "hält")
+    table.cell(lt, 0, r, ib, text_color = color.white, text_size = size.small)
+    table.cell(lt, 1, r, art, text_color = typ == 1 ? cTP : cSL, text_size = size.small)
+    table.cell(lt, 2, r, lvl + "  " + str.tostring(price, format.mintick), text_color = color.white, text_size = size.small)
+    table.cell(lt, 3, r, na(p) ? "" : f_pct(p), text_color = color.white, text_size = size.small)
+    table.cell(lt, 4, r, st, text_color = color.white, bgcolor = color.new(bg, 25), text_size = size.small)
+
+if showLvl and barstate.islast
+    table.clear(lt, 0, 0, 4, 41)
+    table.cell(lt, 0, 0, "IB", text_color = color.gray, text_size = size.small)
+    table.cell(lt, 1, 0, "Art", text_color = color.gray, text_size = size.small)
+    table.cell(lt, 2, 0, "Level · Preis", text_color = color.gray, text_size = size.small)
+    table.cell(lt, 3, 0, "%", text_color = color.gray, text_size = size.small)
+    table.cell(lt, 4, 0, "Status", text_color = color.gray, text_size = size.small)
+    int r = 1
+    for j = 0 to NI - 1
+        if array.get(aDone, j)
+            string ib = str.tostring(array.get(LENS, j)) + "m"
+            for side = 0 to 1
+                string sg = side == 0 ? "+" : "−"
+                if lvlMode == "Kompakt"
+                    int kT = -1
+                    int kS = -1
+                    for k = 0 to NK - 1
+                        int si = f_si(j, side, k)
+                        if array.get(SA, si) or array.get(SH, si)
+                            if array.get(ST, si) == 1
+                                kT := k
+                            if array.get(ST, si) == 2 and kS < 0
+                                kS := k
+                    if kT >= 0 and r < 42
+                        int si = f_si(j, side, kT)
+                        f_lrow(r, ib, "Target", sg + f_fmt(kT), f_price(j, side, kT), array.get(SP, si), 1, array.get(SH, si))
+                        r += 1
+                    if kS >= 0 and r < 42
+                        int si = f_si(j, side, kS)
+                        f_lrow(r, ib, "Protect", sg + f_fmt(kS), f_price(j, side, kS), array.get(SP, si), 2, array.get(SH, si))
+                        r += 1
+                else
+                    for k = 0 to NK - 1
+                        int si = f_si(j, side, k)
+                        if (array.get(SA, si) or array.get(SH, si)) and r < 42
+                            int typ = array.get(ST, si)
+                            f_lrow(r, ib, typ == 1 ? "Target" : "Protect", sg + f_fmt(k), f_price(j, side, k), array.get(SP, si), typ, array.get(SH, si))
+                            r += 1
+            if array.get(aRtAct, j) and r < 42
+                int sd = array.get(aRtS, j)
+                f_lrow(r, ib, "Target", sd == 0 ? "IB-Hoch (zurück)" : "IB-Tief (zurück)", sd == 0 ? array.get(aH, j) : array.get(aL, j), array.get(aRtP, j), 1, array.get(aRtHit, j))
+                r += 1
