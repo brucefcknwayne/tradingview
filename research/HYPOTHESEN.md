@@ -154,3 +154,22 @@ gab es, und lässt sich daraus eine Strategie mit Alpha bauen?
 ## H8 – RTY-Skalierung im Indikator (Status: im HAR-Modus gelöst, 2026-10-19; IV-Modi für RTY weiter zu eng)
 RTY nutzt im Pine-Code die VIX-Familie. Reaktionen/Ranges liegen bei 1,0–1,45σ statt ~0,8σ → σ zu klein. RVX-Skalierung
 (RVX bzw. VIX1D·RVX/VIX) prüfen: Schluss in ±1σ soll ~68 % ergeben.
+
+## H9 – Intraday-VWAP-Strategie (1–3 Setups/Tag, Prop-Firm-tauglich) (Status: in Arbeit)
+**Auftrag (Nutzer, 2026-10-19):** Selbstständig eine Intraday-Strategie mit Edge finden, Startpunkt VWAP (Session-/RTH-VWAP,
+±1/2/3σ-Bänder, Multi-Timeframe-/Multi-Session-VWAP). Märkte NQ, ES, RTY, GC. Drawdown möglichst klein (Prop-Firm). Nur vorhandene Daten.
+
+### Vorab festgelegtes Vorgehen (2026-10-19, vor jeder Auswertung)
+- **Vier Datentöpfe:** Explore 2011–2019 (suchen) · Validate 2020–2024 (erste Prüfung, unverändert) · Test 2025-01 bis 2026-04-16
+  (zweite Prüfung) · **Holdout ab 2026-04-17 unberührt** (nur mit Freigabe des Nutzers, einmal, für den finalen Kandidaten).
+  RTY erst ab 2017-07 (Explore dort kürzer).
+- **Trades:** Signal bei Kerzenschluss (1m), Einstieg Open der nächsten Minute. Stop vor Ziel bei gleicher Kerze. Spätestens flat zum
+  RTH-Ende (Index 15:59, GC 13:29) bzw. Session-Ende bei Nacht-Setups. Max. 3 Trades/Tag/Markt, keine Überlappung.
+  Kosten je Round-Trip: NQ 1,0 · ES 0,5 · RTY 0,3 · GC 0,4 Punkte (Kommission + Slippage).
+- **Suche:** Setup-Familien mit Mechanismus (Band-Fade, Trend-Pullback an VWAP, Reclaim, Eröffnungs-Position zu VWAPs,
+  Schluss-Rücklauf zu VWAP, Multi-Anker-/Multi-Session-VWAP), jeweils kleines festes Parameter-Gitter. **Jede Variante wird gezählt.**
+- **Auswahl für Validate (nur aus Explore):** EW netto > 0, Profit Factor ≥ 1,15, positiv in ≥ 70 % der Explore-Jahre,
+  Nachbar-Parameter ebenfalls positiv (Plateau statt Spitze), Mechanismus benannt. Höchstens 5 Kandidaten.
+- **Validate/Test:** Kandidaten unverändert. Erfolg: EW netto > 0 mit 95 %-KI-Untergrenze > 0 (Bootstrap über Tage), PF ≥ 1,1,
+  besser als Zufall (gleiche Uhrzeit/Richtung/Stop/Ziel, 1.000×), Holm über alle Kandidaten – in Validate UND Test.
+- **Prop-Kennzahlen:** Max Drawdown (Punkte und $ je Kontrakt), schlechtester Tag, Gewinntage %, Trades/Tag, Sharpe der Tages-P&L.
