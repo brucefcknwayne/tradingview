@@ -129,3 +129,24 @@ d. h. es erkennt, WANN große Bewegungen kommen, aber nicht die Richtung → kei
 **Mechanismus:** H5 zeigt, dass große Reaktionen vorhersagbar häufiger in bewegten Phasen kommen (Volatilität clustert).
 Das ist eine Aussage über die **Größe** der Bewegung, nicht die Richtung. Nutzbar evtl. als Filter für Zielgröße/Stop
 (große Ziele nur bei hoher Volatilität), nicht als Einstiegssignal. Niedrige Priorität für Richtungs-Edge.
+
+## H7 – Gotham Zones (ohne Auto-Kalibrierung): HOD/LOD, Modus-Vergleich, Strategie-Suche (Status: in Arbeit → LOG #4ff.)
+**Auftrag (Nutzer, 2026-10-19):** Wie oft liefern die Zonen HOD/LOD je Modus und Asset, wie groß ist die Reaktion, welche Konfluenzen
+gab es, und lässt sich daraus eine Strategie mit Alpha bauen?
+
+### Vorab festgelegtes Vorgehen (2026-10-19, vor jeder Auswertung)
+- **Indikator exakt wie Pine-Code:** Anker = erstes Open der Session (18:00 ET), σ = Open × Wert/100/√252, Wert = letzter Schluss vor
+  dem Anker. NQ: 1D = VIX1D·VXN/VIX, 9D = VIX9D·VXN/VIX, 30D = VXN (Fallback 30D, wenn 1D/9D fehlt – wie im Code).
+  ES und RTY (Code: weder NQ noch GC): VIX1D / VIX9D / VIX. GC: GVZ in jedem Modus. Zonen ±0,5/1/1,5/2σ, Box ±5 % von σ. Keine Kalibrierung.
+- **Zeiträume:** Explore bis 2024-12-31 · Validate 2025-01-01 bis 2026-04-16 · **Holdout ab 2026-04-17 unberührt**.
+  1D-Daten gibt es erst ab Mai 2022.
+- **Teil A (beschreibend, keine Tests):** HOD/LOD in Zonen-Box vs. gleich breite Kontroll-Bänder dazwischen; „wenn berührt, war es das
+  Extrem“; Reaktion in Punkten und σ; Konfluenzen (Vortag H/T, Overnight H/T, IB H/T, RTH-VWAP ±2σ, Wochen-Zonen, Zonen anderer Modi,
+  100er) – immer im Vergleich Zone vs. Kontroll-Band.
+- **Teil B (Strategie-Suche, nur Explore):** Ereignis = erste Berührung einer Zonen-Box an einem Tag. Feste Trade-Vorlagen
+  (Fade und Durchbruch, Stop/Ziel in σ). Bedingungen aus Mechanismus-Überlegungen (Uhrzeit, Restbewegung, Range verbraucht, Event-Tag,
+  Modus-Konfluenz u. a.). **Jede ausprobierte Variante wird gezählt.** Kandidat nur, wenn: EW netto > 0 in Explore, positiv in jedem
+  Explore-Jahr mit ≥ 30 Trades, in ≥ 2 Märkten gleiches Vorzeichen, und ein Mechanismus benannt ist. Höchstens 5 Kandidaten.
+- **Teil C (Prüfung):** Kandidaten unverändert auf Validate, gegen Zufall (gleiche Stunde, gleicher Stop/Ziel, 1.000×), Holm über alle
+  Kandidaten. Erfolg: Holm-p < 0,05, EW netto > 0, KI-Untergrenze > 0, ≥ 30 Trades.
+- **Kosten je Round-Trip:** NQ 1,0 · ES 0,5 · RTY 0,3 · GC 0,4 Punkte.
