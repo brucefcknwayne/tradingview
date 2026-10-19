@@ -8,11 +8,13 @@ indicator("Gotham Zones @Brucefcknwayne", shorttitle = "Gotham Zones", overlay =
 //  Upper zones magenta, lower zones cyan. Fixed at the open, no repaint.
 //  Previous days stay on the chart.
 //  Optional: auto scale, live Z + range used, weekly zones.
+//  HAR mode: forecast from recent sessions blended with the market's expectation.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const string S_1D  = "1D"
 const string S_9D  = "9D"
 const string S_30D = "30D"
+const string S_HAR = "HAR"
 const float  YEAR_DAYS = 252.0
 const float  PARK      = 1.6651      // sqrt(4·ln2): high/low range → 1σ
 const float  MED_FIX   = 0.9         // median of range/1.6651 is ~0.9σ for a fair market → divide it out
@@ -29,7 +31,7 @@ color C_FILL   = color.new(#9598a1, 80)
 color C_BORDER = color.new(#b2b5be, 45)
 
 // ═══════════════════════════════ INPUTS ═══════════════════════════════
-string srcMode = input.string(S_1D, "Mode", options = [S_1D, S_9D, S_30D], group = "General")
+string srcMode = input.string(S_1D, "Mode", options = [S_1D, S_9D, S_30D, S_HAR], group = "General", tooltip = "HAR = forecast from the real movement of the last sessions, blended with the market's expectation. Fitted for NQ, ES, RTY, GC (and micros); other symbols use 9D. Auto Calibration is not applied in HAR mode.")
 
 bool  show05  = input.bool(true, "±0.5σ", inline = "z", group = "Zones")
 bool  show10  = input.bool(true, "±1σ",   inline = "z", group = "Zones")
@@ -179,6 +181,57 @@ f_stats() =>
 float srcNow = f_level(srcTF, srcMode)
 float srcW   = f_level(srcTF, S_9D)
 
+// ─── HAR: log-variance forecast from completed sessions (Garman-Klass) + market expectation ───
+// Weights fitted offline on 2011–2024 sessions (18:00–17:00 ET), checked on 2025–2026.
+f_gk() =>
+    float g  = math.max(0.5 * math.pow(math.log(high / low), 2) - (2 * math.log(2) - 1) * math.pow(math.log(close / open), 2), 1e-10)
+    float s5 = ta.sma(g, 5)
+    float s22 = ta.sma(g, 22)
+    [g[1], s5[1], s22[1]]
+
+[gk1, gk5, gk22] = request.security(syminfo.tickerid, "D", f_gk(), lookahead = barmerge.lookahead_on)
+
+float h1 = request.security("CBOE:VIX1D", srcTF, close, ignore_invalid_symbol = true)
+float h9 = request.security("CBOE:VIX9D", srcTF, close, ignore_invalid_symbol = true)
+float hx = request.security("CBOE:VIX",   srcTF, close, ignore_invalid_symbol = true)
+float hn = request.security("CBOE:VXN",   srcTF, close, ignore_invalid_symbol = true)
+float hg = request.security("CBOE:GVZ",   srcTF, close, ignore_invalid_symbol = true)
+
+string harMk = isNQ ? "NQ" : (r == "ES" or r == "MES") ? "ES" : (r == "RTY" or r == "M2K") ? "RTY" : isGC ? "GC" : ""
+
+// b0, b1 (last session), b2 (5 sessions), b3 (22 sessions), b4 (expectation), residual variance
+f_coef(string key) =>
+    key == "NQ1"  ? array.from(-0.610723, 0.021279, 0.091801, 0.180494, 0.670322, 0.529936) :
+     key == "NQ9"  ? array.from(0.750116, 0.10761, 0.107931, -0.025666, 0.952608, 0.53413) :
+     key == "ES1"  ? array.from(-0.235076, 0.073192, 0.043163, 0.041404, 0.863827, 0.554627) :
+     key == "ES9"  ? array.from(0.878866, 0.101634, 0.089517, -0.040317, 1.01573, 0.529976) :
+     key == "RTY1" ? array.from(-3.133066, 0.08432, 0.143957, -0.10408, 0.500321, 0.449156) :
+     key == "RTY9" ? array.from(-0.307084, 0.136274, 0.19443, 0.095251, 0.540651, 0.494477) :
+     key == "GC"   ? array.from(-0.34387, -0.001784, 0.155837, -0.039254, 0.901285, 0.530615) : array.new<float>(0)
+
+// 1σ as a fraction of the open, or na if not available
+f_har() =>
+    float out = na
+    if harMk != "" and gk1 > 0 and gk5 > 0 and gk22 > 0
+        float sc  = not na(hn) and not na(hx) and hx > 0 ? hn / hx : na
+        string key = ""
+        float  v   = na
+        if harMk == "GC"
+            key := "GC"
+            v   := hg
+        else if not na(h1)
+            key := harMk + "1"
+            v   := harMk == "NQ" ? h1 * sc : h1
+        else
+            key := harMk + "9"
+            v   := harMk == "NQ" ? h9 * sc : h9
+        array<float> b = f_coef(key)
+        if array.size(b) == 6 and not na(v) and v > 0
+            float ivt  = math.log(math.pow(v / 100, 2) / YEAR_DAYS)
+            float pred = array.get(b, 0) + array.get(b, 1) * math.log(gk1) + array.get(b, 2) * math.log(gk5) + array.get(b, 3) * math.log(gk22) + array.get(b, 4) * ivt
+            out := math.sqrt(math.exp(pred + array.get(b, 5) / 2))
+    out
+
 [cX, cWX] = request.security(syminfo.tickerid, calTF, f_stats(), lookahead = barmerge.lookahead_on)
 
 // ═══════════════════════════════ ANCHOR ═══════════════════════════════
@@ -270,8 +323,10 @@ if anchor
     dayO   := open
     dayH   := high
     dayL   := low
-    dayC   := autoCal ? nz(cX, 1.0) : 1.0
-    float sig = not na(srcNow) and srcNow > 0 ? ref * (srcNow / 100) / math.sqrt(YEAR_DAYS) : na
+    bool  useHar = srcMode == S_HAR
+    float harF   = useHar ? f_har() : na
+    dayC   := autoCal and not (useHar and not na(harF)) ? nz(cX, 1.0) : 1.0
+    float sig = useHar and not na(harF) ? ref * harF : not na(srcNow) and srcNow > 0 ? ref * (srcNow / 100) / math.sqrt(YEAR_DAYS) : na
     daySig := na(sig) ? na : sig * dayC
 
     if not na(daySig) and daySig > 0

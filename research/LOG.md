@@ -17,3 +17,4 @@ Fortlaufender Zähler aller Tests (grob, für Mehrfachtest-Bewusstsein). Früher
 | 5 | 2026-10-19 | H7 Teil B: Strategie-Suche Explore, 22 Konfluenzen + 14 Biases × 4 Vorlagen | 2.685 Varianten, 3 schwache Kandidaten | 2.685 (explorativ) | 2.836 |
 | 6 | 2026-10-19 | H7 Teil C: RTY 1D Fade 2R Abend auf Validate | **durchgefallen**: EW −0,17 R, p 0,84 | 1 | 2.837 |
 | 7 | 2026-10-19 | H7 Zusatz: Zonen-Berührungen, die HOD/LOD wurden vs. durchbrochen (Merkmale + Modell Explore→Validate) | vorhersagbar nur „spät/langsam/Range verbraucht“, gilt an Kontrollen genauso; Top-10 % Fade-EW ≈ 0 | 10 (explorativ) | 2.847 |
+| 8 | 2026-10-19 | HAR-Bänder vs. IV-Bänder (σ-Kalibrierung, 4 Märkte, Fit Explore / Prüfung Validate) | HAR+IV mind. so gut wie bestes IV, RTY stark verbessert (±1σ 72 % statt 56 %) – Kalibrierung, kein Edge-Test | 0 | 2.847 |

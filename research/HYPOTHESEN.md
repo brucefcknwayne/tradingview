@@ -151,6 +151,6 @@ gab es, und lässt sich daraus eine Strategie mit Alpha bauen?
   Kandidaten. Erfolg: Holm-p < 0,05, EW netto > 0, KI-Untergrenze > 0, ≥ 30 Trades.
 - **Kosten je Round-Trip:** NQ 1,0 · ES 0,5 · RTY 0,3 · GC 0,4 Punkte.
 
-## H8 – RTY-Skalierung im Indikator (Status: offen, Indikator-Fix)
+## H8 – RTY-Skalierung im Indikator (Status: im HAR-Modus gelöst, 2026-10-19; IV-Modi für RTY weiter zu eng)
 RTY nutzt im Pine-Code die VIX-Familie. Reaktionen/Ranges liegen bei 1,0–1,45σ statt ~0,8σ → σ zu klein. RVX-Skalierung
 (RVX bzw. VIX1D·RVX/VIX) prüfen: Schluss in ±1σ soll ~68 % ergeben.

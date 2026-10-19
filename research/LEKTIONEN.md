@@ -26,3 +26,5 @@
 - Nur 4–9 % der ersten Zonen-Berührungen werden zum Tages-Extrem. Was sie gemeinsam haben: später am Tag, langsamer Anlauf,
   mehr Range verbraucht, Gegenseite schon berührt – an Kontroll-Levels genauso (oft stärker). Vorhersagbar (AUC Validate 0,56–0,80),
   aber die Fades im besten Zehntel bleiben bei ≈ 0 R: spät am Tag ist auch die Restbewegung klein.
+- HAR+IV (log-HAR auf Garman-Klass + Erwartungswert des Modus) liefert das am besten kalibrierte σ: NQ ±1σ 67,7–68,9 % (Soll 68,3),
+  RTY 72,5 % statt 55,7 % mit der VIX-Familie. Als Lineal besser, als Level-Wand weiterhin ohne Edge zu erwarten.
