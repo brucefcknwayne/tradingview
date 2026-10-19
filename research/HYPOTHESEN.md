@@ -59,7 +59,7 @@ KI-Untergrenze > 0 ist. Sonst: kein Edge.
 genau wie Zufallseinstiege mit gleichem Stop/Ziel. Bester Rohwert: Magenta-Serien (1m Stop B p roh 0,003; Vol 1000 Stop A p roh 0,022),
 nach Korrektur nicht signifikant, KI schließt 0 ein. → verworfen.
 
-## H2 – Zera-Reversal + Orderflow-Filter (Status: in Test → LOG #2)
+## H2 – Zera-Reversal + Orderflow-Filter (Status: **verworfen** – LOG #2, 2026-10-19)
 **Mechanismus:** Ein Rücklauf nach Extrem sollte nur halten, wenn der Druck wirklich nachlässt: Aggressoren drehen,
 Absorption am Extrem oder Delta-Divergenz. H1 zeigt: der Preis allein (Z) unterscheidet sich nicht vom Zufall –
 Orderflow ist eine zusätzliche, unabhängige Information.
@@ -80,6 +80,9 @@ bekannte Werte). Delta = Käufer-Aggressor-Volumen − Verkäufer-Aggressor-Volu
 Tests: 3 Filter × 3 Chart-Typen × 2 Stops = **18 Tests**, Holm-Bonferroni über alle 18, keine Untergruppen.
 Erfolgskriterium wie H1: Holm-p < 0,05 UND EW netto > 0 mit KI-Untergrenze > 0 und ≥ 30 Trades.
 Zusätzlich (nur beschreibend, kein Test): EW gefiltert vs. ungefiltert (H1).
+
+**Ergebnis (2026-10-19):** 0 von 18 Tests nach Holm signifikant, alle EW netto negativ (−0,5 bis −3,1). Bester roher Wert: Vol 1000
+Stop B + „Delta dreht“ (p roh 0,009, Holm 0,16, EW −0,58). Absorption (F2) ist selten (350–3.700 Trades) und nicht besser.
 
 ## H3 – Zera-Reversal nur in Regimen mit Mean Reversion (Status: offen)
 **Mechanismus:** Literatur (Dealer long Gamma → mehr Intraday-Reversals). Ohne Gamma-Daten nur über Proxy möglich

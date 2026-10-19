@@ -11,3 +11,5 @@
   Ziel nah / Stop weit, der Zufall mit gleichem Stop/Ziel schafft dasselbe.
 - „Preisgetrieben“ (Preis läuft wirklich zurück) ist nicht besser als Zufall; „nicht preisgetrieben“ ist am schlechtesten.
 - 1 Punkt Kosten ist bei Zielen von 10–20 Punkten das ganze Spiel: Ohne echten Vorteil vor Kosten bleibt netto ≈ −1.
+- Einfache Orderflow-Filter (Delta der Signal-Kerze dreht, Absorption am Extrem, Delta-Divergenz) machen das Zera-Signal nicht besser:
+  Der Orderflow einer einzelnen Kerze bzw. Serie trägt auf NQ keine verwertbare Information über den Rücklauf.

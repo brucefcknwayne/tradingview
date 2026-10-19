@@ -11,3 +11,4 @@ Fortlaufender Zähler aller Tests (grob, für Mehrfachtest-Bewusstsein). Früher
 | 0e | 2026-10 | Literatur-Tests (Momentum Schluss, runde Zahlen u. a.) | kein Edge, Momentum zuletzt negativ | ~12 | 47 |
 | 0f | 2026-10-18 | 7 Level-Formeln vs. Kontroll-Levels (4 Märkte) | kein Edge (1/28 p<0,05) | 28 | 75 |
 | 1 | 2026-10-19 | H1 Zera-Reversal: 1m, Vol 500, Vol 1000 × Stop A/B × 9 Gruppen, 2022-09–2026-04, Zufall 1.000× | **kein Edge**: 0/54 nach Holm, EW netto ≈ −1 Pkt = Zufall | 54 | 129 |
+| 2 | 2026-10-19 | H2 Zera + Orderflow-Filter (Delta dreht / Absorption / Delta-Divergenz) × 3 Charts × 2 Stops | **kein Edge**: 0/18 nach Holm, EW netto −0,5 bis −3,1 | 18 | 147 |
