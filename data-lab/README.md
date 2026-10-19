@@ -22,6 +22,21 @@ Rohdaten für eigene Strategie-Forschung (Python), Quelle Databento (CME Globex 
 
 Weitere Märkte im gleichen Format: `data/es_1m/`, `data/gc_1m/` (RTH 08:20–13:30), `data/rty_1m/` (ab 2017-07).
 
+## Orderflow (Tickdaten NQ, ab 2022-09-19)
+
+Aus Databento `trades` (jeder Trade mit Aggressor-Seite), gebaut mit `build_trades.py`. Front-Kontrakt wie in `nq_1m`.
+Abgleich mit `nq_1m`: Hoch/Tief 99,99 %, Volumen 99,6 % gleich, Kontrakt 100 %.
+
+| Ordner | Inhalt |
+|---|---|
+| `data/nq_of1m/` | 1m-Bars: OHLC, `volume`, `buy_vol`/`sell_vol` (Aggressor), `delta`, `trades`, `vwap`, `max_order`, Volumen großer Orders `big10_*`/`big50_*` (≥10/≥50 Kontrakte), `rth` |
+| `data/nq_fp/` | Footprint: je `session_date`, Minute (`ts_utc`) und Preis (`px` in Ticks, Preis = px × 0,25) `buy`/`sell` |
+| `data/nq_vp/` | Volume Profile: je `session_date`, `part` (ETH/RTH) und `px` `buy`/`sell` |
+
+„Order“ = alle Prints mit gleichem Zeitstempel und gleicher Seite (eine aggressive Order über mehrere Preise).
+Kein Orderbuch (keine Limit Orders/Cancels). Letzter Tag 2026-10-19 nur angebrochen.
+Neu bauen: Rohdateien nach `data/raw/trades/` legen, dann `python data-lab/build_trades.py`.
+
 ## Neu bauen
 
 Rohdatei (`*.dbn.zst`, nicht im Repo) nach `data/raw/` legen, dann:
