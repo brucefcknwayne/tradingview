@@ -2,7 +2,7 @@
 
 Status: offen · getestet · verworfen · Kandidat
 
-## H1 – Zera-Reversal (Status: getestet → siehe LOG #1)
+## H1 – Zera-Reversal (Status: **verworfen** – LOG #1, 2026-10-19)
 
 **Mechanismus-Idee:** Nach einer Serie extremer Abweichungen vom 50-Kerzen-Mittel (|Z| ≥ 2) läuft der Preis
 zurück Richtung Mittel, sobald die Abweichung nachlässt (erste neutrale Kerze).
@@ -54,3 +54,25 @@ p = (1 + Anzahl Wiederholungen mit Zufalls-Erwartungswert ≥ echtem) / 1.001.
 
 **Erfolgskriterium (vorab):** Edge nur, wenn eine Gruppe nach Holm p < 0,05 hat UND der Erwartungswert netto > 0 mit
 KI-Untergrenze > 0 ist. Sonst: kein Edge.
+
+**Ergebnis (2026-10-19):** 0 von 54 Tests nach Holm signifikant. Erwartungswert vor Kosten ≈ 0, nach Kosten ≈ −1 Pkt,
+genau wie Zufallseinstiege mit gleichem Stop/Ziel. Bester Rohwert: Magenta-Serien (1m Stop B p roh 0,003; Vol 1000 Stop A p roh 0,022),
+nach Korrektur nicht signifikant, KI schließt 0 ein. → verworfen.
+
+## H2 – Zera-Reversal + Orderflow-Filter (Status: offen)
+**Mechanismus:** Ein Rücklauf nach Extrem sollte nur halten, wenn der Druck wirklich nachlässt: Absorption am Extrem
+(viel aggressives Volumen in Serien-Richtung, Preis kommt nicht weiter) oder Delta-Divergenz (neues Extrem ohne neues
+Delta-Extrem). H1 zeigt: der Preis allein (Z) unterscheidet sich nicht vom Zufall – Orderflow ist eine unabhängige Information.
+Daten: `data-lab/data/nq_of1m`, `nq_fp`. Vorab-Registrierung nötig (feste Schwellen, eine Filterdefinition).
+
+## H3 – Zera-Reversal nur in Regimen mit Mean Reversion (Status: offen)
+**Mechanismus:** Literatur (Dealer long Gamma → mehr Intraday-Reversals). Ohne Gamma-Daten nur über Proxy möglich
+(z. B. tiefe 1D-Vol, ruhiger Vortag). Schwach begründet, niedrige Priorität.
+
+## H4 – Rücklauf an VWAP ±2σ/±3σ bzw. LVN (Status: offen)
+**Mechanismus:** Extreme an Bändern mit wenig gehandeltem Volumen (LVN) sollen schneller zurücklaufen. Achtung: Level-Tests
+(LOG 0f) zeigten keine Wand-Wirkung von VWAP-Bändern → nur mit Orderflow-Zusatz sinnvoll.
+
+## Hinweis Magenta
+Magenta-Serien sahen in mehreren Feldern roh besser aus als Zufall (nicht signifikant). Das ist **kein** neuer Test auf denselben
+Daten wert; prüfbar nur einmal auf dem Holdout – lohnt sich erst, wenn eine Variante (z. B. H2) auf den Testdaten besteht.
