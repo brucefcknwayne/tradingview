@@ -92,3 +92,26 @@ Zusätzlich (nur beschreibend, kein Test): EW gefiltert vs. ungefiltert (H1).
 ## Hinweis Magenta
 Magenta-Serien sahen in mehreren Feldern roh besser aus als Zufall (nicht signifikant). Das ist **kein** neuer Test auf denselben
 Daten wert; prüfbar nur einmal auf dem Holdout – lohnt sich erst, wenn eine Variante (z. B. H2) auf den Testdaten besteht.
+
+## H5 – Was haben die großen Reaktionen gemeinsam? (Status: in Test → LOG #3)
+**Idee (Nutzer):** Nur die Zera-Signale anschauen, die eine große Reaktion geliefert haben, und suchen, was sie gemeinsam haben
+(Level in der Nähe, Absorption, Zeit, Volatilität …). **Risiko:** Gemeinsamkeiten der Gewinner sind oft auch Gemeinsamkeiten der
+Verlierer → immer gegen die Grundrate vergleichen und auf getrennten Daten bestätigen.
+
+### Vorab-Registrierung (2026-10-19, VOR jeder Auswertung)
+- **Universum:** alle Zera-Signale aus H1 (ungefiltert) auf **1m** und **Vol 500**.
+- **Ergebnis-Trade „60/20“:** Einstieg Open der Kerze nach dem Signal, Stop 20 Pkt, Ziel **+60 Pkt**, Timeout 120 Kerzen (Close),
+  gleiche Kerze → Stop, Kontraktwechsel → Exit, Kosten 1 Pkt. **Gewinner** = Ziel erreicht. Ohne Vorteil: ~25 % Gewinner, EW ≈ −1.
+- **Suchen (Explore):** 2022-09-19 bis 2024-12-31. **Prüfen (Validate):** 2025-01-01 bis 2026-04-16. **Holdout ab 2026-04-17 bleibt unberührt.**
+- **Merkmale** (nur zum Signal-Zeitpunkt bekannte Werte, ca. 40): Serie (max |Z|, Länge, Magenta, Preisanteil, Z der Signal-Kerze,
+  Zielabstand), Zeit (Stunde, RTH, Wochentag, Minuten seit 18:00), Volatilität (1D-σ, Range bisher / σ, Serien-Spanne / σ),
+  Trend (Steigung 50er-Mittel, Lage zum Tages-Open / VWAP in σ), Levels = Abstand des Serien-Extrems zu: Session-VWAP und
+  RTH-VWAP ±1/2/3σ, Session-Hoch/-Tief bisher (neues Extrem ja/nein), Vortag RTH Hoch/Tief/Close, Overnight-Hoch/-Tief, IB-Hoch/-Tief
+  (ab 10:30), Vortag POC/VAH/VAL (RTH-Volumenprofil), 100er/500er-Runde, Gotham-Zonen (1D) – Orderflow der Serie (Delta, Delta der
+  Extrem- und Signal-Kerze, Absorption wie H2-F2, Divergenz wie H2-F3, Volumen der Serie relativ, Volumen großer Orders ≥10/≥50).
+- **Methode (Explore):** (a) Gewinner vs. Verlierer je Merkmal (Effektstärke) und Gewinnrate je Merkmals-Dezil (Lift ggü. Grundrate);
+  (b) Gradient-Boosting (fest: max_depth 3, learning_rate 0,05, 300 Iterationen, min_samples_leaf 200);
+  (c) Entscheidungsbaum Tiefe 2 (min_samples_leaf 300) → das Blatt mit der höchsten Gewinnrate = Regel.
+- **Prüfung (Validate), genau 4 Tests:** je Chart-Typ (V1) Modell-Top-10 % (Schwelle = 90 %-Quantil der Explore-Scores) und
+  (V2) die Baum-Regel. Trades ohne Überlappung, gegen Zufall (gleiche Stunde, gleicher 60/20-Bracket, 1.000×), Holm über 4.
+- **Erfolg:** Holm-p < 0,05 UND EW netto > 0 mit KI-Untergrenze > 0 und ≥ 30 Trades. Sonst: Muster nicht echt.
