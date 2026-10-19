@@ -96,7 +96,7 @@ Stop B + „Delta dreht“ (p roh 0,009, Holm 0,16, EW −0,58). Absorption (F2)
 Magenta-Serien sahen in mehreren Feldern roh besser aus als Zufall (nicht signifikant). Das ist **kein** neuer Test auf denselben
 Daten wert; prüfbar nur einmal auf dem Holdout – lohnt sich erst, wenn eine Variante (z. B. H2) auf den Testdaten besteht.
 
-## H5 – Was haben die großen Reaktionen gemeinsam? (Status: in Test → LOG #3)
+## H5 – Was haben die großen Reaktionen gemeinsam? (Status: **verworfen** – LOG #3, 2026-10-19)
 **Idee (Nutzer):** Nur die Zera-Signale anschauen, die eine große Reaktion geliefert haben, und suchen, was sie gemeinsam haben
 (Level in der Nähe, Absorption, Zeit, Volatilität …). **Risiko:** Gemeinsamkeiten der Gewinner sind oft auch Gemeinsamkeiten der
 Verlierer → immer gegen die Grundrate vergleichen und auf getrennten Daten bestätigen.
@@ -118,3 +118,14 @@ Verlierer → immer gegen die Grundrate vergleichen und auf getrennten Daten bes
 - **Prüfung (Validate), genau 4 Tests:** je Chart-Typ (V1) Modell-Top-10 % (Schwelle = 90 %-Quantil der Explore-Scores) und
   (V2) die Baum-Regel. Trades ohne Überlappung, gegen Zufall (gleiche Stunde, gleicher 60/20-Bracket, 1.000×), Holm über 4.
 - **Erfolg:** Holm-p < 0,05 UND EW netto > 0 mit KI-Untergrenze > 0 und ≥ 30 Trades. Sonst: Muster nicht echt.
+
+**Ergebnis H5 (2026-10-19):** 0 von 4 Prüf-Tests nach Holm signifikant (bester: 1m Modell-Top-10 % EW −0,41, p roh 0,059, Holm 0,24).
+Gemeinsam haben die Gewinner vor allem **Bewegung**: RTH/Nachmittag, hohe Kerzen-Volatilität, viel verbrauchte Tagesrange.
+Nähe zu Levels (Vortag H/T/C, POC/VAH/VAL, VWAP-Bänder, runde Zahlen, Gotham-Zonen) bringt nichts – Gewinner liegen eher WEITER weg.
+Starkes Delta in Serien-Richtung → weniger Gewinner (beschreibend, nicht geprüft). Modell: AUC Validate 0,64 (1m) / 0,54 (Vol 500),
+d. h. es erkennt, WANN große Bewegungen kommen, aber nicht die Richtung → kein EW-Vorteil.
+
+## H6 – Volatilitäts-Timing statt Richtung (Status: offen)
+**Mechanismus:** H5 zeigt, dass große Reaktionen vorhersagbar häufiger in bewegten Phasen kommen (Volatilität clustert).
+Das ist eine Aussage über die **Größe** der Bewegung, nicht die Richtung. Nutzbar evtl. als Filter für Zielgröße/Stop
+(große Ziele nur bei hoher Volatilität), nicht als Einstiegssignal. Niedrige Priorität für Richtungs-Edge.

@@ -13,3 +13,7 @@
 - 1 Punkt Kosten ist bei Zielen von 10–20 Punkten das ganze Spiel: Ohne echten Vorteil vor Kosten bleibt netto ≈ −1.
 - Einfache Orderflow-Filter (Delta der Signal-Kerze dreht, Absorption am Extrem, Delta-Divergenz) machen das Zera-Signal nicht besser:
   Der Orderflow einer einzelnen Kerze bzw. Serie trägt auf NQ keine verwertbare Information über den Rücklauf.
+- „Was haben die Gewinner gemeinsam?“ → vor allem Volatilität und Tageszeit. Das erklärt, WANN große Bewegungen kommen, nicht wohin.
+  Ein Modell mit ~40 Merkmalen (Levels, Orderflow, Zeit, Vola) trennt Gewinner/Verlierer nur über die Bewegungsgröße (AUC 0,54–0,64)
+  und bringt nach Kosten keinen Vorteil gegenüber Zufall.
+- Nähe zu klassischen Levels macht Reversals nicht besser – Gewinner lagen eher weiter von Vortages-Levels/POC entfernt.
