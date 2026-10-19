@@ -231,7 +231,7 @@ könnte das neue Extrem ein Liquiditäts-Griff sein (ICT-Lesart) → Rücklauf i
 - Stop: neues Extrem von A + Puffer (0,05 bzw. 0,15 ATR). Ziel: RTH-VWAP, 1R oder 2R. Ausstieg RTH-Ende. Max. 2 Trades/Tag.
 - Gitter: Spanne 2 × Puffer 2 × Ziel 3 = 12 Varianten je Markt A. Zeiträume/Prüfung wie H9.
 
-## H15 – LVNs (Low Volume Nodes): Wand, Beschleuniger, Kombination mit VWAP-Bändern (Status: in Arbeit)
+## H15 – LVNs (Low Volume Nodes): Wand, Beschleuniger, Kombination mit VWAP-Bändern (Status: **verworfen** – LOG #15)
 **Mechanismus (Trader-Praxis):** LVN = Preis mit wenig gehandeltem Volumen zwischen zwei HVNs → keine Akzeptanz, Preis reagiert scharf
 (Abweisung) oder läuft schnell durch zum nächsten HVN.
 ### Vorab festgelegt (2026-10-19)

@@ -34,3 +34,6 @@
 - Einzel-Setups mit fester Uhrzeit (z. B. 11:30) können in-sample stark aussehen (p 0,001–0,002) und sind trotzdem Zufallsspitzen:
   über mehrere Uhrzeiten/Märkte gemittelt verschwinden sie. Immer Plateau über Uhrzeiten prüfen, nicht nur über Parameter.
 - Intraday-Periodizität (gleiches Halbstunden-Fenster an Folgetagen) existiert auf NQ/ES/RTY/GC nicht in handelbarer Größe.
+- LVNs (Volumenprofil-Täler, algorithmisch wie gängige TradingView-Finder) sind auf NQ/ES/RTY/GC 2021–2026 weder Wand noch Beschleuniger:
+  Abprall = zufällige Preise, Durchlauf zum nächsten HVN bei gleicher Distanz gleich oft und gleich schnell. Auch an VWAP-±2σ-Bändern kein Zusatz.
+- Vergleiche immer bei gleicher Distanz: Ein scheinbarer Effekt (LVN schlechter als Kontrolle, Holm p 0,015) war nur der längere Weg zum Ziel.

@@ -24,3 +24,4 @@ Fortlaufender Zähler aller Tests (grob, für Mehrfachtest-Bewusstsein). Früher
 | 12 | 2026-10-19 | H11 VWAP-Momentum-Portfolio, 16 Varianten, Explore | **alle negativ** → verworfen | 16 | 3.429 |
 | 13 | 2026-10-19 | H12 Intraday-Periodizität (Halbstunden-Fenster, 9 Varianten × 4 Märkte), Explore | **kein Effekt** (brutto ≈ 0, 0/9 Jahre positiv netto) | 9 | 3.438 |
 | 14 | 2026-10-19 | H13 Event-Tage (08:30/10:00/14:00, datenbasiert), 3 Uhrzeiten × 2 R × 3 M × 2 Richtungen × 3 Ausstiege × 4 Märkte | kein Kandidat (GC 10:00 Fortsetzung stabil, aber selten/einzeln) | 396 (explorativ) | 3.834 |
+| 15 | 2026-10-19 | H15 LVN-Tests (Wand, Beschleuniger, + VWAP-±2σ), 4 Märkte × P1/P5 × 3 Prominenzen, 2021-10 – 2026-04 | **kein Effekt**: Abprall LVN = Kontrolle (47–54 %); „Beschleuniger“ nur scheinbar schlechter (Distanz-Effekt), bei gleicher Distanz ±0–2 Pkt-% | 72 | 3.906 |
