@@ -155,7 +155,7 @@ gab es, und lässt sich daraus eine Strategie mit Alpha bauen?
 RTY nutzt im Pine-Code die VIX-Familie. Reaktionen/Ranges liegen bei 1,0–1,45σ statt ~0,8σ → σ zu klein. RVX-Skalierung
 (RVX bzw. VIX1D·RVX/VIX) prüfen: Schluss in ±1σ soll ~68 % ergeben.
 
-## H9 – Intraday-VWAP-Strategie (1–3 Setups/Tag, Prop-Firm-tauglich) (Status: in Arbeit)
+## H9 – Intraday-VWAP-Strategie (1–3 Setups/Tag, Prop-Firm-tauglich) (Status: **verworfen** – LOG #9/#10; Momentum nur bis 2019)
 **Auftrag (Nutzer, 2026-10-19):** Selbstständig eine Intraday-Strategie mit Edge finden, Startpunkt VWAP (Session-/RTH-VWAP,
 ±1/2/3σ-Bänder, Multi-Timeframe-/Multi-Session-VWAP). Märkte NQ, ES, RTY, GC. Drawdown möglichst klein (Prop-Firm). Nur vorhandene Daten.
 
@@ -173,3 +173,15 @@ RTY nutzt im Pine-Code die VIX-Familie. Reaktionen/Ranges liegen bei 1,0–1,45�
 - **Validate/Test:** Kandidaten unverändert. Erfolg: EW netto > 0 mit 95 %-KI-Untergrenze > 0 (Bootstrap über Tage), PF ≥ 1,1,
   besser als Zufall (gleiche Uhrzeit/Richtung/Stop/Ziel, 1.000×), Holm über alle Kandidaten – in Validate UND Test.
 - **Prop-Kennzahlen:** Max Drawdown (Punkte und $ je Kontrakt), schlechtester Tag, Gewinntage %, Trades/Tag, Sharpe der Tages-P&L.
+
+## H10 – Intraday-VWAP-Strategie im neuen Regime (seit 2022) (Status: in Arbeit)
+**Begründung:** H9 zeigt einen Strukturbruch: VWAP-Momentum bis 2019 stark, ab 2020 weg. Literatur: 0DTE-Volumen seit 2022 stark
+gestiegen, Market Maker meist long Gamma → Hedging dämpft Momentum, fördert Reversals (Dim/Eraker/Vilkov; Amaya et al.).
+Hypothese: Seit 2022 funktionieren eher Rücklauf-/Fade-Setups am VWAP bzw. an den Bändern; Momentum-Setups nicht.
+
+### Vorab festgelegt (2026-10-19, bevor irgendein H9/H10-Ergebnis nach 2019 für Fade-Familien angesehen wurde)
+- **Zeiträume neu:** Explore 2022-01-01 bis 2023-12-31 · Validate 2024-01-01 bis 2025-06-30 · Test 2025-07-01 bis 2026-04-16 ·
+  Holdout ab 2026-04-17 unberührt. Hinweis: Momentum-Kandidaten K1–K3 wurden auf 2020–2026 schon geprüft – Momentum-Familien
+  werden in H10 nicht erneut als Kandidaten zugelassen.
+- Alle anderen Regeln wie H9 (Ausführung, Kosten, max. 3 Trades/Tag, Kandidaten-Kriterien, Prüfung, Prop-Kennzahlen).
+  Jahres-Konsistenz-Kriterium ersetzt durch: positiv in jedem Explore-Halbjahr (4 Halbjahre) mit ≥ 20 Trades.

@@ -28,3 +28,6 @@
   aber die Fades im besten Zehntel bleiben bei ≈ 0 R: spät am Tag ist auch die Restbewegung klein.
 - HAR+IV (log-HAR auf Garman-Klass + Erwartungswert des Modus) liefert das am besten kalibrierte σ: NQ ±1σ 67,7–68,9 % (Soll 68,3),
   RTY 72,5 % statt 55,7 % mit der VIX-Familie. Als Lineal besser, als Level-Wand weiterhin ohne Edge zu erwarten.
+- VWAP-Landkarte 2011–2019: Preis läuft eher vom VWAP weg (Momentum), v. a. nachmittags; Mean Reversion zu VWAP-Bändern verliert überall.
+- Multi-Timeframe-VWAP-Ausrichtung (Session/Woche/Monat) und energiereiche Tage verstärken das Momentum 2011–2019 deutlich (PF bis 1,5),
+  ab 2020 verschwindet es (PF ≈ 1,0), 2025–26 negativ. Vermutete Ursache: 0DTE/Dealer-long-Gamma dämpft Intraday-Momentum.

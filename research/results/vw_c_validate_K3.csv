@@ -1,0 +1,4 @@
+Kandidat,Markt,Zeitraum,Trades,Trades/Tag,EW Pkt,Summe Pkt,Treffer %,PF,Max DD Pkt,Max DD $,schlechtester Tag Pkt,Sharpe Tag (ann.),Jahre pos,KI95 EW unten,KI95 EW oben,Zufall EW,p roh,p Holm,bestanden
+K3,NQ,Explore,291,0.13,3.805,1107.2,52.9,1.502,261.4,5229.0,-73.8,0.75,7/9,0.627,7.116,-0.805,0.001,,False
+K3,NQ,Validate,154,0.12,0.376,57.9,52.6,1.01,1315.3,26307.0,-213.6,0.02,3/5,-14.024,15.037,0.573,0.5035,0.5035,False
+K3,NQ,Test,27,0.08,-11.528,-311.3,44.4,0.75,554.7,11095.0,-240.4,-0.47,0/2,-52.64,30.457,-1.081,0.6593,0.6593,False

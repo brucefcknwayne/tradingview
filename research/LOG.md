@@ -18,3 +18,5 @@ Fortlaufender Zähler aller Tests (grob, für Mehrfachtest-Bewusstsein). Früher
 | 6 | 2026-10-19 | H7 Teil C: RTY 1D Fade 2R Abend auf Validate | **durchgefallen**: EW −0,17 R, p 0,84 | 1 | 2.837 |
 | 7 | 2026-10-19 | H7 Zusatz: Zonen-Berührungen, die HOD/LOD wurden vs. durchbrochen (Merkmale + Modell Explore→Validate) | vorhersagbar nur „spät/langsam/Range verbraucht“, gilt an Kontrollen genauso; Top-10 % Fade-EW ≈ 0 | 10 (explorativ) | 2.847 |
 | 8 | 2026-10-19 | HAR-Bänder vs. IV-Bänder (σ-Kalibrierung, 4 Märkte, Fit Explore / Prüfung Validate) | HAR+IV mind. so gut wie bestes IV, RTY stark verbessert (±1σ 72 % statt 56 %) – Kalibrierung, kein Edge-Test | 0 | 2.847 |
+| 9 | 2026-10-19 | H9 Runde 1–3: VWAP-Familien A–L (Band-Fade, Pullback, Ausbruch, Nachmittags-/MTF-Momentum, ORB, Gap), Explore 2011–2019 | 560 Varianten; 3 Kandidaten | 560 (explorativ) | 3.407 |
+| 10 | 2026-10-19 | H9 Prüfung K1 (NQ MTF-Momentum 11:30), K2 (RTY 1σ-Ausbruch + Monat), K3 (NQ Momentum energiereiche Tage) auf Validate 2020–24 / Test 2025–26 | **alle durchgefallen** (Validate p 0,34–0,50, Test negativ) | 6 | 3.413 |
