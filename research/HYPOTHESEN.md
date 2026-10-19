@@ -246,3 +246,19 @@ könnte das neue Extrem ein Liquiditäts-Griff sein (ICT-Lesart) → Rücklauf i
   über das Level fällt? Und wie schnell (Punkte/Minute)? LVN vs. Kontrolle (gleiche Regel, Ziel = nächstes HVN).
 - **Test 3 (mit VWAP-Bändern):** Test 1 nur für Berührungen, bei denen das Level ≤ 0,1σ von RTH-VWAP ±2σ liegt: LVN vs. Kontrolle.
 - **Erfolg:** LVN besser als Kontrolle (Zwei-Stichproben-Test, Holm über alle Markt × Profil × p × Test), gleiche Richtung in A und B.
+
+## H16 – 9:30 Opening Range Breakout (Status: in Arbeit)
+**Quellen:** Zarattini & Aziz (2023, SSRN 4416622): 5-Min-ORB auf QQQ 2016–2023 profitabel (Regel laut Replikation: Richtung der ersten
+5-Min-Kerze, Einstieg 9:35, Stop andere Kerzenseite, Ziel 10R oder Schluss). Unabhängige Replikation: brutto bestätigt, netto ≈ 0.
+Crabel (1990): ORB, enge Eröffnungs-Range → Ausdehnung. Kein Peer-Review-Beleg mit Kosten auf Index-Futures bekannt.
+### Vorab festgelegt (2026-10-19)
+- **A (beschreibend):** OR 5/15/30/60 Min. ab RTH-Start (GC ab 08:20): Erstausbruch Hoch/Tief/keiner, beide Seiten, Ausdehnung nach Erstausbruch
+  (0,5/1/1,5/2/3 × OR), Fehlausbruch (Gegenseite danach), Uhrzeit, Einfluss OR-Größe/ATR. Zeiträume: 2011–2026-04 und letzte 5 Jahre.
+- **B1 (Paper-Regel, unverändert):** Richtung = Vorzeichen (Close 9:34 − Open 9:30); keine Position wenn |Close−Open| < 10 % der Kerzen-Range.
+  Einstieg Open 9:35, Stop = Tief (Long) bzw. Hoch (Short) der ersten 5 Min., Ziel 10R (R ab Close 9:34) oder RTH-Ende. Kosten wie H9.
+  **Entscheidend: nach Veröffentlichung (2023-05-01 bis 2026-04-16)**; vorher = Replikation.
+- **B2 (klassisch, Gitter 48):** OR {5,15,30,60} × Stop {Gegenseite, Mitte} × Ziel {RTH-Ende, 1R, 2R} × Filter {ohne, OR ≤ unteres Terzil von OR/ATR (letzte 60 Tage)};
+  Einstieg nach erstem Close jenseits der OR (Open der nächsten Minute), 1 Trade/Tag, Einstiege bis RTH-Ende − 90 Min.
+- **B3 (Fehlausbruch, Gitter 16):** erster Close jenseits OR, danach Close zurück in der OR → Gegenrichtung; Stop Extrem des Ausbruchs; Ziel OR-Mitte
+  bzw. Gegenseite; × Filter wie B2.
+- B2/B3: Explore 2011–2019, Validate 2020–2024, Test 2025–04/2026 (Kandidaten-Kriterien wie H9). Holdout unberührt.
