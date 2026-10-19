@@ -208,3 +208,16 @@ im selben Fenster an Folgetagen fort (für Aktien belegt).
   t-Wert |t| ≥ τ (τ ∈ {0; 1,0; 1,5}). Trade: Einstieg Open zu Fensterbeginn, Richtung = Vorzeichen, Ausstieg Close am Fensterende, kein Stop.
   Max. 3 Trades/Tag/Markt: die 3 Fenster mit dem größten |t|. Kosten wie H9. 9 Varianten × 4 Märkte.
 - Zeiträume und Prüfregeln wie H9 (Explore 2011–2019, Validate 2020–2024, Test 2025–04/2026, Holdout unberührt).
+
+## H13 – Event-Tage intraday (08:30 / 10:00 / 14:00 ET) (Status: in Arbeit)
+**Mechanismus:** Makro-Zahlen (CPI, NFP, PPI, Retail Sales …) und FOMC-Entscheidungen bringen neue Information; die Verarbeitung ist
+nicht immer sofort abgeschlossen → Drift in Richtung der ersten Reaktion möglich (Fortsetzung) – oder bekannte FOMC-Umkehr (Reversal).
+### Vorab festgelegt (2026-10-19)
+- **Event-Erkennung aus den Daten (ohne Termin-Liste):** Volumen in den ersten 5 Minuten ab 08:30 / 10:00 / 14:00 ET ≥ R × Median
+  derselben 5 Minuten der letzten 20 Tage (R ∈ {4, 8}); nur Index-Märkte + GC. Erkennbar zum Zeitpunkt E+5 Min. (kein Blick in die Zukunft).
+- **Trades (je Event-Tag max. 1 pro Uhrzeit):** Bei E+M (M ∈ {5, 15, 30} Min.) Richtung = Vorzeichen (Close − Preis vor dem Event).
+  Varianten: **Fortsetzung** (mit der Reaktion) und **Umkehr** (gegen die Reaktion). Stop: Preis vor dem Event (Fortsetzung) bzw.
+  Event-Extrem bis E+M (Umkehr). Ausstieg: E+60 Min., E+120 Min. oder RTH-Ende (08:30-Events: Ausstieg frühestens 09:30+).
+  Gitter: 3 Uhrzeiten × R 2 × M 3 × Richtung 2 × Ausstieg 3 = 108 Varianten je Markt.
+- Zeiträume und Prüfung wie H9 (Explore 2011–2019, Validate 2020–2024, Test 2025–04/2026, Holdout unberührt); Kandidaten-Kriterien wie H9,
+  Plateau zusätzlich über M (Nachbar-Minuten) und über ≥ 2 Märkte gleiches Vorzeichen.
