@@ -17,3 +17,9 @@
   Ein Modell mit ~40 Merkmalen (Levels, Orderflow, Zeit, Vola) trennt Gewinner/Verlierer nur über die Bewegungsgröße (AUC 0,54–0,64)
   und bringt nach Kosten keinen Vorteil gegenüber Zufall.
 - Nähe zu klassischen Levels macht Reversals nicht besser – Gewinner lagen eher weiter von Vortages-Levels/POC entfernt.
+- Gotham-Zonen exakt wie im Indikator: HOD/LOD nicht häufiger als in gleich breiten Bändern daneben, in allen Märkten und Modi.
+  Keine der 22 getesteten Level-Formeln als Konfluenz und keiner von 14 Biases macht Berührungen handelbar (2.685 Varianten).
+- Konfluenz „mehrere Levels an einer Stelle“ ist auf NQ/ES/RTY/GC kein Vorteil; Vortages-Hoch/-Tief liegen bei Zonen-Extremen sogar seltener.
+- Long-Fades an unteren Zonen sind weniger schlecht als Short-Fades oben (Index-Drift), aber nicht positiv.
+- Durchbrüche laufen in der RTH besser als nachts (~+0,1 R), erreichen aber höchstens null.
+- RTY-σ im Indikator ist mit der VIX-Familie zu klein (Reaktionen > 1σ) → RVX verwenden.

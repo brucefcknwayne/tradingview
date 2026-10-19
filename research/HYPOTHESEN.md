@@ -130,7 +130,7 @@ d. h. es erkennt, WANN große Bewegungen kommen, aber nicht die Richtung → kei
 Das ist eine Aussage über die **Größe** der Bewegung, nicht die Richtung. Nutzbar evtl. als Filter für Zielgröße/Stop
 (große Ziele nur bei hoher Volatilität), nicht als Einstiegssignal. Niedrige Priorität für Richtungs-Edge.
 
-## H7 – Gotham Zones (ohne Auto-Kalibrierung): HOD/LOD, Modus-Vergleich, Strategie-Suche (Status: in Arbeit → LOG #4ff.)
+## H7 – Gotham Zones (ohne Auto-Kalibrierung): HOD/LOD, Modus-Vergleich, Strategie-Suche (Status: **verworfen** – LOG #4–#6, 2026-10-19; Bericht `results/gz_report.md`)
 **Auftrag (Nutzer, 2026-10-19):** Wie oft liefern die Zonen HOD/LOD je Modus und Asset, wie groß ist die Reaktion, welche Konfluenzen
 gab es, und lässt sich daraus eine Strategie mit Alpha bauen?
 
@@ -150,3 +150,7 @@ gab es, und lässt sich daraus eine Strategie mit Alpha bauen?
 - **Teil C (Prüfung):** Kandidaten unverändert auf Validate, gegen Zufall (gleiche Stunde, gleicher Stop/Ziel, 1.000×), Holm über alle
   Kandidaten. Erfolg: Holm-p < 0,05, EW netto > 0, KI-Untergrenze > 0, ≥ 30 Trades.
 - **Kosten je Round-Trip:** NQ 1,0 · ES 0,5 · RTY 0,3 · GC 0,4 Punkte.
+
+## H8 – RTY-Skalierung im Indikator (Status: offen, Indikator-Fix)
+RTY nutzt im Pine-Code die VIX-Familie. Reaktionen/Ranges liegen bei 1,0–1,45σ statt ~0,8σ → σ zu klein. RVX-Skalierung
+(RVX bzw. VIX1D·RVX/VIX) prüfen: Schluss in ±1σ soll ~68 % ergeben.

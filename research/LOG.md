@@ -13,3 +13,6 @@ Fortlaufender Zähler aller Tests (grob, für Mehrfachtest-Bewusstsein). Früher
 | 1 | 2026-10-19 | H1 Zera-Reversal: 1m, Vol 500, Vol 1000 × Stop A/B × 9 Gruppen, 2022-09–2026-04, Zufall 1.000× | **kein Edge**: 0/54 nach Holm, EW netto ≈ −1 Pkt = Zufall | 54 | 129 |
 | 2 | 2026-10-19 | H2 Zera + Orderflow-Filter (Delta dreht / Absorption / Delta-Divergenz) × 3 Charts × 2 Stops | **kein Edge**: 0/18 nach Holm, EW netto −0,5 bis −3,1 | 18 | 147 |
 | 3 | 2026-10-19 | H5 Gewinner-Merkmale (~40 Merkmale, Modell + Baum-Regel), Explore 2022–24 / Validate 2025–26, 1m + Vol 500 | **kein Edge**: 0/4 nach Holm; Gewinner = Volatilität/RTH, nicht Levels | 4 (+ ~80 explorative Vergleiche) | 151 |
+| 4 | 2026-10-19 | H7 Teil A: Gotham-Zonen HOD/LOD, Reaktion, Konfluenz (4 Märkte × Modi) | beschreibend: Zonen = Kontroll-Bänder | 0 | 151 |
+| 5 | 2026-10-19 | H7 Teil B: Strategie-Suche Explore, 22 Konfluenzen + 14 Biases × 4 Vorlagen | 2.685 Varianten, 3 schwache Kandidaten | 2.685 (explorativ) | 2.836 |
+| 6 | 2026-10-19 | H7 Teil C: RTY 1D Fade 2R Abend auf Validate | **durchgefallen**: EW −0,17 R, p 0,84 | 1 | 2.837 |
