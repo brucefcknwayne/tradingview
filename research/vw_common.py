@@ -21,8 +21,15 @@ TICK = {"NQ": 0.25, "ES": 0.25, "RTY": 0.1, "GC": 0.1}
 USD = {"NQ": 20.0, "ES": 50.0, "RTY": 50.0, "GC": 100.0}       # $ je Punkt, Standard-Kontrakt (Micro = 1/10)
 
 
+import os
+SPLIT = os.environ.get("VW_SPLIT", "H9")
+
+
 def period_of(days):
-    y = pd.to_datetime(days).year
+    d = pd.to_datetime(days)
+    if SPLIT == "H10":   # neues Regime: Explore 2022–23, Validate 2024–06/2025, Test 07/2025–04/2026, davor „alt“
+        return np.where(d < "2022-01-01", "alt", np.where(d <= "2023-12-31", "Explore", np.where(d <= "2025-06-30", "Validate", "Test")))
+    y = d.year
     return np.where(y <= 2019, "Explore", np.where(y <= 2024, "Validate", "Test"))
 
 

@@ -174,7 +174,7 @@ RTY nutzt im Pine-Code die VIX-Familie. Reaktionen/Ranges liegen bei 1,0–1,45�
   besser als Zufall (gleiche Uhrzeit/Richtung/Stop/Ziel, 1.000×), Holm über alle Kandidaten – in Validate UND Test.
 - **Prop-Kennzahlen:** Max Drawdown (Punkte und $ je Kontrakt), schlechtester Tag, Gewinntage %, Trades/Tag, Sharpe der Tages-P&L.
 
-## H10 – Intraday-VWAP-Strategie im neuen Regime (seit 2022) (Status: in Arbeit)
+## H10 – Intraday-VWAP-Strategie im neuen Regime (seit 2022) (Status: **verworfen** – Landkarte 2022–23 zeigt Momentum, keine Reversion)
 **Begründung:** H9 zeigt einen Strukturbruch: VWAP-Momentum bis 2019 stark, ab 2020 weg. Literatur: 0DTE-Volumen seit 2022 stark
 gestiegen, Market Maker meist long Gamma → Hedging dämpft Momentum, fördert Reversals (Dim/Eraker/Vilkov; Amaya et al.).
 Hypothese: Seit 2022 funktionieren eher Rücklauf-/Fade-Setups am VWAP bzw. an den Bändern; Momentum-Setups nicht.
@@ -185,3 +185,17 @@ Hypothese: Seit 2022 funktionieren eher Rücklauf-/Fade-Setups am VWAP bzw. an d
   werden in H10 nicht erneut als Kandidaten zugelassen.
 - Alle anderen Regeln wie H9 (Ausführung, Kosten, max. 3 Trades/Tag, Kandidaten-Kriterien, Prüfung, Prop-Kennzahlen).
   Jahres-Konsistenz-Kriterium ersetzt durch: positiv in jedem Explore-Halbjahr (4 Halbjahre) mit ≥ 20 Trades.
+
+## H11 – VWAP-Momentum-Portfolio (4 Märkte × 3 Zeitpunkte) (Status: in Arbeit)
+**Begründung:** VWAP-Momentum zeigt sich 2011–2019 und (beschreibend) 2022–23; Einzel-Setups scheiterten an zu wenigen Trades.
+Ein Portfolio (NQ, ES, RTY, GC; Prüfzeitpunkte RTH+60/+150/+270 Min.) erhöht die Stichprobe auf ~1–3 Setups/Tag.
+
+### Vorab festgelegt (2026-10-19)
+- **Regel je Markt:** zu jedem Prüfzeitpunkt, wenn flat: |z_RTH| ≥ k und Preis auf derselben Seite von Session-, Wochen- und Monats-VWAP
+  (bzw. nur Monat) → Trade in Richtung z; Stop VWAP ∓ 0,5σ (zum Signalzeitpunkt); Ausstieg RTH-Ende. Max. 3 Trades/Tag/Markt, keine Überlappung.
+  Variante mit Energie-Filter (Range bisher ≥ 0,6 ATR). Gitter: k ∈ {1,0; 1,5} × Ausrichtung {alle, Monat} × Zeitpunkte {3, nur 10:30+12:00}
+  × Filter {ohne, Range ≥ 0,6 ATR} = 16 Varianten. Portfolio-Ergebnis in R (Gewinn / Stop-Abstand), alle Märkte gleich gewichtet.
+- **Auswahl (nur Explore 2011–2019):** wie H9 (EW > 0, PF ≥ 1,15, ≥ 70 % Jahre positiv, Plateau, max. 2 Kandidaten).
+- **Prüfung:** Validate 2020–2024 wird berichtet, ist aber durch die H10-Landkarte (2022–23) teilweise bekannt → nicht entscheidend.
+  **Entscheidend: Test 2025-01-01 bis 2026-04-16** (EW in R > 0 mit KI-Untergrenze > 0 über Tage, PF ≥ 1,1, besser als Zufall, Holm über
+  alle bisher geprüften Kandidaten K1–K3 + neue). Danach Holdout nur mit Freigabe.

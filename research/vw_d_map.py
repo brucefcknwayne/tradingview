@@ -45,7 +45,9 @@ for mk in ["NQ", "ES", "RTY", "GC"]:
             rows.append(row)
     print(mk, flush=True)
 X = pd.DataFrame(rows)
-X.to_csv(RES / "vw_d_map.csv", index=False)
-(RES / "vw_d_map.md").write_text("# VWAP-Landkarte (Explore ≤ 2019)\n\n+ = Preis läuft bis RTH-Ende weiter vom VWAP weg (Trend), − = zurück (Mean Reversion). Werte in % der Tages-ATR; Zellen: Ø Rendite (Tage).\n\n" + X.to_markdown(index=False))
+import os
+suf = "_h10" if os.environ.get("VW_SPLIT") == "H10" else ""
+X.to_csv(RES / f"vw_d_map{suf}.csv", index=False)
+(RES / f"vw_d_map{suf}.md").write_text("# VWAP-Landkarte (Explore ≤ 2019)\n\n+ = Preis läuft bis RTH-Ende weiter vom VWAP weg (Trend), − = zurück (Mean Reversion). Werte in % der Tages-ATR; Zellen: Ø Rendite (Tage).\n\n" + X.to_markdown(index=False))
 pd.set_option("display.width", 250)
 print(X[["Markt", "Uhrzeit", "VWAP", "Tage", "Ø weiter weg % ATR", "t", "Steigung % ATR je σ"]].to_string(index=False))

@@ -20,3 +20,4 @@ Fortlaufender Zähler aller Tests (grob, für Mehrfachtest-Bewusstsein). Früher
 | 8 | 2026-10-19 | HAR-Bänder vs. IV-Bänder (σ-Kalibrierung, 4 Märkte, Fit Explore / Prüfung Validate) | HAR+IV mind. so gut wie bestes IV, RTY stark verbessert (±1σ 72 % statt 56 %) – Kalibrierung, kein Edge-Test | 0 | 2.847 |
 | 9 | 2026-10-19 | H9 Runde 1–3: VWAP-Familien A–L (Band-Fade, Pullback, Ausbruch, Nachmittags-/MTF-Momentum, ORB, Gap), Explore 2011–2019 | 560 Varianten; 3 Kandidaten | 560 (explorativ) | 3.407 |
 | 10 | 2026-10-19 | H9 Prüfung K1 (NQ MTF-Momentum 11:30), K2 (RTY 1σ-Ausbruch + Monat), K3 (NQ Momentum energiereiche Tage) auf Validate 2020–24 / Test 2025–26 | **alle durchgefallen** (Validate p 0,34–0,50, Test negativ) | 6 | 3.413 |
+| 11 | 2026-10-19 | H10 Landkarte 2022–23 (VWAP-Rücklauf?) | widerlegt: weiterhin Momentum (t bis 2,7) → H10 verworfen | 0 | 3.413 |
