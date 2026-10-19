@@ -59,11 +59,27 @@ KI-Untergrenze > 0 ist. Sonst: kein Edge.
 genau wie Zufallseinstiege mit gleichem Stop/Ziel. Bester Rohwert: Magenta-Serien (1m Stop B p roh 0,003; Vol 1000 Stop A p roh 0,022),
 nach Korrektur nicht signifikant, KI schließt 0 ein. → verworfen.
 
-## H2 – Zera-Reversal + Orderflow-Filter (Status: offen)
-**Mechanismus:** Ein Rücklauf nach Extrem sollte nur halten, wenn der Druck wirklich nachlässt: Absorption am Extrem
-(viel aggressives Volumen in Serien-Richtung, Preis kommt nicht weiter) oder Delta-Divergenz (neues Extrem ohne neues
-Delta-Extrem). H1 zeigt: der Preis allein (Z) unterscheidet sich nicht vom Zufall – Orderflow ist eine unabhängige Information.
-Daten: `data-lab/data/nq_of1m`, `nq_fp`. Vorab-Registrierung nötig (feste Schwellen, eine Filterdefinition).
+## H2 – Zera-Reversal + Orderflow-Filter (Status: in Test → LOG #2)
+**Mechanismus:** Ein Rücklauf nach Extrem sollte nur halten, wenn der Druck wirklich nachlässt: Aggressoren drehen,
+Absorption am Extrem oder Delta-Divergenz. H1 zeigt: der Preis allein (Z) unterscheidet sich nicht vom Zufall –
+Orderflow ist eine zusätzliche, unabhängige Information.
+
+### Vorab-Registrierung (2026-10-19, VOR jeder Auswertung)
+Alles wie H1 (Daten, Zeitraum 2022-09-19 bis 2026-04-16, Holdout ab 2026-04-17 unberührt, Chart-Typen 1m / Vol 500 / Vol 1000,
+Indikator, Signal, Einstieg, Ziel, Stop A 20 Pkt und Stop B Serien-Extrem, Timeout, Kosten, kein Signal bei offenem Trade,
+Zufalls-Baseline mit 1.000 Wiederholungen). Neu: Ein Signal zählt nur, wenn sein Filter erfüllt ist (nur bei Kerzenschluss
+bekannte Werte). Delta = Käufer-Aggressor-Volumen − Verkäufer-Aggressor-Volumen je Kerze (aus `side`).
+„Serie“ = die farbigen Kerzen vor dem Signal; „Extrem-Kerze“ = Kerze mit dem höchsten Hoch (nach +Z) bzw. tiefsten Tief (nach −Z) der Serie.
+
+- **F1 Delta dreht:** Delta der Signal-Kerze gegen die Serien-Richtung (nach +Z: Delta < 0; nach −Z: Delta > 0).
+- **F2 Absorption am Extrem:** In der Extrem-Kerze ≥ 60 % des Aggressor-Volumens in Serien-Richtung (nach +Z: Kauf-Anteil ≥ 0,60)
+  UND Schluss in der Gegenhälfte der Kerze (nach +Z: Close ≤ Mitte von Hoch/Tief; nach −Z: Close ≥ Mitte).
+- **F3 Delta-Divergenz:** Serie hat ≥ 2 Kerzen und die Extrem-Kerze ist nicht die erste; ihr Delta ist kleiner als das größte Delta
+  der Serien-Kerzen davor (nach +Z) bzw. größer als das kleinste (nach −Z).
+
+Tests: 3 Filter × 3 Chart-Typen × 2 Stops = **18 Tests**, Holm-Bonferroni über alle 18, keine Untergruppen.
+Erfolgskriterium wie H1: Holm-p < 0,05 UND EW netto > 0 mit KI-Untergrenze > 0 und ≥ 30 Trades.
+Zusätzlich (nur beschreibend, kein Test): EW gefiltert vs. ungefiltert (H1).
 
 ## H3 – Zera-Reversal nur in Regimen mit Mean Reversion (Status: offen)
 **Mechanismus:** Literatur (Dealer long Gamma → mehr Intraday-Reversals). Ohne Gamma-Daten nur über Proxy möglich
