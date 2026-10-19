@@ -200,7 +200,7 @@ Ein Portfolio (NQ, ES, RTY, GC; Prüfzeitpunkte RTH+60/+150/+270 Min.) erhöht d
   **Entscheidend: Test 2025-01-01 bis 2026-04-16** (EW in R > 0 mit KI-Untergrenze > 0 über Tage, PF ≥ 1,1, besser als Zufall, Holm über
   alle bisher geprüften Kandidaten K1–K3 + neue). Danach Holdout nur mit Freigabe.
 
-## H12 – Intraday-Periodizität (Heston/Korajczyk/Sadka 2010) (Status: in Arbeit)
+## H12 – Intraday-Periodizität (Heston/Korajczyk/Sadka 2010) (Status: **verworfen** – Explore: brutto ≈ 0 in allen 4 Märkten)
 **Mechanismus:** Große Marktteilnehmer handeln wiederkehrend zu festen Uhrzeiten → Renditen eines Halbstunden-Fensters setzen sich
 im selben Fenster an Folgetagen fort (für Aktien belegt).
 ### Vorab festgelegt (2026-10-19)

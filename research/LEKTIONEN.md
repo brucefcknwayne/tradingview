@@ -31,3 +31,6 @@
 - VWAP-Landkarte 2011–2019: Preis läuft eher vom VWAP weg (Momentum), v. a. nachmittags; Mean Reversion zu VWAP-Bändern verliert überall.
 - Multi-Timeframe-VWAP-Ausrichtung (Session/Woche/Monat) und energiereiche Tage verstärken das Momentum 2011–2019 deutlich (PF bis 1,5),
   ab 2020 verschwindet es (PF ≈ 1,0), 2025–26 negativ. Vermutete Ursache: 0DTE/Dealer-long-Gamma dämpft Intraday-Momentum.
+- Einzel-Setups mit fester Uhrzeit (z. B. 11:30) können in-sample stark aussehen (p 0,001–0,002) und sind trotzdem Zufallsspitzen:
+  über mehrere Uhrzeiten/Märkte gemittelt verschwinden sie. Immer Plateau über Uhrzeiten prüfen, nicht nur über Parameter.
+- Intraday-Periodizität (gleiches Halbstunden-Fenster an Folgetagen) existiert auf NQ/ES/RTY/GC nicht in handelbarer Größe.
