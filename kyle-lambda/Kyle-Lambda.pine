@@ -1,6 +1,9 @@
 //@version=6
-// Kyle Lambda Profile – Preis-Impact je Kontrakt: rollierend (Regression Δp auf vorzeichenbehaftetes Volumen) und je Preiszone.
-// Hohes λ = wenig Volumen bewegt den Preis weit (dünn, schnell durchgelaufen). Niedriges λ = viel Volumen ohne Bewegung (dick, absorbiert).
+// Kyle Lambda Profile – Preis-Impact je Kontrakt.
+// Rollierend: Kyle-Regression Δp = λ·SV + ε, verglichen mit derselben Uhrzeit der letzten Tage (sonst misst λ nur Nacht vs. RTH).
+// Je Preiszone: relativer Impact = tatsächliche Bewegung / erwartete Bewegung (Volumen × λ der letzten Kerzen).
+//   > 1 = Preis lief hier mit weniger Volumen weiter als zu dieser Zeit üblich (dünn, schnell durch).
+//   < 1 = viel Volumen ohne Bewegung (dick, absorbiert).
 indicator("Kyle Lambda Profile", shorttitle = "Kyle λ", overlay = true, max_boxes_count = 500, max_bars_back = 5000)
 
 // ───── Inputs ─────
@@ -11,31 +14,35 @@ bvcLen = input.int(100, "BVC σ length", minval = 10, group = grpS)
 ltfIn  = input.timeframe("", "Lower TF (tick rule)", group = grpS)
 
 grpR = "Rolling Kyle λ"
-kLen    = input.int(60, "Regression length (bars)", minval = 10, group = grpR)
-pLen    = input.int(1000, "Percentile lookback", minval = 50, group = grpR)
+kLen    = input.int(30, "Regression length (bars)", minval = 10, group = grpR)
+todDays = input.int(20, "Same-time comparison (days)", minval = 5, maxval = 100, group = grpR,
+     tooltip = "λ is compared with λ at the same time of day on the last N days (overnight is always thinner than RTH).")
 showTbl = input.bool(true, "Show table", group = grpR)
 tblPos  = input.string("Top Right", "Table position", options = ["Top Right", "Bottom Right", "Top Left", "Bottom Left"], group = grpR)
 
 grpP = "λ profile"
 pMode     = input.string("Current session", "Range", options = ["Current session", "Previous session", "Last N bars"], group = grpP)
 nBars     = input.int(1380, "N bars", minval = 50, maxval = 4900, group = grpP)
+rthOnly   = input.bool(false, "Only bars inside session below", group = grpP)
+sessIn    = input.session("0930-1600", "Session (New York)", group = grpP)
+refLen    = input.int(30, "Expected impact length (bars)", minval = 5, group = grpP,
+     tooltip = "Expected move of a bar = its volume × average |Δp|/volume of the previous N bars.")
 rows      = input.int(80, "Rows", minval = 20, maxval = 200, group = grpP)
-minHits   = input.int(1, "Min. bars per row", minval = 1, group = grpP, tooltip = "Fast traversed prices have few bars – keep this low.")
-thrMode   = input.string("Percentile", "Zone threshold", options = ["Percentile", "× median"], group = grpP,
-     tooltip = "Percentile: thin = highest X % of rows, thick = lowest X % (always shows zones).\n× median: fixed multiples of the median λ.")
-thinPct   = input.float(15.0, "Thin: top % of rows", minval = 1.0, maxval = 50.0, step = 1.0, group = grpP)
-thickPct  = input.float(15.0, "Thick: bottom % of rows", minval = 1.0, maxval = 50.0, step = 1.0, group = grpP)
-thinX     = input.float(1.5, "Thin: λ ≥ × median", minval = 1.0, step = 0.1, group = grpP)
-thickX    = input.float(0.67, "Thick: λ ≤ × median", minval = 0.05, maxval = 1.0, step = 0.01, group = grpP)
-minRows   = input.int(1, "Min. rows per zone", minval = 1, group = grpP)
+thrMode   = input.string("Fixed", "Zone threshold", options = ["Fixed", "Percentile"], group = grpP,
+     tooltip = "Fixed: thin if relative impact ≥ value, thick if ≤ value (1 = normal).\nPercentile: thin = highest X % of rows, thick = lowest X % (always shows zones).")
+thinX     = input.float(1.8, "Thin: relative impact ≥", minval = 1.0, step = 0.1, group = grpP)
+thickX    = input.float(0.6, "Thick: relative impact ≤", minval = 0.05, maxval = 1.0, step = 0.05, group = grpP)
+thinPct   = input.float(10.0, "Thin: top % of rows", minval = 1.0, maxval = 50.0, step = 1.0, group = grpP)
+thickPct  = input.float(10.0, "Thick: bottom % of rows", minval = 1.0, maxval = 50.0, step = 1.0, group = grpP)
+minRows   = input.int(2, "Min. rows per zone", minval = 1, group = grpP)
 showHist  = input.bool(true, "Show histogram", group = grpP)
 histW     = input.int(40, "Histogram width (bars)", minval = 5, group = grpP)
 histOff   = input.int(5, "Histogram offset (bars)", minval = 0, group = grpP)
 showThin  = input.bool(true, "Show thin zones", group = grpP)
 showThick = input.bool(true, "Show thick zones", group = grpP)
 extR      = input.int(30, "Extend zones right (bars)", minval = 0, group = grpP)
-cThin     = input.color(color.new(#eb6834, 75), "Thin color", group = grpP)
-cThick    = input.color(color.new(#2a78d6, 80), "Thick color", group = grpP)
+cThin     = input.color(color.new(#eb6834, 70), "Thin color", group = grpP)
+cThick    = input.color(color.new(#2a78d6, 75), "Thick color", group = grpP)
 cMid      = input.color(color.new(color.gray, 85), "Neutral color", group = grpP)
 
 // ───── Standardnormal-Verteilung (Abramowitz/Stegun 26.2.17) ─────
@@ -65,16 +72,46 @@ if nI > 0
         lastS := s
 float sv = svMode == "BVC (math)" ? svBvc : svTick
 
-// ───── Rollierendes Kyle λ: Δp = λ · SV + ε (Punkte je 1.000 Kontrakte) ─────
+// ───── Rollierendes Kyle λ (Punkte je 1.000 Kontrakte) ─────
 float mXY = ta.sma(dp * sv, kLen)
 float mX  = ta.sma(sv, kLen)
 float mY  = ta.sma(dp, kLen)
 float vX  = ta.variance(sv, kLen)
 float lam = vX > 0 ? (mXY - mX * mY) / vX * 1000.0 : na
 float r2  = math.pow(ta.correlation(dp, sv, kLen), 2)
-float pr  = ta.percentrank(lam, pLen)
+
+// Vergleich mit derselben Uhrzeit der letzten Tage
+type TodBuf
+    array<float> v
+
+var map<int, TodBuf> tod = map.new<int, TodBuf>()
+int key = hour(time, syminfo.timezone) * 60 + minute(time, syminfo.timezone)
+float lamRel = na
+float lamPct = na
+if not na(lam) and lam > 0
+    TodBuf tb0 = map.get(tod, key)
+    if not na(tb0) and array.size(tb0.v) >= 5
+        float md = array.median(tb0.v)
+        lamRel := md > 0 ? lam / md : na
+        int below = 0
+        for x in tb0.v
+            below += x < lam ? 1 : 0
+        lamPct := 100.0 * below / array.size(tb0.v)
+    if barstate.isconfirmed
+        if na(tb0)
+            tb0 := TodBuf.new(array.new<float>())
+            map.put(tod, key, tb0)
+        array.push(tb0.v, lam)
+        if array.size(tb0.v) > todDays
+            array.shift(tb0.v)
 plot(lam, "Kyle λ (pts / 1k contracts)", display = display.data_window)
-plot(pr, "Kyle λ percentile", display = display.data_window)
+plot(lamRel, "Kyle λ vs same time", display = display.data_window)
+
+// ───── Erwartete Bewegung je Kerze: Volumen × (Σ|Δp| / ΣVolumen der vorherigen refLen Kerzen) ─────
+float refImp = ta.sma(math.abs(dp), refLen)[1] / ta.sma(volume, refLen)[1]
+float expMv  = volume * refImp
+bool  inSess = not rthOnly or not na(time(timeframe.period, sessIn, "America/New_York"))
+bool  gapBar = time - time[1] > 2 * timeframe.in_seconds(timeframe.period) * 1000     // Wiedereröffnung/Lücke: Δp nicht vergleichbar
 
 // ───── Session-Anfänge (Handelstag, bei Futures 18:00 ET) ─────
 var int sessStart = na
@@ -83,7 +120,7 @@ if timeframe.change("D")
     prevStart := sessStart
     sessStart := bar_index
 
-// ───── λ-Profil je Preiszone: λ(p) = Σ|Δp|·w / Σ|SV|·w, w = Anteil der Kerze an der Zeile ─────
+// ───── Profil: relativer Impact je Preiszeile = Σ|Δp|·w / Σ erwartete Bewegung·w ─────
 var array<box> bxs = array.new<box>()
 if barstate.islast
     for b in bxs
@@ -104,72 +141,78 @@ if barstate.islast
         float hi = na
         float lo = na
         for i = oTo to oFrom
-            hi := na(hi) ? high[i] : math.max(hi, high[i])
-            lo := na(lo) ? low[i] : math.min(lo, low[i])
+            if inSess[i]
+                hi := na(hi) ? high[i] : math.max(hi, high[i])
+                lo := na(lo) ? low[i] : math.min(lo, low[i])
         float bs = (hi - lo) / rows
         if bs > 0
-            array<float> num  = array.new<float>(rows, 0.0)
-            array<float> den  = array.new<float>(rows, 0.0)
+            array<float> act  = array.new<float>(rows, 0.0)
+            array<float> exv  = array.new<float>(rows, 0.0)
             array<int>   hits = array.new<int>(rows, 0)
+            array<float> best = array.new<float>(rows, 0.0)     // stärkster Einzel-Impact je Zeile
+            array<int>   bOff = array.new<int>(rows, 0)         // … und wann er war (Offset)
             for i = oTo to oFrom
-                float d = math.abs(dp[i])
-                float s = math.abs(sv[i])
-                if not na(d) and not na(s)
+                float a = math.abs(dp[i])
+                float e = expMv[i]
+                if inSess[i] and not gapBar[i] and not na(a) and not na(e) and e > 0
                     int r0 = math.max(0, math.min(rows - 1, int(math.floor((low[i] - lo) / bs))))
                     int r1 = math.max(0, math.min(rows - 1, int(math.floor((high[i] - lo) / bs))))
                     float k = r1 - r0 + 1
                     for r = r0 to r1
-                        array.set(num, r, array.get(num, r) + d / k)
-                        array.set(den, r, array.get(den, r) + s / k)
+                        array.set(act, r, array.get(act, r) + a / k)
+                        array.set(exv, r, array.get(exv, r) + e / k)
                         array.set(hits, r, array.get(hits, r) + 1)
+                        if a / e > array.get(best, r)
+                            array.set(best, r, a / e)
+                            array.set(bOff, r, i)
             // Glättung über ±1 Zeile (Verhältnis der Summen)
             array<float> lr = array.new<float>(rows, na)
             for r = 0 to rows - 1
-                float n3 = 0.0
-                float d3 = 0.0
+                float a3 = 0.0
+                float e3 = 0.0
                 for j = math.max(0, r - 1) to math.min(rows - 1, r + 1)
-                    n3 += array.get(num, j)
-                    d3 += array.get(den, j)
-                if array.get(hits, r) >= minHits and d3 > 0
-                    array.set(lr, r, n3 / d3)
+                    a3 += array.get(act, j)
+                    e3 += array.get(exv, j)
+                if array.get(hits, r) > 0 and e3 > 0
+                    array.set(lr, r, a3 / e3)
             array<float> valid = array.new<float>()
             for r = 0 to rows - 1
                 float v = array.get(lr, r)
                 if not na(v)
                     array.push(valid, v)
-            float med = array.size(valid) > 0 ? array.median(valid) : na
-            if not na(med) and med > 0
-                int xL = bar_index - oFrom
-                // Schwellen als Vielfaches des Medians (bei Perzentil-Modus aus der Verteilung der Zeilen)
-                float tHi = thrMode == "Percentile" ? array.percentile_linear_interpolation(valid, 100.0 - thinPct) / med : thinX
-                float tLo = thrMode == "Percentile" ? array.percentile_linear_interpolation(valid, thickPct) / med : thickX
+            if array.size(valid) > 5
+                float tHi = thrMode == "Percentile" ? array.percentile_linear_interpolation(valid, 100.0 - thinPct) : thinX
+                float tLo = thrMode == "Percentile" ? array.percentile_linear_interpolation(valid, thickPct) : thickX
                 if showHist
                     for r = 0 to rows - 1
-                        float v = array.get(lr, r)
-                        if not na(v)
-                            float q = v / med
+                        float q = array.get(lr, r)
+                        if not na(q)
                             int w = math.max(1, int(math.round(histW * math.min(q / (tHi * 1.5), 1.0))))
                             color c = q >= tHi ? cThin : q <= tLo ? cThick : cMid
                             array.push(bxs, box.new(bar_index + histOff, lo + (r + 1) * bs, bar_index + histOff + w, lo + r * bs,
                                  border_color = color.new(c, 100), bgcolor = color.new(c, 35)))
                 int ri = 0
                 while ri < rows
-                    float v = array.get(lr, ri)
-                    int typ = na(v) ? 0 : v / med >= tHi ? 1 : v / med <= tLo ? -1 : 0
+                    float q = array.get(lr, ri)
+                    int typ = na(q) ? 0 : q >= tHi ? 1 : q <= tLo ? -1 : 0
                     if typ != 0
                         int rEnd = ri
-                        float qX = v / med
+                        float qX = q
+                        int oMax = array.get(bOff, ri)
                         while rEnd + 1 < rows
-                            float v2 = array.get(lr, rEnd + 1)
-                            int t2 = na(v2) ? 0 : v2 / med >= tHi ? 1 : v2 / med <= tLo ? -1 : 0
+                            float q2 = array.get(lr, rEnd + 1)
+                            int t2 = na(q2) ? 0 : q2 >= tHi ? 1 : q2 <= tLo ? -1 : 0
                             if t2 != typ
                                 break
                             rEnd += 1
-                            qX := typ == 1 ? math.max(qX, v2 / med) : math.min(qX, v2 / med)
+                            qX := typ == 1 ? math.max(qX, q2) : math.min(qX, q2)
+                            oMax := math.max(oMax, array.get(bOff, rEnd))
                         if ((typ == 1 and showThin) or (typ == -1 and showThick)) and rEnd - ri + 1 >= minRows
                             color zc = typ == 1 ? cThin : cThick
+                            // dünne Zone beginnt bei der schnellsten Kerze, dicke Zone am Anfang des Bereichs
+                            int xL = typ == 1 ? bar_index - oMax : bar_index - oFrom
                             array.push(bxs, box.new(xL, lo + (rEnd + 1) * bs, bar_index + extR, lo + ri * bs, border_color = zc, bgcolor = zc,
-                                 text = (typ == 1 ? "thin λ ×" : "thick λ ×") + str.tostring(qX, "#.0#"), text_color = color.gray,
+                                 text = (typ == 1 ? "thin ×" : "thick ×") + str.tostring(qX, "#.0#"), text_color = color.gray,
                                  text_size = size.tiny, text_halign = text.align_left, text_valign = text.align_top))
                         ri := rEnd + 1
                     else
@@ -177,15 +220,17 @@ if barstate.islast
 
 // ───── Tabelle ─────
 tPos = tblPos == "Top Right" ? position.top_right : tblPos == "Bottom Right" ? position.bottom_right : tblPos == "Top Left" ? position.top_left : position.bottom_left
-var table tb = table.new(tPos, 2, 4, bgcolor = color.new(color.black, 30), border_width = 1)
+var table tb = table.new(tPos, 2, 5, bgcolor = color.new(color.black, 30), border_width = 1)
 if showTbl and barstate.islast
-    string reg = na(pr) ? "–" : pr >= 80 ? "Thin (fast)" : pr <= 20 ? "Thick (absorbing)" : "Normal"
-    color regC = na(pr) ? color.gray : pr >= 80 ? #eb6834 : pr <= 20 ? #2a78d6 : color.gray
+    string reg = na(lamRel) ? "–" : lamRel >= 1.5 ? "Thin (fast)" : lamRel <= 0.67 ? "Thick (absorbing)" : "Normal"
+    color regC = na(lamRel) ? color.gray : lamRel >= 1.5 ? #eb6834 : lamRel <= 0.67 ? #2a78d6 : color.gray
     table.cell(tb, 0, 0, "Kyle λ", text_color = color.white, text_size = size.small)
     table.cell(tb, 1, 0, str.tostring(lam, "#.###") + " pts/1k", text_color = color.white, text_size = size.small)
-    table.cell(tb, 0, 1, "Percentile", text_color = color.white, text_size = size.small)
-    table.cell(tb, 1, 1, str.tostring(pr, "#") + " %", text_color = color.white, text_size = size.small)
-    table.cell(tb, 0, 2, "R²", text_color = color.white, text_size = size.small)
-    table.cell(tb, 1, 2, str.tostring(r2, "#.00"), text_color = color.white, text_size = size.small)
-    table.cell(tb, 0, 3, "Regime", text_color = color.white, text_size = size.small)
-    table.cell(tb, 1, 3, reg, text_color = regC, text_size = size.small)
+    table.cell(tb, 0, 1, "vs same time " + str.tostring(todDays) + "d", text_color = color.white, text_size = size.small)
+    table.cell(tb, 1, 1, na(lamRel) ? "–" : "×" + str.tostring(lamRel, "#.00"), text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 2, "Percentile (same time)", text_color = color.white, text_size = size.small)
+    table.cell(tb, 1, 2, na(lamPct) ? "–" : str.tostring(lamPct, "#") + " %", text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 3, "R²", text_color = color.white, text_size = size.small)
+    table.cell(tb, 1, 3, str.tostring(r2, "#.00"), text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 4, "Regime", text_color = color.white, text_size = size.small)
+    table.cell(tb, 1, 4, reg, text_color = regC, text_size = size.small)
