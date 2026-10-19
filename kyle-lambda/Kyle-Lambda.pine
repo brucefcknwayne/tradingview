@@ -20,9 +20,14 @@ grpP = "λ profile"
 pMode     = input.string("Current session", "Range", options = ["Current session", "Previous session", "Last N bars"], group = grpP)
 nBars     = input.int(1380, "N bars", minval = 50, maxval = 4900, group = grpP)
 rows      = input.int(80, "Rows", minval = 20, maxval = 200, group = grpP)
-minHits   = input.int(3, "Min. bars per row", minval = 1, group = grpP)
-thinX     = input.float(2.0, "Thin zone: λ ≥ × median", minval = 1.0, step = 0.1, group = grpP)
-thickX    = input.float(0.5, "Thick zone: λ ≤ × median", minval = 0.05, maxval = 1.0, step = 0.05, group = grpP)
+minHits   = input.int(1, "Min. bars per row", minval = 1, group = grpP, tooltip = "Fast traversed prices have few bars – keep this low.")
+thrMode   = input.string("Percentile", "Zone threshold", options = ["Percentile", "× median"], group = grpP,
+     tooltip = "Percentile: thin = highest X % of rows, thick = lowest X % (always shows zones).\n× median: fixed multiples of the median λ.")
+thinPct   = input.float(15.0, "Thin: top % of rows", minval = 1.0, maxval = 50.0, step = 1.0, group = grpP)
+thickPct  = input.float(15.0, "Thick: bottom % of rows", minval = 1.0, maxval = 50.0, step = 1.0, group = grpP)
+thinX     = input.float(1.5, "Thin: λ ≥ × median", minval = 1.0, step = 0.1, group = grpP)
+thickX    = input.float(0.67, "Thick: λ ≤ × median", minval = 0.05, maxval = 1.0, step = 0.01, group = grpP)
+minRows   = input.int(1, "Min. rows per zone", minval = 1, group = grpP)
 showHist  = input.bool(true, "Show histogram", group = grpP)
 histW     = input.int(40, "Histogram width (bars)", minval = 5, group = grpP)
 histOff   = input.int(5, "Histogram offset (bars)", minval = 0, group = grpP)
@@ -135,30 +140,33 @@ if barstate.islast
             float med = array.size(valid) > 0 ? array.median(valid) : na
             if not na(med) and med > 0
                 int xL = bar_index - oFrom
+                // Schwellen als Vielfaches des Medians (bei Perzentil-Modus aus der Verteilung der Zeilen)
+                float tHi = thrMode == "Percentile" ? array.percentile_linear_interpolation(valid, 100.0 - thinPct) / med : thinX
+                float tLo = thrMode == "Percentile" ? array.percentile_linear_interpolation(valid, thickPct) / med : thickX
                 if showHist
                     for r = 0 to rows - 1
                         float v = array.get(lr, r)
                         if not na(v)
                             float q = v / med
-                            int w = math.max(1, int(math.round(histW * math.min(q / (thinX * 1.5), 1.0))))
-                            color c = q >= thinX ? cThin : q <= thickX ? cThick : cMid
+                            int w = math.max(1, int(math.round(histW * math.min(q / (tHi * 1.5), 1.0))))
+                            color c = q >= tHi ? cThin : q <= tLo ? cThick : cMid
                             array.push(bxs, box.new(bar_index + histOff, lo + (r + 1) * bs, bar_index + histOff + w, lo + r * bs,
                                  border_color = color.new(c, 100), bgcolor = color.new(c, 35)))
                 int ri = 0
                 while ri < rows
                     float v = array.get(lr, ri)
-                    int typ = na(v) ? 0 : v / med >= thinX ? 1 : v / med <= thickX ? -1 : 0
+                    int typ = na(v) ? 0 : v / med >= tHi ? 1 : v / med <= tLo ? -1 : 0
                     if typ != 0
                         int rEnd = ri
                         float qX = v / med
                         while rEnd + 1 < rows
                             float v2 = array.get(lr, rEnd + 1)
-                            int t2 = na(v2) ? 0 : v2 / med >= thinX ? 1 : v2 / med <= thickX ? -1 : 0
+                            int t2 = na(v2) ? 0 : v2 / med >= tHi ? 1 : v2 / med <= tLo ? -1 : 0
                             if t2 != typ
                                 break
                             rEnd += 1
                             qX := typ == 1 ? math.max(qX, v2 / med) : math.min(qX, v2 / med)
-                        if (typ == 1 and showThin) or (typ == -1 and showThick)
+                        if ((typ == 1 and showThin) or (typ == -1 and showThick)) and rEnd - ri + 1 >= minRows
                             color zc = typ == 1 ? cThin : cThick
                             array.push(bxs, box.new(xL, lo + (rEnd + 1) * bs, bar_index + extR, lo + ri * bs, border_color = zc, bgcolor = zc,
                                  text = (typ == 1 ? "thin λ ×" : "thick λ ×") + str.tostring(qX, "#.0#"), text_color = color.gray,
