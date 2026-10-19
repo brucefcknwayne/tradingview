@@ -230,3 +230,19 @@ könnte das neue Extrem ein Liquiditäts-Griff sein (ICT-Lesart) → Rücklauf i
   mindestens 0,05 ATR unter seinem bisherigen Hoch derselben Spanne → Short A (Spiegel für Tiefs → Long A). A ∈ {NQ, ES}.
 - Stop: neues Extrem von A + Puffer (0,05 bzw. 0,15 ATR). Ziel: RTH-VWAP, 1R oder 2R. Ausstieg RTH-Ende. Max. 2 Trades/Tag.
 - Gitter: Spanne 2 × Puffer 2 × Ziel 3 = 12 Varianten je Markt A. Zeiträume/Prüfung wie H9.
+
+## H15 – LVNs (Low Volume Nodes): Wand, Beschleuniger, Kombination mit VWAP-Bändern (Status: in Arbeit)
+**Mechanismus (Trader-Praxis):** LVN = Preis mit wenig gehandeltem Volumen zwischen zwei HVNs → keine Akzeptanz, Preis reagiert scharf
+(Abweisung) oder läuft schnell durch zum nächsten HVN.
+### Vorab festgelegt (2026-10-19)
+- **Zeitraum:** letzte 5 Jahre ohne Holdout: 2021-10-18 bis 2026-04-16; berichtet gesamt und getrennt (A: bis 2025-03-31, B: danach).
+- **Profil:** RTH des Vortags (P1) und Komposit der letzten 5 RTH-Sessions desselben Kontrakts (P5). Volumen jeder 1m-Kerze gleichmäßig
+  auf alle Preis-Buckets zwischen Tief und Hoch verteilt. Bucket: NQ 5 · ES 1 · RTY 0,5 · GC 1 Punkt. Glättung: gleitender Ø über 3 Buckets.
+- **LVN:** Minimum innerhalb ±3 Buckets und Volumen ≤ p × kleinerer der beiden Gipfel (Maximum je 15 Buckets links/rechts), p ∈ {0,35; 0,5; 0,7}.
+  **HVN:** Maximum innerhalb ±3 Buckets und ≥ Ø-Volumen des Profils. **Kontrolle:** gleich viele zufällige Preise im Profil-Bereich, ≥ 2 Buckets
+  von jedem LVN/HVN entfernt.
+- **Test 1 (Wand):** erste Berührung in der RTH des Folgetags; Rennen: zuerst r = 0,1 ATR zurück (Abprall) vs. r durch. LVN vs. Kontrolle (vs. HVN).
+- **Test 2 (Beschleuniger):** erster Close ≥ 1 Bucket jenseits des Levels → erreicht der Preis das nächste HVN in Laufrichtung, bevor er r zurück
+  über das Level fällt? Und wie schnell (Punkte/Minute)? LVN vs. Kontrolle (gleiche Regel, Ziel = nächstes HVN).
+- **Test 3 (mit VWAP-Bändern):** Test 1 nur für Berührungen, bei denen das Level ≤ 0,1σ von RTH-VWAP ±2σ liegt: LVN vs. Kontrolle.
+- **Erfolg:** LVN besser als Kontrolle (Zwei-Stichproben-Test, Holm über alle Markt × Profil × p × Test), gleiche Richtung in A und B.
