@@ -186,7 +186,7 @@ Hypothese: Seit 2022 funktionieren eher Rücklauf-/Fade-Setups am VWAP bzw. an d
 - Alle anderen Regeln wie H9 (Ausführung, Kosten, max. 3 Trades/Tag, Kandidaten-Kriterien, Prüfung, Prop-Kennzahlen).
   Jahres-Konsistenz-Kriterium ersetzt durch: positiv in jedem Explore-Halbjahr (4 Halbjahre) mit ≥ 20 Trades.
 
-## H11 – VWAP-Momentum-Portfolio (4 Märkte × 3 Zeitpunkte) (Status: in Arbeit)
+## H11 – VWAP-Momentum-Portfolio (4 Märkte × 3 Zeitpunkte) (Status: **verworfen** – Explore negativ in allen 16 Varianten; K1/K3 waren Uhrzeit-Spitzen)
 **Begründung:** VWAP-Momentum zeigt sich 2011–2019 und (beschreibend) 2022–23; Einzel-Setups scheiterten an zu wenigen Trades.
 Ein Portfolio (NQ, ES, RTY, GC; Prüfzeitpunkte RTH+60/+150/+270 Min.) erhöht die Stichprobe auf ~1–3 Setups/Tag.
 
@@ -199,3 +199,12 @@ Ein Portfolio (NQ, ES, RTY, GC; Prüfzeitpunkte RTH+60/+150/+270 Min.) erhöht d
 - **Prüfung:** Validate 2020–2024 wird berichtet, ist aber durch die H10-Landkarte (2022–23) teilweise bekannt → nicht entscheidend.
   **Entscheidend: Test 2025-01-01 bis 2026-04-16** (EW in R > 0 mit KI-Untergrenze > 0 über Tage, PF ≥ 1,1, besser als Zufall, Holm über
   alle bisher geprüften Kandidaten K1–K3 + neue). Danach Holdout nur mit Freigabe.
+
+## H12 – Intraday-Periodizität (Heston/Korajczyk/Sadka 2010) (Status: in Arbeit)
+**Mechanismus:** Große Marktteilnehmer handeln wiederkehrend zu festen Uhrzeiten → Renditen eines Halbstunden-Fensters setzen sich
+im selben Fenster an Folgetagen fort (für Aktien belegt).
+### Vorab festgelegt (2026-10-19)
+- RTH in Halbstunden-Fenster (Index 13, GC 10). Signal für Fenster h an Tag t: Ø Rendite im Fenster h der letzten L Tage (L ∈ {20, 40, 60}),
+  t-Wert |t| ≥ τ (τ ∈ {0; 1,0; 1,5}). Trade: Einstieg Open zu Fensterbeginn, Richtung = Vorzeichen, Ausstieg Close am Fensterende, kein Stop.
+  Max. 3 Trades/Tag/Markt: die 3 Fenster mit dem größten |t|. Kosten wie H9. 9 Varianten × 4 Märkte.
+- Zeiträume und Prüfregeln wie H9 (Explore 2011–2019, Validate 2020–2024, Test 2025–04/2026, Holdout unberührt).
