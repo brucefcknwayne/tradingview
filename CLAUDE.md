@@ -16,4 +16,5 @@
 | `gotham-zones/` | Gotham Zones (IV-σ-Zonen ums Daily Open; `Gotham-Zones.pine` = Hauptindikator mit Modi 1D/9D/30D/HAR, Auto-Kalibrierung, Live-Z/Range used, Weekly Zones), IB-Levels und IB-Expansion (Targets/Protects/Rücklauf ab 70 %, `IB-Expansion_ALL.pine` = ein Indikator für alle 4 Märkte), Auswertung in `data-lab/` |
 | `orderblocks/` | 1H-Orderblocks auf kleineren Charts |
 | `adamcapitals/` | Nutzer-Strategie aus der AdamCapitals-PDF: Failed Zone → Breaker → Inducement (LIQ) → Limit in unmitigated Zone, SL hinter Zone, TP 1:7, Teilgewinn 1:4 + BE, max. 2 Trades/Tag |
-| `ib-first/` | IB First: Tief der IB zuerst → IB-Hoch wird geholt (und umgekehrt), Linien mit % für Gegenseite, +0,5/+1 IB, Erstseite; Statistik in `data-lab/ib_first_*.py` (aktuelles Projekt) |
+| `ib-first/` | IB First: Tief der IB zuerst → IB-Hoch wird geholt (und umgekehrt), Linien mit % für Gegenseite, +0,5/+1 IB, Erstseite; Statistik in `data-lab/ib_first_*.py` |
+| `kyle-lambda/` | Kyle-λ-Profil: Preis-Impact je Kontrakt (Δp auf vorzeichenbehaftetes Volumen, BVC oder Tick-Regel), rollierend + je Preiszone, dünne/dicke Zonen (aktuelles Projekt, noch ungetestet) |
