@@ -269,7 +269,7 @@ Crabel (1990): ORB, enge Eröffnungs-Range → Ausdehnung. Kein Peer-Review-Bele
   Richtung der ersten Kerze trägt Information (Signal − Zufallsrichtung +0,3 bis +0,6 R), Struktur (enger Stop, Kosten) frisst sie.
 - B2/B3: 256 Varianten, 2 mit EW > 0 & PF ≥ 1,15 (beide RTY, 2/3 Jahre) → kein Kandidat.
 
-## H16b – ORB-Tiefenanalyse: Ausdehnung nach Erstausbruch, Einstieg am Ausbruch, negatives RR (Status: in Arbeit)
+## H16b – ORB-Tiefenanalyse: Ausdehnung nach Erstausbruch, Einstieg am Ausbruch, negatives RR (Status: **verworfen** – 5 Explore-Kandidaten, alle in Validate negativ; Beobachtung NQ ab 2020 siehe unten)
 **Frage des Nutzers:** Wie weit läuft der Erstausbruch wirklich, und lohnt sich ein Einstieg am Ausbruch mit kleinem Ziel / weitem Stop (negatives RR)?
 ### Vorab festgelegt (2026-10-19, vor jedem Ergebnis)
 - Märkte NQ/ES/RTY/GC, OR ∈ {5, 15, 30, 60} Min. ab RTH-Start. Erstausbruch = erste Minute nach OR-Ende mit Hoch > OR-Hoch bzw. Tief < OR-Tief.
@@ -288,4 +288,17 @@ Crabel (1990): ORB, enge Eröffnungs-Range → Ausdehnung. Kein Peer-Review-Bele
 - **Auswahl (nur Explore 2011–2019):** EW netto > 0, PF ≥ 1,15, ≥ 70 % Explore-Jahre positiv, ≥ 100 Trades, Signal − Zufall > 0,
   Plateau (Nachbar T und S ebenfalls EW > 0), max. 5 Kandidaten (nach Sharpe). **Prüfung:** unverändert auf Validate 2020–2024 und Test 2025–04/2026,
   Erfolg wie H9 (EW > 0, Bootstrap-KI-Untergrenze > 0, PF ≥ 1,1, Holm über Kandidaten, Signal > Gegenrichtung). Holdout unberührt.
+### Ergebnis (2026-10-19)
+- **Ausdehnung = Volatilität, keine Richtung.** Nach dem Erstausbruch: +k×OR vor −k×OR (ab Close der Ausbruchskerze) 47–53 % in allen
+  16 Markt × OR-Kombinationen (k = 0,25/0,5/1). NQ OR15: Ausdehnung ≥ 1×OR 54 %, Gegenseite erreicht 52,5 % – fast symmetrisch.
+- NQ 2011–04/2026: MFE-Median OR5 1,9× · OR15 1,1× · OR30 0,8× · OR60 0,56× OR; Leiter P(1|0,5) 84/71/62/45 %, P(2|1) 66/50/34/20 %;
+  MFE im Median erst ~2 h nach Ausbruch, nur 20–36 % in der ersten RTH-Stunde, 24–32 % in der letzten. Retest der Kante vor +0,5×OR 77–93 %.
+  Enge OR (unteres Terzil OR/ATR) dehnt sich in OR-Vielfachen weiter aus, aber in Punkten nicht weiter (gleiche Tagesvola) und Fehlausbruch steigt mit.
+- **Negatives RR:** Trefferquote = Break-even-Quote des Zufallspfads (z. B. NQ OR15 Ziel 0,25×OR / Stop Gegenseite: 80,8 % Treffer, 81,2 % nötig).
+  Kleines Ziel + weiter Stop erzeugt hohe Trefferquote, aber keinen Vorteil.
+- Teil B/C: Explore 8,2 % der 2.048 Varianten EW > 0; 5 Kandidaten (alle RTY, Filter OR weit, 3 Explore-Jahre) → Validate alle negativ (EW −0,3 bis −1,0 Pkt).
+- **Beobachtung (nachträglich, nicht vorab registriert, nur Hypothese für später):** E1 mit Stop Gegenseite und Halten bis RTH-Ende ist brutto
+  leicht positiv in R (NQ ab 2020 +0,09–0,11 R, 2011–19 +0,01–0,03 R; RTY 2017–26 +0,02–0,06 R; Gegenrichtung ≤ 0). NQ OR30 2020–04/2026:
+  +0,087 R netto, t 2,9, PF 1,18, Max DD 18,5 R, 1.605 Trades. Nach > 7.000 Tests und Auswahl des Zeitraums im Nachhinein nicht belastbar.
+  Kosten in R fielen von ~10–15 % (2012) auf ~1 % (2025), weil die Range in Punkten gewachsen ist.
 

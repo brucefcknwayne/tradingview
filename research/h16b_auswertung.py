@@ -93,11 +93,21 @@ if len(K):
         D = Ds[mk]; per = D["period"]
         arr = np.load(CACHE / f"{mk}_OR{int(k['OR'])}_{k['Einstieg']}_pess.npy")
         dd = np.load(CACHE / f"{mk}_OR{int(k['OR'])}_{k['Einstieg']}_d.npy")
-        ti, si = TGN.index(str(k["T"]).replace(".0", "") if str(k["T"]) not in TGN else str(k["T"])), SG.index(float(k["S"]))
+        tt = str(k["T"]); tt = tt[:-2] if tt.endswith(".0") else tt
+        ti, si = TGN.index(tt), SG.index(float(k["S"]))
         pnl, opp, risk, oc = arr[ti * len(SG) + si]
         fm = np.ones(len(dd), bool)
-        if k["Quelle"] == "C":
-            raise SystemExit("Filter-Kandidat: Filtermaske nachbauen (siehe h16b_orb_deep.py Teil C)")
+        if k["Quelle"] == "C":                        # Filtermaske wie in h16b_orb_deep.py Teil C
+            a, b = D["rth"]; m = int(k["OR"])
+            with np.errstate(all="ignore"):
+                R = np.nanmax(D["H"][:, a:a + m], 1) - np.nanmin(D["L"][:, a:a + m], 1)
+            ratio = R / D["atr"]
+            if k["Filter"] == "OR weit (oberes Terzil)":
+                fm = ratio[dd] >= pd.Series(ratio).rolling(60, min_periods=40).quantile(2 / 3).shift(1).to_numpy()[dd]
+            elif k["Filter"] == "OR eng (unteres Terzil)":
+                fm = ratio[dd] <= pd.Series(ratio).rolling(60, min_periods=40).quantile(1 / 3).shift(1).to_numpy()[dd]
+            else:
+                raise SystemExit("Filter nachbauen: " + k["Filter"])
         for pname in ("Validate", "Test"):
             ok = (per[dd] == pname) & fm & np.isfinite(pnl)
             p, o = pnl[ok], opp[ok]
@@ -105,7 +115,7 @@ if len(K):
             rng = np.random.default_rng(0)
             bs = np.array([rng.choice(daily, len(daily)).mean() for _ in range(5000)])
             w, l = p[p > 0].sum(), -p[p <= 0].sum()
-            out.append(dict(Kandidat=f"{mk} OR{int(k['OR'])} {k['Einstieg']} T{k['T']} S{k['S']}", Zeitraum=pname, Trades=int(ok.sum()),
+            out.append(dict(Kandidat=f"{mk} OR{int(k['OR'])} {k['Einstieg']} T{k['T']} S{k['S']} {k['Filter']}", Zeitraum=pname, Trades=int(ok.sum()),
                             **{"EW Pkt": round(p.mean(), 3), "KI 2,5 % (Tag)": round(np.percentile(bs, 2.5), 3), "PF": round(w / l, 3),
                                "p (t, einseitig)": st.ttest_1samp(daily, 0, alternative="greater").pvalue,
                                "p Signal > Gegenrichtung": st.ttest_rel(p, o, alternative="greater").pvalue}))

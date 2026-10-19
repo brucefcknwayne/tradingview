@@ -1,0 +1,6 @@
+Quelle,Filter,Markt,OR,Einstieg,Modus,T,S,Zeitraum,Trades,Treffer %,Break-even %,EW Pkt,EW R,PF,Gegenrichtung EW Pkt,Signal − Zufall Pkt,Ø Risiko Pkt,Max DD Pkt,Sharpe (ann.),Jahre pos,Anteil Jahre pos
+C,OR weit (oberes Terzil),RTY,5,E1,,1,1.0,Explore,188,59.6,53.3,1.144,0.17,1.513,-1.749,1.446,5.89,113.4,3.09,3/3,1.0
+C,OR weit (oberes Terzil),RTY,30,E1,,0.25,1.0,Explore,180,82.2,82.4,0.769,0.071,1.567,-0.907,0.838,11.98,35.2,2.76,3/3,1.0
+C,OR weit (oberes Terzil),RTY,5,E1,,Ende,1.0,Explore,188,42.6,,1.455,0.238,1.463,-2.504,1.98,5.89,106.5,2.26,3/3,1.0
+C,OR weit (oberes Terzil),RTY,5,E1,,Ende,0.5,Explore,188,27.7,,1.124,0.391,1.485,-1.341,1.233,2.99,60.7,2.05,3/3,1.0
+C,OR weit (oberes Terzil),RTY,5,E2,,Ende,1.0,Explore,188,41.5,,1.273,0.2,1.384,-1.522,1.398,6.59,100.7,1.97,3/3,1.0

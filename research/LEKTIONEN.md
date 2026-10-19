@@ -39,3 +39,8 @@
 - Vergleiche immer bei gleicher Distanz: Ein scheinbarer Effekt (LVN schlechter als Kontrolle, Holm p 0,015) war nur der längere Weg zum Ziel.
 - 9:30-ORB: Die Richtung der ersten 5-Min-Kerze trägt messbar Information (+0,3–0,6 R gegenüber Gegenrichtung), aber mit Stop an der
   anderen Kerzenseite und Kosten bleibt netto nur NQ leicht positiv (nach Veröffentlichung nicht signifikant). Erstausbruch-Seite ist Münzwurf.
+- ORB-Ausdehnung ist Volatilität, nicht Richtung: nach dem Erstausbruch erreicht der Preis +k×OR genauso oft zuerst wie −k×OR (47–53 %).
+  „72 % erreichen 1×OR“ (OR5) heißt nichts, wenn die Gegenseite fast genauso oft erreicht wird.
+- Negatives RR ändert den Erwartungswert nicht: die Trefferquote steigt exakt auf die Break-even-Quote des Zufallspfads.
+- Kosten im Verhältnis zur Range ändern sich über die Jahre stark (NQ 2012: 10–15 % von R, 2025: ~1 %). Ergebnisse über Jahrzehnte immer auch brutto in R vergleichen.
+
