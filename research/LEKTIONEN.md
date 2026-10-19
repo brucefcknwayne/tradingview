@@ -37,3 +37,5 @@
 - LVNs (Volumenprofil-Täler, algorithmisch wie gängige TradingView-Finder) sind auf NQ/ES/RTY/GC 2021–2026 weder Wand noch Beschleuniger:
   Abprall = zufällige Preise, Durchlauf zum nächsten HVN bei gleicher Distanz gleich oft und gleich schnell. Auch an VWAP-±2σ-Bändern kein Zusatz.
 - Vergleiche immer bei gleicher Distanz: Ein scheinbarer Effekt (LVN schlechter als Kontrolle, Holm p 0,015) war nur der längere Weg zum Ziel.
+- 9:30-ORB: Die Richtung der ersten 5-Min-Kerze trägt messbar Information (+0,3–0,6 R gegenüber Gegenrichtung), aber mit Stop an der
+  anderen Kerzenseite und Kosten bleibt netto nur NQ leicht positiv (nach Veröffentlichung nicht signifikant). Erstausbruch-Seite ist Münzwurf.

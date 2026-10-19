@@ -247,7 +247,7 @@ könnte das neue Extrem ein Liquiditäts-Griff sein (ICT-Lesart) → Rücklauf i
 - **Test 3 (mit VWAP-Bändern):** Test 1 nur für Berührungen, bei denen das Level ≤ 0,1σ von RTH-VWAP ±2σ liegt: LVN vs. Kontrolle.
 - **Erfolg:** LVN besser als Kontrolle (Zwei-Stichproben-Test, Holm über alle Markt × Profil × p × Test), gleiche Richtung in A und B.
 
-## H16 – 9:30 Opening Range Breakout (Status: in Arbeit)
+## H16 – 9:30 Opening Range Breakout (Status: **verworfen** – Paper-Regel nur NQ positiv, nach Veröffentlichung n. s.; B2/B3 kein Kandidat)
 **Quellen:** Zarattini & Aziz (2023, SSRN 4416622): 5-Min-ORB auf QQQ 2016–2023 profitabel (Regel laut Replikation: Richtung der ersten
 5-Min-Kerze, Einstieg 9:35, Stop andere Kerzenseite, Ziel 10R oder Schluss). Unabhängige Replikation: brutto bestätigt, netto ≈ 0.
 Crabel (1990): ORB, enge Eröffnungs-Range → Ausdehnung. Kein Peer-Review-Beleg mit Kosten auf Index-Futures bekannt.
@@ -262,3 +262,30 @@ Crabel (1990): ORB, enge Eröffnungs-Range → Ausdehnung. Kein Peer-Review-Bele
 - **B3 (Fehlausbruch, Gitter 16):** erster Close jenseits OR, danach Close zurück in der OR → Gegenrichtung; Stop Extrem des Ausbruchs; Ziel OR-Mitte
   bzw. Gegenseite; × Filter wie B2.
 - B2/B3: Explore 2011–2019, Validate 2020–2024, Test 2025–04/2026 (Kandidaten-Kriterien wie H9). Holdout unberührt.
+### Ergebnis (2026-10-19)
+- A: Erstausbruch-Seite ≈ 50/50. NQ: Ausdehnung ≥ 1×OR nach Erstausbruch OR5 72,6 % · OR15 54 % · OR30 41 % · OR60 24,5 %;
+  Fehlausbruch (Gegenseite danach) 68,8 / 52 / 39 / 23,7 %. Schluss jenseits der Ausbruchsseite ~50–55 %. ES/RTY/GC ähnlich, letzte 5 J. ähnlich.
+- B1: NQ Paper-Zeitraum +0,143 R (t 2,34), nach Veröffentlichung +0,134 R (t 1,48, n. s., 700 Trades); ES/GC negativ, RTY ≈ 0.
+  Richtung der ersten Kerze trägt Information (Signal − Zufallsrichtung +0,3 bis +0,6 R), Struktur (enger Stop, Kosten) frisst sie.
+- B2/B3: 256 Varianten, 2 mit EW > 0 & PF ≥ 1,15 (beide RTY, 2/3 Jahre) → kein Kandidat.
+
+## H16b – ORB-Tiefenanalyse: Ausdehnung nach Erstausbruch, Einstieg am Ausbruch, negatives RR (Status: in Arbeit)
+**Frage des Nutzers:** Wie weit läuft der Erstausbruch wirklich, und lohnt sich ein Einstieg am Ausbruch mit kleinem Ziel / weitem Stop (negatives RR)?
+### Vorab festgelegt (2026-10-19, vor jedem Ergebnis)
+- Märkte NQ/ES/RTY/GC, OR ∈ {5, 15, 30, 60} Min. ab RTH-Start. Erstausbruch = erste Minute nach OR-Ende mit Hoch > OR-Hoch bzw. Tief < OR-Tief.
+- **Teil A (beschreibend, 2011–04/2026 je Zeitraum + letzte 5 J. + je Jahr):** ab Ausbruchskante in OR-Vielfachen, Punkten und % ATR:
+  MFE bis RTH-Ende und bis zur Gegenseite (Ausdehnung vor Fehlausbruch), Quantile 10/25/50/75/90, P(≥ k) für k ∈ {0,1; 0,25; 0,5; 0,75; 1; 1,5; 2; 3};
+  Leiter P(k2 | k1 erreicht); Rücklauf in die OR vor dem MFE (Tiefe, Retest-Quote der Kante); Zeit bis MFE; **Richtungs-Test:**
+  P(+k vor −k ab Ausbruch) – bei Zufallspfad 50 %. Zweiter Ausbruch nach Fehlausbruch: dieselben Kennzahlen ab der Gegenkante.
+- **Teil B (Trade-Matrix):** Einstiege E1 Stop-Order an der Kante (+1 Tick; Einstiegskerze pessimistisch: Stop zuerst, Ziel erst ab nächster Kerze;
+  zusätzlich optimistische Schranke ausgewiesen), E2 erster Close jenseits → Open nächste Minute, E3 Retest: nach E2-Signal Limit an der Kante,
+  E4 zweiter Ausbruch nach Fehlausbruch (Stop-Order an der Gegenkante). Stop = Kante ∓ S × OR, S ∈ {0,25; 0,5; 1 (= Gegenseite); 1,5};
+  Ziel = Einstieg ± T × OR, T ∈ {0,1; 0,25; 0,5; 0,75; 1; 1,5; 2; RTH-Ende}. Einstiege bis RTH-Ende − 90 Min., 1 Trade je Einstiegsart/Tag,
+  Flat RTH-Ende, Kosten wie H9. Gitter 4 × 4 × 4 × 32 = 2.048. **Zufalls-Basis je Trade:** gleicher Zeitpunkt, gleicher Preis, gleiche Geometrie,
+  Gegenrichtung; Zufallsrichtung = Mittel beider; zusätzlich Break-even-Trefferquote.
+- **Teil C (Filter, nur Explore):** E1/E2 × T {0,25; 0,5; 1; Ende} × S {0,5; 1} × OR × Markt × 6 Filter (OR/ATR unteres Terzil, oberes Terzil,
+  Ausbruch = Gap-Richtung, = Richtung der OR-Kerze, Ausbruch ≤ 15 Min. nach OR-Ende, Ausbruch auf der VWAP-Seite) = 1.536.
+- **Auswahl (nur Explore 2011–2019):** EW netto > 0, PF ≥ 1,15, ≥ 70 % Explore-Jahre positiv, ≥ 100 Trades, Signal − Zufall > 0,
+  Plateau (Nachbar T und S ebenfalls EW > 0), max. 5 Kandidaten (nach Sharpe). **Prüfung:** unverändert auf Validate 2020–2024 und Test 2025–04/2026,
+  Erfolg wie H9 (EW > 0, Bootstrap-KI-Untergrenze > 0, PF ≥ 1,1, Holm über Kandidaten, Signal > Gegenrichtung). Holdout unberührt.
+
