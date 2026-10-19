@@ -23,3 +23,6 @@
 - Long-Fades an unteren Zonen sind weniger schlecht als Short-Fades oben (Index-Drift), aber nicht positiv.
 - Durchbrüche laufen in der RTH besser als nachts (~+0,1 R), erreichen aber höchstens null.
 - RTY-σ im Indikator ist mit der VIX-Familie zu klein (Reaktionen > 1σ) → RVX verwenden.
+- Nur 4–9 % der ersten Zonen-Berührungen werden zum Tages-Extrem. Was sie gemeinsam haben: später am Tag, langsamer Anlauf,
+  mehr Range verbraucht, Gegenseite schon berührt – an Kontroll-Levels genauso (oft stärker). Vorhersagbar (AUC Validate 0,56–0,80),
+  aber die Fades im besten Zehntel bleiben bei ≈ 0 R: spät am Tag ist auch die Restbewegung klein.

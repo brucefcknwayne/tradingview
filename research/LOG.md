@@ -16,3 +16,4 @@ Fortlaufender Zähler aller Tests (grob, für Mehrfachtest-Bewusstsein). Früher
 | 4 | 2026-10-19 | H7 Teil A: Gotham-Zonen HOD/LOD, Reaktion, Konfluenz (4 Märkte × Modi) | beschreibend: Zonen = Kontroll-Bänder | 0 | 151 |
 | 5 | 2026-10-19 | H7 Teil B: Strategie-Suche Explore, 22 Konfluenzen + 14 Biases × 4 Vorlagen | 2.685 Varianten, 3 schwache Kandidaten | 2.685 (explorativ) | 2.836 |
 | 6 | 2026-10-19 | H7 Teil C: RTY 1D Fade 2R Abend auf Validate | **durchgefallen**: EW −0,17 R, p 0,84 | 1 | 2.837 |
+| 7 | 2026-10-19 | H7 Zusatz: Zonen-Berührungen, die HOD/LOD wurden vs. durchbrochen (Merkmale + Modell Explore→Validate) | vorhersagbar nur „spät/langsam/Range verbraucht“, gilt an Kontrollen genauso; Top-10 % Fade-EW ≈ 0 | 10 (explorativ) | 2.847 |
