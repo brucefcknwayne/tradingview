@@ -1,0 +1,161 @@
+Markt,Modus,Extrem,Konfluenz,bei Zone-Extrem %,bei Kontroll-Extrem %,Verhältnis,n Zone,n Kontrolle
+NQ,1D,HOD,Vortag Hoch/Tief,10.5,14.3,0.73,153,203
+NQ,1D,HOD,Vortag RTH Hoch/Tief,9.8,13.8,0.71,153,203
+NQ,1D,HOD,Overnight Hoch/Tief (Extrem in RTH),6.5,9.9,0.66,153,203
+NQ,1D,HOD,IB Hoch/Tief (Extrem nach 10:30),6.5,3.9,1.66,153,203
+NQ,1D,HOD,RTH-VWAP ±2σ,47.7,37.4,1.27,153,203
+NQ,1D,HOD,Wochen-Zone,2.0,5.4,0.36,153,203
+NQ,1D,HOD,Zone eines anderen Modus,52.3,31.0,1.68,153,203
+NQ,1D,HOD,Runde Zahl,45.8,43.3,1.06,153,203
+NQ,1D,LOD,Vortag Hoch/Tief,11.8,10.8,1.09,153,194
+NQ,1D,LOD,Vortag RTH Hoch/Tief,11.8,9.8,1.2,153,194
+NQ,1D,LOD,Overnight Hoch/Tief (Extrem in RTH),3.3,8.2,0.4,153,194
+NQ,1D,LOD,IB Hoch/Tief (Extrem nach 10:30),4.6,6.7,0.68,153,194
+NQ,1D,LOD,RTH-VWAP ±2σ,32.7,36.6,0.89,153,194
+NQ,1D,LOD,Wochen-Zone,4.6,5.7,0.81,153,194
+NQ,1D,LOD,Zone eines anderen Modus,51.6,26.3,1.96,153,194
+NQ,1D,LOD,Runde Zahl,39.9,45.9,0.87,153,194
+NQ,9D,HOD,Vortag Hoch/Tief,9.4,17.3,0.54,638,790
+NQ,9D,HOD,Vortag RTH Hoch/Tief,10.0,15.7,0.64,638,790
+NQ,9D,HOD,Overnight Hoch/Tief (Extrem in RTH),7.7,12.4,0.62,638,790
+NQ,9D,HOD,IB Hoch/Tief (Extrem nach 10:30),8.0,8.1,0.99,638,790
+NQ,9D,HOD,RTH-VWAP ±2σ,46.4,39.5,1.17,638,790
+NQ,9D,HOD,Wochen-Zone,3.6,4.1,0.89,638,790
+NQ,9D,HOD,Zone eines anderen Modus,74.8,14.3,5.23,638,790
+NQ,9D,HOD,Runde Zahl,26.3,22.3,1.18,638,790
+NQ,9D,LOD,Vortag Hoch/Tief,12.7,13.4,0.95,535,753
+NQ,9D,LOD,Vortag RTH Hoch/Tief,14.0,14.3,0.98,535,753
+NQ,9D,LOD,Overnight Hoch/Tief (Extrem in RTH),8.0,9.7,0.83,535,753
+NQ,9D,LOD,IB Hoch/Tief (Extrem nach 10:30),6.0,5.4,1.1,535,753
+NQ,9D,LOD,RTH-VWAP ±2σ,46.2,38.1,1.21,535,753
+NQ,9D,LOD,Wochen-Zone,2.6,3.5,0.76,535,753
+NQ,9D,LOD,Zone eines anderen Modus,78.1,15.9,4.9,535,753
+NQ,9D,LOD,Runde Zahl,27.9,26.0,1.07,535,753
+NQ,30D,HOD,Vortag Hoch/Tief,8.4,16.4,0.51,609,764
+NQ,30D,HOD,Vortag RTH Hoch/Tief,9.7,15.4,0.63,609,764
+NQ,30D,HOD,Overnight Hoch/Tief (Extrem in RTH),7.1,13.2,0.53,609,764
+NQ,30D,HOD,IB Hoch/Tief (Extrem nach 10:30),9.4,9.4,0.99,609,764
+NQ,30D,HOD,RTH-VWAP ±2σ,50.2,42.8,1.17,609,764
+NQ,30D,HOD,Wochen-Zone,3.9,3.1,1.25,609,764
+NQ,30D,HOD,Zone eines anderen Modus,81.4,18.2,4.48,609,764
+NQ,30D,HOD,Runde Zahl,28.1,24.5,1.15,609,764
+NQ,30D,LOD,Vortag Hoch/Tief,13.1,12.9,1.02,548,735
+NQ,30D,LOD,Vortag RTH Hoch/Tief,14.4,15.4,0.94,548,735
+NQ,30D,LOD,Overnight Hoch/Tief (Extrem in RTH),8.4,11.2,0.75,548,735
+NQ,30D,LOD,IB Hoch/Tief (Extrem nach 10:30),7.5,6.9,1.08,548,735
+NQ,30D,LOD,RTH-VWAP ±2σ,47.1,40.3,1.17,548,735
+NQ,30D,LOD,Wochen-Zone,4.4,2.7,1.61,548,735
+NQ,30D,LOD,Zone eines anderen Modus,78.5,15.9,4.93,548,735
+NQ,30D,LOD,Runde Zahl,26.5,26.5,1.0,548,735
+ES,1D,HOD,Vortag Hoch/Tief,9.9,15.0,0.66,151,193
+ES,1D,HOD,Vortag RTH Hoch/Tief,10.6,16.1,0.66,151,193
+ES,1D,HOD,Overnight Hoch/Tief (Extrem in RTH),11.3,5.2,2.17,151,193
+ES,1D,HOD,IB Hoch/Tief (Extrem nach 10:30),7.3,5.7,1.28,151,193
+ES,1D,HOD,RTH-VWAP ±2σ,52.3,38.9,1.35,151,193
+ES,1D,HOD,Wochen-Zone,4.6,2.6,1.79,151,193
+ES,1D,HOD,Zone eines anderen Modus,53.6,22.3,2.41,151,193
+ES,1D,HOD,Runde Zahl,39.1,43.5,0.9,151,193
+ES,1D,LOD,Vortag Hoch/Tief,12.1,8.0,1.5,141,187
+ES,1D,LOD,Vortag RTH Hoch/Tief,11.3,8.6,1.33,141,187
+ES,1D,LOD,Overnight Hoch/Tief (Extrem in RTH),8.5,5.9,1.45,141,187
+ES,1D,LOD,IB Hoch/Tief (Extrem nach 10:30),9.9,2.7,3.71,141,187
+ES,1D,LOD,RTH-VWAP ±2σ,36.9,27.3,1.35,141,187
+ES,1D,LOD,Wochen-Zone,2.8,4.8,0.59,141,187
+ES,1D,LOD,Zone eines anderen Modus,48.9,19.8,2.47,141,187
+ES,1D,LOD,Runde Zahl,41.1,43.3,0.95,141,187
+ES,9D,HOD,Vortag Hoch/Tief,13.0,16.0,0.81,577,810
+ES,9D,HOD,Vortag RTH Hoch/Tief,10.9,17.4,0.63,577,810
+ES,9D,HOD,Overnight Hoch/Tief (Extrem in RTH),10.1,11.7,0.86,577,810
+ES,9D,HOD,IB Hoch/Tief (Extrem nach 10:30),6.6,7.0,0.94,577,810
+ES,9D,HOD,RTH-VWAP ±2σ,47.0,42.1,1.12,577,810
+ES,9D,HOD,Wochen-Zone,3.8,2.1,1.82,577,810
+ES,9D,HOD,Zone eines anderen Modus,78.7,11.6,6.78,577,810
+ES,9D,HOD,Runde Zahl,26.3,27.3,0.97,577,810
+ES,9D,LOD,Vortag Hoch/Tief,10.6,10.3,1.03,528,750
+ES,9D,LOD,Vortag RTH Hoch/Tief,11.2,13.9,0.81,528,750
+ES,9D,LOD,Overnight Hoch/Tief (Extrem in RTH),8.3,9.3,0.89,528,750
+ES,9D,LOD,IB Hoch/Tief (Extrem nach 10:30),7.4,5.3,1.38,528,750
+ES,9D,LOD,RTH-VWAP ±2σ,44.9,34.8,1.29,528,750
+ES,9D,LOD,Wochen-Zone,2.7,3.5,0.76,528,750
+ES,9D,LOD,Zone eines anderen Modus,75.8,12.4,6.11,528,750
+ES,9D,LOD,Runde Zahl,24.6,26.8,0.92,528,750
+ES,30D,HOD,Vortag Hoch/Tief,11.1,16.3,0.68,549,817
+ES,30D,HOD,Vortag RTH Hoch/Tief,10.9,18.2,0.6,549,817
+ES,30D,HOD,Overnight Hoch/Tief (Extrem in RTH),10.0,12.4,0.81,549,817
+ES,30D,HOD,IB Hoch/Tief (Extrem nach 10:30),7.7,7.8,0.98,549,817
+ES,30D,HOD,RTH-VWAP ±2σ,49.0,40.0,1.22,549,817
+ES,30D,HOD,Wochen-Zone,4.6,2.0,2.33,549,817
+ES,30D,HOD,Zone eines anderen Modus,83.2,14.6,5.72,549,817
+ES,30D,HOD,Runde Zahl,27.5,26.3,1.05,549,817
+ES,30D,LOD,Vortag Hoch/Tief,11.0,13.4,0.82,526,722
+ES,30D,LOD,Vortag RTH Hoch/Tief,12.7,17.6,0.72,526,722
+ES,30D,LOD,Overnight Hoch/Tief (Extrem in RTH),7.8,10.5,0.74,526,722
+ES,30D,LOD,IB Hoch/Tief (Extrem nach 10:30),5.5,5.4,1.02,526,722
+ES,30D,LOD,RTH-VWAP ±2σ,43.2,35.9,1.2,526,722
+ES,30D,LOD,Wochen-Zone,2.3,4.0,0.57,526,722
+ES,30D,LOD,Zone eines anderen Modus,80.6,18.4,4.38,526,722
+ES,30D,LOD,Runde Zahl,29.3,28.3,1.04,526,722
+RTY,1D,HOD,Vortag Hoch/Tief,5.6,10.4,0.54,179,192
+RTY,1D,HOD,Vortag RTH Hoch/Tief,6.7,10.9,0.61,179,192
+RTY,1D,HOD,Overnight Hoch/Tief (Extrem in RTH),7.8,7.3,1.07,179,192
+RTY,1D,HOD,IB Hoch/Tief (Extrem nach 10:30),3.4,3.6,0.92,179,192
+RTY,1D,HOD,RTH-VWAP ±2σ,33.5,25.0,1.34,179,192
+RTY,1D,HOD,Wochen-Zone,2.8,3.6,0.77,179,192
+RTY,1D,HOD,Zone eines anderen Modus,51.4,28.6,1.79,179,192
+RTY,1D,HOD,Runde Zahl,41.9,42.7,0.98,179,192
+RTY,1D,LOD,Vortag Hoch/Tief,6.2,14.9,0.42,145,168
+RTY,1D,LOD,Vortag RTH Hoch/Tief,6.2,14.9,0.42,145,168
+RTY,1D,LOD,Overnight Hoch/Tief (Extrem in RTH),9.0,11.3,0.79,145,168
+RTY,1D,LOD,IB Hoch/Tief (Extrem nach 10:30),6.2,4.8,1.3,145,168
+RTY,1D,LOD,RTH-VWAP ±2σ,37.9,26.8,1.42,145,168
+RTY,1D,LOD,Wochen-Zone,4.8,3.0,1.62,145,168
+RTY,1D,LOD,Zone eines anderen Modus,51.7,30.4,1.7,145,168
+RTY,1D,LOD,Runde Zahl,48.3,44.0,1.1,145,168
+RTY,9D,HOD,Vortag Hoch/Tief,7.7,13.3,0.58,325,399
+RTY,9D,HOD,Vortag RTH Hoch/Tief,8.0,13.8,0.58,325,399
+RTY,9D,HOD,Overnight Hoch/Tief (Extrem in RTH),4.3,9.0,0.48,325,399
+RTY,9D,HOD,IB Hoch/Tief (Extrem nach 10:30),5.5,3.5,1.58,325,399
+RTY,9D,HOD,RTH-VWAP ±2σ,39.1,32.8,1.19,325,399
+RTY,9D,HOD,Wochen-Zone,4.6,3.0,1.53,325,399
+RTY,9D,HOD,Zone eines anderen Modus,68.0,22.8,2.98,325,399
+RTY,9D,HOD,Runde Zahl,37.8,43.1,0.88,325,399
+RTY,9D,LOD,Vortag Hoch/Tief,7.9,9.2,0.86,315,402
+RTY,9D,LOD,Vortag RTH Hoch/Tief,7.9,10.7,0.74,315,402
+RTY,9D,LOD,Overnight Hoch/Tief (Extrem in RTH),7.3,8.5,0.86,315,402
+RTY,9D,LOD,IB Hoch/Tief (Extrem nach 10:30),4.4,4.5,0.99,315,402
+RTY,9D,LOD,RTH-VWAP ±2σ,36.5,28.4,1.29,315,402
+RTY,9D,LOD,Wochen-Zone,6.3,5.7,1.11,315,402
+RTY,9D,LOD,Zone eines anderen Modus,74.3,19.4,3.83,315,402
+RTY,9D,LOD,Runde Zahl,43.8,39.3,1.11,315,402
+RTY,30D,HOD,Vortag Hoch/Tief,10.6,12.7,0.84,340,395
+RTY,30D,HOD,Vortag RTH Hoch/Tief,11.5,14.9,0.77,340,395
+RTY,30D,HOD,Overnight Hoch/Tief (Extrem in RTH),5.3,10.6,0.5,340,395
+RTY,30D,HOD,IB Hoch/Tief (Extrem nach 10:30),4.1,6.3,0.65,340,395
+RTY,30D,HOD,RTH-VWAP ±2σ,45.6,40.0,1.14,340,395
+RTY,30D,HOD,Wochen-Zone,4.4,3.5,1.24,340,395
+RTY,30D,HOD,Zone eines anderen Modus,70.9,32.2,2.2,340,395
+RTY,30D,HOD,Runde Zahl,43.5,47.6,0.91,340,395
+RTY,30D,LOD,Vortag Hoch/Tief,7.6,9.3,0.82,341,386
+RTY,30D,LOD,Vortag RTH Hoch/Tief,9.1,12.2,0.75,341,386
+RTY,30D,LOD,Overnight Hoch/Tief (Extrem in RTH),7.0,10.1,0.7,341,386
+RTY,30D,LOD,IB Hoch/Tief (Extrem nach 10:30),4.1,4.1,0.99,341,386
+RTY,30D,LOD,RTH-VWAP ±2σ,40.8,28.8,1.42,341,386
+RTY,30D,LOD,Wochen-Zone,6.2,5.4,1.13,341,386
+RTY,30D,LOD,Zone eines anderen Modus,70.1,29.3,2.39,341,386
+RTY,30D,LOD,Runde Zahl,47.8,49.2,0.97,341,386
+GC,GVZ,HOD,Vortag Hoch/Tief,9.7,10.9,0.89,589,754
+GC,GVZ,HOD,Vortag RTH Hoch/Tief,11.0,17.0,0.65,589,754
+GC,GVZ,HOD,Overnight Hoch/Tief (Extrem in RTH),9.2,8.6,1.06,589,754
+GC,GVZ,HOD,IB Hoch/Tief (Extrem nach 10:30),5.6,4.5,1.24,589,754
+GC,GVZ,HOD,RTH-VWAP ±2σ,35.1,27.6,1.27,589,754
+GC,GVZ,HOD,Wochen-Zone,3.6,3.6,1.0,589,754
+GC,GVZ,HOD,Zone eines anderen Modus,0.0,0.0,,589,754
+GC,GVZ,HOD,Runde Zahl,41.6,35.9,1.16,589,754
+GC,GVZ,LOD,Vortag Hoch/Tief,7.8,12.8,0.61,554,766
+GC,GVZ,LOD,Vortag RTH Hoch/Tief,11.6,19.7,0.59,554,766
+GC,GVZ,LOD,Overnight Hoch/Tief (Extrem in RTH),6.9,7.0,0.97,554,766
+GC,GVZ,LOD,IB Hoch/Tief (Extrem nach 10:30),4.2,2.3,1.77,554,766
+GC,GVZ,LOD,RTH-VWAP ±2σ,33.2,23.9,1.39,554,766
+GC,GVZ,LOD,Wochen-Zone,3.4,3.9,0.88,554,766
+GC,GVZ,LOD,Zone eines anderen Modus,0.0,0.0,,554,766
+GC,GVZ,LOD,Runde Zahl,33.6,39.8,0.84,554,766
