@@ -220,6 +220,7 @@ def features(name, bars, ctx):
         F[f"big{b}_with"] = withd; F[f"big{b}_against"] = agst
     F["session_date"] = C["session_date"].to_numpy()
     F["win"] = win; F["pnl"] = pnl
+    F = F.replace([np.inf, -np.inf], np.nan)
     meta = dict(o=o, h=h, l=l, c=c, seg=seg, e=e, ex=ex, sdir=sdir, si=si,
                 hour=bars["ts"].dt.tz_convert("America/New_York").dt.hour.to_numpy(),
                 day=pd.factorize((bars["ts"].dt.tz_convert("America/New_York") + pd.Timedelta(hours=6)).dt.date)[0].astype(np.int64),
@@ -287,6 +288,7 @@ if __name__ == "__main__":
             if ok.sum() < 500 or x[ok].nunique() < 2:
                 continue
             q = np.unique(np.nanquantile(x[ok], np.linspace(0, 1, 11)))
+            q = q[np.isfinite(q)]
             if len(q) < 3:
                 continue
             be = pd.cut(x, q, include_lowest=True, duplicates="drop"); bv = pd.cut(xv[va_m], q, include_lowest=True, duplicates="drop")
