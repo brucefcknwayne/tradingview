@@ -209,7 +209,7 @@ im selben Fenster an Folgetagen fort (für Aktien belegt).
   Max. 3 Trades/Tag/Markt: die 3 Fenster mit dem größten |t|. Kosten wie H9. 9 Varianten × 4 Märkte.
 - Zeiträume und Prüfregeln wie H9 (Explore 2011–2019, Validate 2020–2024, Test 2025–04/2026, Holdout unberührt).
 
-## H13 – Event-Tage intraday (08:30 / 10:00 / 14:00 ET) (Status: in Arbeit)
+## H13 – Event-Tage intraday (08:30 / 10:00 / 14:00 ET) (Status: **verworfen** – kein Kandidat; Beobachtung: GC 10:00 Fortsetzung PF ~3, 8–9/9 Jahre, aber nur ~4 Trades/Jahr und nicht in anderen Märkten)
 **Mechanismus:** Makro-Zahlen (CPI, NFP, PPI, Retail Sales …) und FOMC-Entscheidungen bringen neue Information; die Verarbeitung ist
 nicht immer sofort abgeschlossen → Drift in Richtung der ersten Reaktion möglich (Fortsetzung) – oder bekannte FOMC-Umkehr (Reversal).
 ### Vorab festgelegt (2026-10-19)
@@ -221,3 +221,12 @@ nicht immer sofort abgeschlossen → Drift in Richtung der ersten Reaktion mögl
   Gitter: 3 Uhrzeiten × R 2 × M 3 × Richtung 2 × Ausstieg 3 = 108 Varianten je Markt.
 - Zeiträume und Prüfung wie H9 (Explore 2011–2019, Validate 2020–2024, Test 2025–04/2026, Holdout unberührt); Kandidaten-Kriterien wie H9,
   Plateau zusätzlich über M (Nachbar-Minuten) und über ≥ 2 Märkte gleiches Vorzeichen.
+
+## H14 – SMT-Divergenz NQ ↔ ES (Status: in Arbeit)
+**Mechanismus:** NQ und ES sind über Index-Arbitrage gekoppelt. Macht ein Markt ein neues Hoch/Tief und der andere bestätigt nicht,
+könnte das neue Extrem ein Liquiditäts-Griff sein (ICT-Lesart) → Rücklauf im divergierenden Markt.
+### Vorab festgelegt (2026-10-19)
+- 10:00–15:00 ET, bei Kerzenschluss: Markt A macht neues Session-Hoch (RTH bzw. ganze Session seit 18:00), Markt B liegt mit seinem Hoch
+  mindestens 0,05 ATR unter seinem bisherigen Hoch derselben Spanne → Short A (Spiegel für Tiefs → Long A). A ∈ {NQ, ES}.
+- Stop: neues Extrem von A + Puffer (0,05 bzw. 0,15 ATR). Ziel: RTH-VWAP, 1R oder 2R. Ausstieg RTH-Ende. Max. 2 Trades/Tag.
+- Gitter: Spanne 2 × Puffer 2 × Ziel 3 = 12 Varianten je Markt A. Zeiträume/Prüfung wie H9.

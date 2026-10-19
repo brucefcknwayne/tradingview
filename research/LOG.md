@@ -23,3 +23,4 @@ Fortlaufender Zähler aller Tests (grob, für Mehrfachtest-Bewusstsein). Früher
 | 11 | 2026-10-19 | H10 Landkarte 2022–23 (VWAP-Rücklauf?) | widerlegt: weiterhin Momentum (t bis 2,7) → H10 verworfen | 0 | 3.413 |
 | 12 | 2026-10-19 | H11 VWAP-Momentum-Portfolio, 16 Varianten, Explore | **alle negativ** → verworfen | 16 | 3.429 |
 | 13 | 2026-10-19 | H12 Intraday-Periodizität (Halbstunden-Fenster, 9 Varianten × 4 Märkte), Explore | **kein Effekt** (brutto ≈ 0, 0/9 Jahre positiv netto) | 9 | 3.438 |
+| 14 | 2026-10-19 | H13 Event-Tage (08:30/10:00/14:00, datenbasiert), 3 Uhrzeiten × 2 R × 3 M × 2 Richtungen × 3 Ausstiege × 4 Märkte | kein Kandidat (GC 10:00 Fortsetzung stabil, aber selten/einzeln) | 396 (explorativ) | 3.834 |
