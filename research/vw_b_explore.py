@@ -49,12 +49,11 @@ def variants(D):
     nan = np.full_like(W, np.nan); F = np.zeros_like(W, dtype=bool)
     win = np.zeros_like(W, dtype=bool)
     flat = b - 1
-    V = []
     # A Nachmittags-Trend
     for T, k, sb in itertools.product((a + 150, a + 210, a + 270), (0.5, 1.0, 1.5), (0.0, 0.5)):
         sl = np.zeros_like(F); ss = np.zeros_like(F)
         sl[:, T] = z[:, T] >= k; ss[:, T] = z[:, T] <= -k
-        V.append((f"A T+{T - a} k{k} stop{sb}", sl, ss, W - sb * S, W + sb * S, nan, nan, F, F, T, T, 1))
+        yield ((f"A T+{T - a} k{k} stop{sb}", sl, ss, W - sb * S, W + sb * S, nan, nan, F, F, T, T, 1))
     # B Trend-Pullback
     w0, w1 = a + 60, b - 60
     win[:] = False; win[:, w0:w1] = True
@@ -64,14 +63,14 @@ def variants(D):
         sl = win & prevA & (slope > 0) & (L <= W + x * S) & (Cf > W + x * S)
         ss = win & prevB & (slope < 0) & (H >= W - x * S) & (Cf < W - x * S)
         tl = W + 2 * S if tg == "2s" else nan; ts = W - 2 * S if tg == "2s" else nan
-        V.append((f"B N{N} x{x} s{s} {tg}", sl, ss, W - s * S, W + s * S, tl, ts, F, F, w0, w1, 2))
+        yield ((f"B N{N} x{x} s{s} {tg}", sl, ss, W - s * S, W + s * S, tl, ts, F, F, w0, w1, 2))
     # C Band-Ausbruch
     for k, tg, st in itertools.product((1.0, 2.0), ("close", "next"), (a + 30, a + 60)):
         win2 = np.zeros_like(F); win2[:, st:b - 60] = True
         up = win2 & (Cf > W + k * S) & (slope > 0); dn = win2 & (Cf < W - k * S) & (slope < 0)
         sl, ss = first_true_mask(up), first_true_mask(dn)
         tl = W + (k + 1) * S if tg == "next" else nan; ts = W - (k + 1) * S if tg == "next" else nan
-        V.append((f"C k{k} {tg} start+{st - a}", sl, ss, W + (k - 1) * S, W - (k - 1) * S, tl, ts, F, F, st, b - 60, 1))
+        yield ((f"C k{k} {tg} start+{st - a}", sl, ss, W + (k - 1) * S, W - (k - 1) * S, tl, ts, F, F, st, b - 60, 1))
     # D Band-Fade
     for k, tg, st in itertools.product((2.0, 2.5, 3.0), ("vwap", "1s"), (a + 30, a + 90)):
         win3 = np.zeros_like(F); win3[:, st:b - 30] = True
@@ -81,7 +80,7 @@ def variants(D):
         sl = win3 & prevOut_dn & (Cf >= W - k * S)
         hiE = pd.DataFrame(H).cummax(axis=1).to_numpy(); loE = pd.DataFrame(L).cummin(axis=1).to_numpy()
         tl = W if tg == "vwap" else W - S; ts = W if tg == "vwap" else W + S
-        V.append((f"D k{k} {tg} start+{st - a}", sl, ss, loE - 0.5 * S, hiE + 0.5 * S, tl, ts, F, F, st, b - 30, 3))
+        yield ((f"D k{k} {tg} start+{st - a}", sl, ss, loE - 0.5 * S, hiE + 0.5 * S, tl, ts, F, F, st, b - 30, 3))
     # F Eröffnung zu London-/Session-VWAP
     T = a + 5
     for stopv in ("session", "rth"):
@@ -89,20 +88,22 @@ def variants(D):
         sl[:, T] = (Cf[:, T] > D["lonVW"]) & (Cf[:, T] > D["sVW"][:, T])
         ss[:, T] = (Cf[:, T] < D["lonVW"]) & (Cf[:, T] < D["sVW"][:, T])
         stp = D["sVW"] if stopv == "session" else W
-        V.append((f"F open>London&Session stop{stopv}", sl, ss, stp, stp, nan, nan, F, F, T, T, 1))
-    return V, flat
+        yield ((f"F open>London&Session stop{stopv}", sl, ss, stp, stp, nan, nan, F, F, T, T, 1))
 
 
 rows = []
 for mk in ["NQ", "ES", "RTY", "GC"]:
     D = load(mk)
-    V, flat = variants(D)
-    for (name, sl, ss, stL, stS, tL, tS, eL, eS, t0, t1, mx) in V:
+    flat = D["rth"][1] - 1
+    nv = 0
+    for (name, sl, ss, stL, stS, tL, tS, eL, eS, t0, t1, mx) in variants(D):
+        nv += 1
         T = run(D["O"], D["H"], D["L"], D["C"], sl, ss, stL, stS, tL, tS, eL, eS, t0, t1, flat, mx, COST[mk], D["day_ok"])
         np.save(CACHE / f"{mk}_{name.replace(' ', '_').replace('>', 'gt').replace('&', '_')}.npy", T)
         st = stats(T, D, USD[mk], "Explore")
         rows.append({"Markt": mk, "Variante": name, "Familie": name[0], **st})
-    print(mk, len(V), "Varianten", flush=True)
+    print(mk, nv, "Varianten", flush=True)
+    del D
 X = pd.DataFrame(rows)
 X.to_csv(RES / "vw_b_explore.csv", index=False)
 pd.set_option("display.width", 250); pd.set_option("display.max_rows", 400)
