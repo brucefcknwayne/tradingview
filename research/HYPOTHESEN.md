@@ -303,7 +303,7 @@ Crabel (1990): ORB, enge Eröffnungs-Range → Ausdehnung. Kein Peer-Review-Bele
   Kosten in R fielen von ~10–15 % (2012) auf ~1 % (2025), weil die Range in Punkten gewachsen ist.
 
 
-## H17 – 5-Min-Open-Kerze als Tages-Bias (Status: in Arbeit)
+## H17 – 5-Min-Open-Kerze als Tages-Bias (Status: **verworfen** als allgemeiner Bias; Beobachtung NQ große Kerze → H17b offen)
 **Behauptung (Trader-Gerücht):** Ist die erste 5-Min-Kerze ab 09:30 grün, eher Longs; rot, eher Shorts.
 **Bezug:** Gao, Han, Li & Zhou (2018, JFE „Market intraday momentum“): erste halbe Stunde sagt letzte halbe Stunde voraus (SPY);
 Zarattini & Aziz (2023): 5-Min-ORB. H16-B1: Richtung der ersten Kerze trägt Information, Struktur mit engem Stop frisst sie.
@@ -317,3 +317,16 @@ Zarattini & Aziz (2023): 5-Min-ORB. H16-B1: Richtung der ersten Kerze trägt Inf
   außerdem erste 1-, 15-, 30-Min-Kerze.
 - **Beschreibend:** nach Kerzengröße (Quintile |Körper|/ATR), mit/gegen Gap, Tages-Hoch/-Tief in den ersten 5 Min. (grün vs. rot vs. Zufall
   ≈ 7 % nach Arkussinus-Gesetz), MFE in/gegen Kerzenrichtung ab 09:35, je Jahr. Holdout unberührt.
+### Ergebnis (2026-10-20)
+- Haupttest (Richtung der Kerze bis RTH-Ende): NQ Explore +3,0 % ATR (Holm p 0,02), Validate +0,7 % (p 0,33), Test +1,7 % (p 0,29) → durchgefallen.
+  ES/RTY durchgefallen. GC in allen 3 Zeiträumen positiv (+1,7/+2,2/+4,6 % ATR), aber Holm p 0,11–0,17, netto ≈ +0,15 Pkt/Tag.
+- Richtung getroffen 50–52 % (letzte 5 J. NQ 51,2 %). P(steigt|grün) − P(steigt|rot) = 2–5 Prozentpunkte.
+- Eröffnung ist etwas Besonderes: 5-Min-Kerzen um 10:30/11:00/13:00 ≈ 0; Eröffnungskerzen 1/5/15/30 Min. auf NQ +2–3 % ATR (über alle Jahre).
+- Trivial, nicht handelbar: grüne Kerze → RTH-Tief liegt in 26 % der Tage schon in den ersten 5 Min. (rot: Hoch 23 %).
+- **Beobachtung (Größen-Split vorab als beschreibend registriert, Kombination Q4+Q5 nachträglich):** NQ große Kerze (|Körper| ≥ 8,9 % ATR,
+  Grenze nur aus Explore; 2025 ≈ 34 Pkt) → Richtung bis Schluss: Explore +5,6 % ATR (p 0,002), Validate +6,1 % (p 0,011),
+  Test +11,1 % (p 0,009), Treffer 54–66 %. Kleine Kerze (< 5,6 % ATR) eher Umkehr (Validate/Test positiv, Explore ≈ 0). ES nicht bestätigt.
+## H17b – NQ: große erste 5-Min-Kerze als Tages-Bias (Status: offen, Bestätigung nur Holdout/Forward)
+- Regel fix: |Close 09:34 − Open 09:30| ≥ 8,9 % ATR14 → Richtung der Kerze, Einstieg 09:35, Ausstieg RTH-Ende. Prüfung nur auf Daten ab 2026-04-17
+  (Holdout, mit Freigabe) bzw. Forward-Test. Erwartung: Treffer ≥ 54 %, EW > 0.
+

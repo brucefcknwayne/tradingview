@@ -43,4 +43,6 @@
   „72 % erreichen 1×OR“ (OR5) heißt nichts, wenn die Gegenseite fast genauso oft erreicht wird.
 - Negatives RR ändert den Erwartungswert nicht: die Trefferquote steigt exakt auf die Break-even-Quote des Zufallspfads.
 - Kosten im Verhältnis zur Range ändern sich über die Jahre stark (NQ 2012: 10–15 % von R, 2025: ~1 %). Ergebnisse über Jahrzehnte immer auch brutto in R vergleichen.
+- 5-Min-Open-Kerze: als Tages-Bias praktisch Münzwurf (50–52 %). Nur große Kerzen auf NQ (≥ ~9 % ATR) laufen in allen Zeiträumen weiter;
+  kleine Kerzen eher nicht. Die Eröffnung trägt mehr Information als spätere Kerzen, aber wenig.
 
