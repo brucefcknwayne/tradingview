@@ -330,3 +330,18 @@ Zarattini & Aziz (2023): 5-Min-ORB. H16-B1: Richtung der ersten Kerze trägt Inf
 - Regel fix: |Close 09:34 − Open 09:30| ≥ 8,9 % ATR14 → Richtung der Kerze, Einstieg 09:35, Ausstieg RTH-Ende. Prüfung nur auf Daten ab 2026-04-17
   (Holdout, mit Freigabe) bzw. Forward-Test. Erwartung: Treffer ≥ 54 %, EW > 0.
 
+
+## H18 – LVN + Single Prints + VAH/VAL (Daily-Profil, 30-Min-TPO) (Status: in Arbeit)
+**Idee des Nutzers:** Levels, an denen LVN, Single Prints und Value-Area-Grenzen zusammenfallen, sind gute Reaktions-Levels.
+### Vorab festgelegt (2026-10-20, vor jedem Ergebnis)
+- Profil = Vortag RTH (NQ/ES/RTY 09:30–16:00, GC 08:20–13:30), Buckets NQ 5 · ES 1 · RTY 0,5 · GC 1 Pkt, gleicher Kontrakt wie Folgetag.
+  Volumen je 1m-Kerze gleichmäßig auf die Buckets Tief–Hoch. TPO: 30-Min-Perioden ab RTH-Start, je Periode +1 auf alle Buckets ihrer Range.
+- **VAH/VAL:** 70 % Volumen ab POC (Volumen-POC), Erweiterung je Schritt um den volumenstärkeren Nachbar-Bucket. VAH = Oberkante, VAL = Unterkante.
+- **LVN:** wie H15 mit p = 0,5. **Single Prints (SP):** zusammenhängende Buckets mit TPO-Anzahl = 1, ≥ 2 Buckets, nicht am Hoch/Tief
+  des Tages (keine Tails); Levels = Ober- und Unterkante der SP-Zone.
+- **Konfluenz** (Toleranz 2 Buckets): LVN+SP (LVN liegt in/an SP-Zone; Level = LVN), LVN+VA, SP+VA, LVN+SP+VA (Level = VAH/VAL).
+  Familien: VAH, VAL, LVN, SP, LVN+SP, LVN+VA, SP+VA, LVN+SP+VA (8).
+- **Kontrolle:** je Level ein Preis um ±3…8 Buckets verschoben (zufällig), ≥ 2 Buckets von allen Levels, im Profilbereich.
+- **Test (Wand):** erste Berührung in der RTH des Folgetags, Rennen r zurück (Abprall) vs. r durch, r ∈ {0,1; 0,25} × ATR14.
+  Erfolg je Familie × Markt × r: Abprall-Quote Level > Kontrolle (z-Test, Holm über 64), gleiche Richtung in Explore (2011–19),
+  Validate (2020–24) und Test (2025–04/2026). Holdout unberührt.
