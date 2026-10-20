@@ -331,7 +331,7 @@ Zarattini & Aziz (2023): 5-Min-ORB. H16-B1: Richtung der ersten Kerze trägt Inf
   (Holdout, mit Freigabe) bzw. Forward-Test. Erwartung: Treffer ≥ 54 %, EW > 0.
 
 
-## H18 – LVN + Single Prints + VAH/VAL (Daily-Profil, 30-Min-TPO) (Status: in Arbeit)
+## H18 – LVN + Single Prints + VAH/VAL (Daily-Profil, 30-Min-TPO) (Status: **verworfen** – 0/64 nach Holm, Abprall ≈ Kontrolle)
 **Idee des Nutzers:** Levels, an denen LVN, Single Prints und Value-Area-Grenzen zusammenfallen, sind gute Reaktions-Levels.
 ### Vorab festgelegt (2026-10-20, vor jedem Ergebnis)
 - Profil = Vortag RTH (NQ/ES/RTY 09:30–16:00, GC 08:20–13:30), Buckets NQ 5 · ES 1 · RTY 0,5 · GC 1 Pkt, gleicher Kontrakt wie Folgetag.
@@ -345,3 +345,9 @@ Zarattini & Aziz (2023): 5-Min-ORB. H16-B1: Richtung der ersten Kerze trägt Inf
 - **Test (Wand):** erste Berührung in der RTH des Folgetags, Rennen r zurück (Abprall) vs. r durch, r ∈ {0,1; 0,25} × ATR14.
   Erfolg je Familie × Markt × r: Abprall-Quote Level > Kontrolle (z-Test, Holm über 64), gleiche Richtung in Explore (2011–19),
   Validate (2020–24) und Test (2025–04/2026). Holdout unberührt.
+### Ergebnis (2026-10-20)
+- Vorab registriert (feste Buckets): 0/64 nach Holm. Nachtrag: feste Buckets sind 2011–15 zu grob (NQ-Range < 12 Buckets → Tage fielen weg);
+  zweiter Lauf mit Bucket = ATR14/80: ebenfalls 0/64 nach Holm. „In allen 3 Zeiträumen besser“: 9/64 – so viele erwartet der Zufall (~8).
+- Abprall-Quoten an allen Familien 42–58 % und gleich wie an verschobenen Kontroll-Preisen (Differenz meist ±0–5 Pkt-%).
+- Dreifach-Konfluenz LVN+SP+VA ist sehr selten (NQ 37 Berührungen in 15 Jahren, ≈ 2–3/Jahr) und nicht besser (NQ 43 % vs. 50 %).
+
