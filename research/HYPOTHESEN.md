@@ -302,3 +302,18 @@ Crabel (1990): ORB, enge Eröffnungs-Range → Ausdehnung. Kein Peer-Review-Bele
   +0,087 R netto, t 2,9, PF 1,18, Max DD 18,5 R, 1.605 Trades. Nach > 7.000 Tests und Auswahl des Zeitraums im Nachhinein nicht belastbar.
   Kosten in R fielen von ~10–15 % (2012) auf ~1 % (2025), weil die Range in Punkten gewachsen ist.
 
+
+## H17 – 5-Min-Open-Kerze als Tages-Bias (Status: in Arbeit)
+**Behauptung (Trader-Gerücht):** Ist die erste 5-Min-Kerze ab 09:30 grün, eher Longs; rot, eher Shorts.
+**Bezug:** Gao, Han, Li & Zhou (2018, JFE „Market intraday momentum“): erste halbe Stunde sagt letzte halbe Stunde voraus (SPY);
+Zarattini & Aziz (2023): 5-Min-ORB. H16-B1: Richtung der ersten Kerze trägt Information, Struktur mit engem Stop frisst sie.
+### Vorab festgelegt (2026-10-20, vor jedem Ergebnis)
+- Signal s = Vorzeichen(Close 09:34 − Open 09:30) (GC: 08:20–08:24). Doji (s = 0) ausgelassen.
+- **Hauptmaß:** s × (Close Horizont − Open 09:35), in % ATR14 und Punkten. Horizonte 10:00, 10:30, 11:00, 12:00, 14:00, RTH-Ende.
+  **Haupttest je Markt: Horizont RTH-Ende**, einseitig (> 0), Tages-Bootstrap-KI, Holm über 4 Märkte; muss in Explore (≤ 2019),
+  Validate (2020–24) UND Test (2025–04/2026) positiv sein, um als Bias zu gelten. Netto nach Kosten wie H9 (1 Trade/Tag) zusätzlich.
+- **Kontrolle Drift:** P(Tag steigt ab 09:35 | grün) − P(steigt | rot) statt Trefferquote gegen 50 %.
+- **Kontrolle „ist die Eröffnung besonders?“:** dieselbe Regel mit der 5-Min-Kerze um 10:00, 10:30, 11:00, 13:00 (Rest bis RTH-Ende);
+  außerdem erste 1-, 15-, 30-Min-Kerze.
+- **Beschreibend:** nach Kerzengröße (Quintile |Körper|/ATR), mit/gegen Gap, Tages-Hoch/-Tief in den ersten 5 Min. (grün vs. rot vs. Zufall
+  ≈ 7 % nach Arkussinus-Gesetz), MFE in/gegen Kerzenrichtung ab 09:35, je Jahr. Holdout unberührt.
