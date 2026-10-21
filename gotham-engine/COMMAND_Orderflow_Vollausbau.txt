@@ -1,0 +1,147 @@
+AUFTRAG: GOTHAM ENGINE – VOLLAUSBAU ORDERFLOW (LEVEL 2 / DOM / FOOTPRINT / TAPE) – WIRKLICH ALLES
+
+Du baust die Gotham Engine (MotiveWave-Study, Java, Rithmic-Daten) zur vollständigen Orderflow-Engine aus.
+Das Ziel: ALLES, was man im Orderflow sehen, messen und lernen kann, wird eingebaut. Ausnahmslos.
+Footprint, Delta, Delta-Flip, Trap-Bias, Big Buyers, Big Sellers, Level 2 (DOM), Orderbuch, Tape, Iceberg, Sweeps,
+Pulling/Stacking, Absorption, Exhaustion, Imbalances und jedes weitere Orderflow-Konzept, das du kennst oder findest.
+
+DAS IST NICHT VERHANDELBAR:
+- Du baust wirklich ALLES ein. Nicht eine Auswahl, nicht „die wichtigsten“, nicht „Version 1 mit den Kernfunktionen“.
+- Jedes Modul der Liste unten wird umgesetzt. Zusätzlich recherchierst du selbst und baust jedes weitere
+  Orderflow-Konzept ein, das in der Liste fehlt. Die Liste ist das Minimum, nicht das Maximum.
+- Wenn etwas technisch mit den verfügbaren Daten nicht geht, baust du es trotzdem so weit wie möglich und schreibst
+  in die Abschluss-Checkliste genau, was fehlt und warum (z. B. „MBO-Order-IDs liefert der Feed nicht“). Stillschweigend
+  weglassen ist verboten.
+- Am Ende lieferst du die ausgefüllte Checkliste (Abschnitt 9). Jeder Punkt: EINGEBAUT / TEILWEISE (+ was fehlt) / NICHT MÖGLICH (+ Grund).
+  Ohne vollständige Checkliste ist der Auftrag nicht erledigt.
+
+──────────────────────────────────────────────────────────────────────────────
+1) DATENQUELLEN (MotiveWave SDK, geprüft gegen mwave_sdk.jar Stand 18.09.2026)
+──────────────────────────────────────────────────────────────────────────────
+- Ticks: Instrument.forEachTick(start, end, true, TickOperation) für die Historie, Study.onTick(DataContext, Tick) live.
+  Tick: getPrice(), getVolume()/getVolumeAsFloat(), isAskTick() (= Käufer-Aggressor), getBidPrice(), getBidSize(),
+  getAskPrice(), getAskSize() (Größe der besten Stufe zum Zeitpunkt des Trades), getTime(), getExchOrderId(), getAggExchOrderId().
+- DOM / Level 2 live: Instrument.addListener(DOMListener), DOM.getBidRows()/getAskRows()/getRows() → DOMRow, DOMOrder (Einzelorders/MBO,
+  falls der Rithmic-Feed sie liefert – prüfen und im Log vermerken).
+- DOM-Historie: Instrument.getDOMHistory() / getLatestDOMHistory() → DOMSnapshot (getTime, getBid/AskPrices, getBid/AskSizes).
+- Kerzen: DataSeries (OHLC, Volumen, atr(index, period)), onBarUpdate/onBarClose, addFigure (Marker, Label, Box, Line), ctx.signal(...).
+- Kompilieren: Das SDK ist mit Java 25 gebaut (class version 69) → mit JDK 25 kompilieren, sonst Fehler „wrong version 69.0“.
+- Mehrere Instrumente (für NQ/ES-Vergleich): StudyHeader multipleInstrument = true.
+
+──────────────────────────────────────────────────────────────────────────────
+2) GRUNDREGELN FÜR ALLE MODULE
+──────────────────────────────────────────────────────────────────────────────
+- KEINE festen Ticks als Schwellen. Alle Schwellen relativ und adaptiv: Perzentile/Median/MAD der eigenen jüngsten Daten,
+  Anteil der Kerzen-Range, ATR, σ der 20-s-Bewegung, Tageszeit-Profil (gleiche Minute der letzten Tage).
+  Ziele/Stops/Outcome-Abstände ebenfalls in ATR bzw. σ, nicht in Ticks.
+- Jedes Modul einzeln an/aus, eigene Gewichtung, eigene Farbe, eigener Name im Marker und im Log.
+- Konfluenz-Anzeige „x/N“ am Marker (N = Anzahl aktiver Module, z. B. „7/34 DOM-ABSORB+ICEBERG+FLIP+…“) plus Score 0–100.
+  Getrennt anzeigen: wie viele Footprint-/Tape-Module und wie viele DOM-/Level-2-Module zustimmen.
+- Live-Status-Label (jede 250 ms): ABSORBING ▲/▼, BREAKING ▲/▼, TRAPPED, SWEEP, ICEBERG, PULLING, STACKING, EXHAUSTION, WAITING –
+  mit den aktiven Modulen und dem Preis/Level.
+- Steigende Flanke + Cooldown je Modul und Seite, Duplikat-Filter (gleiche Richtung, gleiches Level → ein Ereignis).
+- Performance: Ringpuffer, keine Arbeit im UI-Thread, keine Neuberechnung der ganzen Historie pro Tick.
+- Alles in den CSV-Log (Abschnitt 7), damit jedes Modul später einzeln ausgewertet werden kann.
+
+──────────────────────────────────────────────────────────────────────────────
+3) FOOTPRINT / DELTA (alles einbauen)
+──────────────────────────────────────────────────────────────────────────────
+F1  Bar-Delta, Delta %, Delta je Preiszeile (Bid × Ask), Volumen je Zeile, POC der Kerze, Value Area der Kerze.
+F2  Delta-Flip: Kerze gegen Delta (rote Kerze + positives Delta = Käufer absorbiert → bärisch; grün + negatives Delta → bullisch).
+F3  Delta-Divergenz: neues Hoch/Tief der Kerzen ohne neues Delta-Hoch/Tief; CVD-Divergenz auf Swing-, Session- und Mehrkerzen-Ebene.
+F4  CVD je Session (Reset 18:00 NY), RTH-CVD, CVD-Steigung, CVD-Beschleunigung.
+F5  Intrabar-Delta: Max-Delta, Min-Delta, Schluss-Delta; Delta-Umkehr in der Kerze (stark positiv → kippt auf ~0/negativ und umgekehrt).
+F6  Diagonale Imbalances (Ask auf Preis p gegen Bid eine Stufe tiefer und umgekehrt), Imbalance-Faktor einstellbar (relativ).
+F7  Stacked Imbalances (≥ 3 Zeilen), als Zone gezeichnet bis sie mitigiert wird; gescheiterte Stacked Imbalance = Trap.
+F8  Unfinished Auction / Finished Auction am Hoch und Tief (Bid bzw. Ask = 0 am Extrem), Poor High/Low aus dem Footprint.
+F9  Exhaustion Print: sehr kleines Volumen am Extrem nach starker Bewegung; Aufwand je Preisfortschritt steigt über mehrere Kerzen.
+F10 Effort vs. Result (Wyckoff): Volumen/Delta weit über normal, Preisfortschritt dafür klein.
+F11 Volumen-Wand in der Kerze: Zeile mit ungewöhnlich viel Volumen bei Delta ≈ 0 (alles wurde gematcht).
+F12 Wick-Absorption: aggressive Käufer im oberen / Verkäufer im unteren Bereich, Kerze weist zurück.
+F13 Trap-Bias am Extrem: Ausbruchskerze mit massiver Imbalance am obersten/untersten Tick, Kerze schließt dagegen; gefangenes Volumen
+    (Volumen jenseits des späteren Schlusses) quantifizieren und als „trapped longs/shorts“ anzeigen, inkl. Level, an dem sie raus müssen.
+F14 Absorption nach Push: Preis läuft in eine Wall, Aggressoren drücken weiter, Preis kommt nicht durch.
+F15 Delta am Level (Delta, das an einem Schlüssel-Level gehandelt wird), Absorption am Level.
+F16 Initiative vs. Responsive: Delta-Richtung außerhalb/innerhalb der Value Area.
+F17 Footprint-Profil je Kerze, je Session, Composite; Naked POCs, HVN/LVN, Single Prints, VAH/VAL, VWAP ±σ als Kontext-Level (at_level).
+
+──────────────────────────────────────────────────────────────────────────────
+4) TAPE / TRADES (alles einbauen)
+──────────────────────────────────────────────────────────────────────────────
+T1  Big Buyers / Big Sellers: Prints ab einer dynamischen Größe (z. B. 99. Perzentil der Trade-Größen der letzten Stunde/Session),
+    als Bubbles am Chart (Größe ∝ Volumen), Big-Trade-Delta, Big-Trade-Cluster an einem Preis.
+T2  Aggregation zu echten Orders: alle Prints mit gleichem Zeitstempel/getAggExchOrderId = eine aggressive Order (Sweep-Aufteilung zusammenfassen).
+T3  Sweeps: eine Order frisst mehrere Preisstufen → Richtung, Anzahl Stufen, Größe; Sweep ohne Folgebewegung = Fade-Kandidat.
+T4  Tape-Speed: Trades/s, Volumen/s, Beschleunigung, Speed-Spike gegen Tageszeit-Normal; Momentum-Ignition.
+T5  Trade-Size-Verteilung: Retail- vs. Block-Anteil, durchschnittliche Trade-Größe und Anomalien.
+T6  Wiederholte gleich große Prints (Algo-/Iceberg-Signatur), Prints auf demselben Preis ohne Fortschritt.
+T7  Stop-Run / Liquidity-Grab: schneller Volumenausbruch am Extrem mit sofortiger Umkehr.
+T8  Toxizität (optional): VPIN / Volumen-synchrone Delta-Imbalance.
+
+──────────────────────────────────────────────────────────────────────────────
+5) DOM / LEVEL 2 / ORDERBUCH (alles einbauen)
+──────────────────────────────────────────────────────────────────────────────
+D1  DOM-Absorption: In eine Bid-/Ask-Stufe wird aggressiv gehandelt, die angezeigte Größe fällt nicht entsprechend oder wird
+    wieder aufgefüllt, der Preis hält. Kennzahl: gehandeltes Volumen ÷ Ø angezeigte Größe an der Stufe (Refill-Faktor).
+D2  Iceberg: (a) mit MBO: dieselbe passive Order-ID wird über ihre sichtbare Größe hinaus gefüllt; (b) ohne MBO: gehandelt > angezeigt
+    und die Stufe lädt nach. Iceberg-Level als Linie, solange aktiv.
+D3  Pulling vs. Stacking: Liquidität verschwindet durch Stornos (ohne Trades) bzw. wird hinzugefügt – je Seite, je Abstand zum Preis.
+    PULL vor dem Preis = Fake-Wall-Warnung (senkt den Absorptions-Score), STACK = echte Verteidigung.
+D4  Spoofing: große Order erscheint und verschwindet in < 1 s (relativ einstellbar) ohne Fills.
+D5  Liquiditäts-Wände: große Resting Orders (relativ zur Ø Tiefe), Lebensdauer, Abbau („Wand schrumpft, hält aber“ = Absorption,
+    „Wand verschwindet“ = Pull), Wände als Level am Chart.
+D6  Liquiditäts-Vakuum: dünne Zone im Buch zwischen zwei dichten Zonen (Buch-LVN) → schneller Durchlauf erwartet.
+D7  Order-Book-Imbalance (OBI) über Top-N Stufen, distanzgewichtet; Microprice; OBI-Divergenz zum Preis.
+D8  Order Flow Imbalance (OFI, Cont/Kukanov/Stoikov) aus Änderungen der besten Bid/Ask-Größe und -Preise.
+D9  Queue-Verhalten: Queue wird bei einem Sweep geleert und füllt sich sofort wieder (DOM-Sweep-Erschöpfung) vs. bleibt leer.
+D10 Spread und Tiefe: Spread-Weitung, Gesamttiefe fällt → Fragmentierungs-Warnung (Regime R5), dann nur Hinweis, kein Signal.
+D11 Heatmap-Level aus der DOM-Historie (wo stand Liquidität, wie lange), als Zonen am Chart.
+
+──────────────────────────────────────────────────────────────────────────────
+6) KONTEXT, BIAS UND BREAKING (alles einbauen)
+──────────────────────────────────────────────────────────────────────────────
+K1  Mikro-Bias-Shift nach Absorption (höhere Tiefs/tiefere Hochs + Delta dreht) als Bestätigung.
+K2  Trap-Bias-Status: wer ist gefangen (Longs/Shorts), wie viel Volumen, wo ist ihr Schmerz-Level.
+K3  Session-Level: Vortag H/L/C, Overnight H/L, IB (60 min) H/L, Session-VWAP ±1/2σ, Naked POCs, VAH/VAL → Spalte at_level.
+K4  NQ/ES-Vergleich (SMT): ein Markt macht ein neues Extrem, der andere nicht; Delta-Vergleich beider Märkte.
+K5  BREAKING neu: Durchbruch eines Levels mit Delta + Tape-Speed + Pull auf der Gegenseite → früh erkennen. Nachgerechnete Basis
+    v1.5.1: Breaking im Median 13 Ticks zu spät, 355 Ereignisse/Tag, im Schnitt −2,7 Ticks nach 5 min (schlechter als Zufall).
+    Ziel: früher und mit DOM-Bestätigung; Breaking ohne Bestätigung als „schwach“ markieren.
+K6  Absorption v1.5.1 war zu streng (0,2 Ereignisse pro RTH-Tag, weil feste 2-Tick-Bewegung in 20 s in der RTH fast nie passt) →
+    durch die relativen Module oben ersetzen. Eine Referenz-Implementierung mit 10 Footprint-Modi (FLIP, EFFORT, WICK, WALL, REFILL,
+    CVD, TRAPPED, EXHAUST, STACKED, D-REV) liegt bei (AbsorptionEngine.java) – übernehmen und erweitern, nicht zurückbauen.
+
+──────────────────────────────────────────────────────────────────────────────
+7) LOGGING (Pflicht, für die spätere Auswertung jedes Moduls)
+──────────────────────────────────────────────────────────────────────────────
+CSV je Ereignis, eine Zeile pro Ereignis, mindestens:
+symbol,time_ny,epoch_ms,type,dir,price,last_price,ref_level,at_level,modules_hit,modules_total,score,
+footprint_modules,dom_modules,delta_bar,delta_20s,cvd_session,maxdelta_bar,mindelta_bar,volume_bar,imbalance_stack,
+big_buy_vol,big_sell_vol,sweep_levels,tape_speed_x,refill_factor,iceberg_order_id,iceberg_fills,pull_bid,pull_ask,
+stack_bid,stack_ask,obi,ofi,spread,depth_total,trapped_volume,trapped_side,atr,activity,
+outcome,outcome_sec,ret_1m_atr,ret_5m_atr,ret_15m_atr,mfe_15m_atr,mae_15m_atr
+Felder, die der Feed nicht liefert, bleiben leer – und im Log-Kopf steht, warum (z. B. „no MBO“).
+Zusätzlich ein Session-Summary: Ereignisse je Modul, je Stunde, RTH vs. Overnight.
+
+──────────────────────────────────────────────────────────────────────────────
+8) TESTEN UND EHRLICHKEIT
+──────────────────────────────────────────────────────────────────────────────
+- Kompiliert fehlerfrei gegen mwave_sdk.jar (JDK 25). Kompilierfehler sind kein „fertig“.
+- Jedes Modul einzeln in der Live-Session prüfen: feuert es, wie oft je Stunde, sieht die Markierung am Chart plausibel aus.
+- Häufigkeit eichen: Absorption soll mehrmals pro RTH-Stunde erkennbar sein, aber nicht jede Minute; über die relativen Schwellen
+  und „mindestens x/N Module“ einstellbar.
+- Nichts erfinden: Wenn ein Modul mit den Daten nicht berechenbar ist, wird das gesagt, nicht geschätzt.
+- Hinweis aus der Nachrechnung auf 20 Tagen NQ-Ticks: Footprint-Absorption allein lag beim fairen Richtungstest (zuerst ±1 ATR)
+  bei ~50 %, auch bei 2–3 gleichzeitigen Modi. Genau deshalb müssen DOM-Module (D1–D11) und das Logging dazu – damit messbar wird,
+  ob Level-2-Bestätigung den Unterschied macht.
+
+──────────────────────────────────────────────────────────────────────────────
+9) ABSCHLUSS-CHECKLISTE (vollständig ausgefüllt zurückgeben)
+──────────────────────────────────────────────────────────────────────────────
+Für JEDEN Punkt F1–F17, T1–T8, D1–D11, K1–K6 und jedes zusätzlich gefundene Konzept:
+  Status (EINGEBAUT / TEILWEISE / NICHT MÖGLICH) · Einstellungen (Name, Standardwert, relativ wozu) · Anzeige am Chart · Log-Spalte · Grund bei TEILWEISE/NICHT MÖGLICH.
+Dazu eine Liste „Zusätzlich recherchiert und eingebaut“ – mindestens alles, was in gängigen Orderflow-Tools (Footprint-, DOM-,
+Heatmap-, Tape-Tools) und in der Orderflow-Literatur vorkommt und oben nicht steht.
+
+Lieferung: kompletter Quellcode, kompilierte .jar, Changelog gegenüber v1.5.1, Einstellungs-Doku, ausgefüllte Checkliste.
+Noch einmal: ALLES einbauen. Nichts auslassen. Was fehlt, muss in der Checkliste mit Grund stehen.
