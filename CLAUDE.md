@@ -17,4 +17,5 @@
 | `orderblocks/` | 1H-Orderblocks auf kleineren Charts |
 | `adamcapitals/` | Nutzer-Strategie aus der AdamCapitals-PDF: Failed Zone → Breaker → Inducement (LIQ) → Limit in unmitigated Zone, SL hinter Zone, TP 1:7, Teilgewinn 1:4 + BE, max. 2 Trades/Tag |
 | `ib-first/` | IB First: Tief der IB zuerst → IB-Hoch wird geholt (und umgekehrt), Linien mit % für Gegenseite, +0,5/+1 IB, Erstseite; Statistik in `data-lab/ib_first_*.py` |
-| `kyle-lambda/` | Kyle-λ-Profil: Preis-Impact je Kontrakt (Δp auf vorzeichenbehaftetes Volumen, BVC oder Tick-Regel), rollierend + je Preiszone, dünne/dicke Zonen (aktuelles Projekt, noch ungetestet) |
+| `kyle-lambda/` | Kyle-λ-Profil: Preis-Impact je Kontrakt (Δp auf vorzeichenbehaftetes Volumen, BVC oder Tick-Regel), rollierend + je Preiszone, dünne/dicke Zonen (ungetestet) |
+| `gotham-engine/` | Nachrechnung der MotiveWave-Study „Gotham Engine“ (Absorption/Breaking) auf NQ-Trades: Ereignisse, Zufallsvergleich, Kalibrierung (aktuelles Projekt) |
