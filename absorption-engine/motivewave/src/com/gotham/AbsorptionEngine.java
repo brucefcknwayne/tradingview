@@ -147,31 +147,31 @@ public class AbsorptionEngine extends Study
     var tab = sd.addTab("Engine");
     var grp = tab.addGroup("Allgemein");
     grp.addRow(new IntegerDescriptor(LOOKBACK, "Normal = Median der letzten Kerzen", 100, 20, 2000, 10));
-    grp.addRow(new IntegerDescriptor(SWING, "Extrem/Divergenz: Kerzen zurück", 20, 3, 500, 1));
-    grp.addRow(new IntegerDescriptor(MIN_STRENGTH, "Mindest-Stärke (0–100)", 40, 0, 100, 5));
+    grp.addRow(new IntegerDescriptor(SWING, "Extrem/Divergenz: Kerzen zurück", 60, 3, 500, 1));
+    grp.addRow(new IntegerDescriptor(MIN_STRENGTH, "Mindest-Stärke (0–100)", 0, 0, 100, 5));
     grp.addRow(new IntegerDescriptor(MIN_MODES, "Mindestens Modi gleichzeitig (x/10)", 1, 1, 10, 1));
 
     grp = tab.addGroup("1 Delta-Flip");
     grp.addRow(new BooleanDescriptor(USE_FLIP, "Aktiv", true));
-    grp.addRow(new DoubleDescriptor(FLIP_BODY, "Kerzenkörper ≥ Anteil der Range", 0.30, 0.0, 1.0, 0.05));
-    grp.addRow(new DoubleDescriptor(FLIP_DELTA, "|Delta| ≥ × normal", 0.8, 0.0, 20.0, 0.1));
+    grp.addRow(new DoubleDescriptor(FLIP_BODY, "Kerzenkörper ≥ Anteil der Range", 0.40, 0.0, 1.0, 0.05));
+    grp.addRow(new DoubleDescriptor(FLIP_DELTA, "|Delta| ≥ × normal", 1.5, 0.0, 20.0, 0.1));
 
     grp = tab.addGroup("2 Aufwand ohne Ergebnis");
     grp.addRow(new BooleanDescriptor(USE_EFFORT, "Aktiv", true));
-    grp.addRow(new DoubleDescriptor(EFF_VOL, "Volumen ≥ × normal", 1.5, 1.0, 20.0, 0.1));
-    grp.addRow(new DoubleDescriptor(EFF_RATIO, "Ergebnis/Aufwand ≤ (Range-Faktor ÷ Volumen-Faktor)", 0.6, 0.05, 2.0, 0.05));
+    grp.addRow(new DoubleDescriptor(EFF_VOL, "Volumen ≥ × normal", 2.5, 1.0, 20.0, 0.1));
+    grp.addRow(new DoubleDescriptor(EFF_RATIO, "Ergebnis/Aufwand ≤ (Range-Faktor ÷ Volumen-Faktor)", 0.4, 0.05, 2.0, 0.05));
 
     grp = tab.addGroup("3 Wick-Absorption");
     grp.addRow(new BooleanDescriptor(USE_WICK, "Aktiv", true));
     grp.addRow(new DoubleDescriptor(WICK_ZONE, "Extrem-Zone = Anteil der Range", 0.25, 0.05, 0.5, 0.05));
-    grp.addRow(new DoubleDescriptor(WICK_SHARE, "Aggressor-Volumen in Zone ≥ Anteil des Kerzenvolumens", 0.15, 0.01, 1.0, 0.01));
-    grp.addRow(new DoubleDescriptor(WICK_DOM, "Aggressoren / Gegenseite in Zone ≥", 1.3, 1.0, 20.0, 0.1));
-    grp.addRow(new DoubleDescriptor(WICK_LEN, "Docht ≥ Anteil der Range", 0.35, 0.0, 1.0, 0.05));
+    grp.addRow(new DoubleDescriptor(WICK_SHARE, "Aggressor-Volumen in Zone ≥ Anteil des Kerzenvolumens", 0.35, 0.01, 1.0, 0.01));
+    grp.addRow(new DoubleDescriptor(WICK_DOM, "Aggressoren / Gegenseite in Zone ≥", 3.0, 1.0, 20.0, 0.1));
+    grp.addRow(new DoubleDescriptor(WICK_LEN, "Docht ≥ Anteil der Range", 0.50, 0.0, 1.0, 0.05));
 
     grp = tab.addGroup("4 Passive Wand");
     grp.addRow(new BooleanDescriptor(USE_WALL, "Aktiv", true));
-    grp.addRow(new DoubleDescriptor(WALL_MULT, "Zeilen-Volumen ≥ × normale Max-Zeile", 1.5, 1.0, 20.0, 0.1));
-    grp.addRow(new DoubleDescriptor(WALL_BAL, "|Zeilen-Delta| / Zeilen-Volumen ≤", 0.2, 0.0, 1.0, 0.05));
+    grp.addRow(new DoubleDescriptor(WALL_MULT, "Zeilen-Volumen ≥ × normale Max-Zeile", 2.5, 1.0, 20.0, 0.1));
+    grp.addRow(new DoubleDescriptor(WALL_BAL, "|Zeilen-Delta| / Zeilen-Volumen ≤", 0.15, 0.0, 1.0, 0.05));
 
     grp = tab.addGroup("5 Refill / Iceberg (braucht Bid/Ask-Größen)");
     grp.addRow(new BooleanDescriptor(USE_REFILL, "Aktiv", true));
@@ -181,19 +181,19 @@ public class AbsorptionEngine extends Study
     grp = tab.addGroup("6–8 Mehrkerzen-Muster");
     grp.addRow(new BooleanDescriptor(USE_CVD, "6 CVD-Divergenz", true));
     grp.addRow(new BooleanDescriptor(USE_TRAP, "7 Trapped (Push scheitert)", true));
-    grp.addRow(new DoubleDescriptor(TRAP_DELTA, "Trapped: Push-|Delta| ≥ × normal", 1.5, 0.5, 20.0, 0.1));
+    grp.addRow(new DoubleDescriptor(TRAP_DELTA, "Trapped: Push-|Delta| ≥ × normal", 2.0, 0.5, 20.0, 0.1));
     grp.addRow(new BooleanDescriptor(USE_EXH, "8 Erschöpfung", true));
-    grp.addRow(new DoubleDescriptor(EXH_GROWTH, "Erschöpfung: Aufwand je Fortschritt wächst ≥ ×", 2.0, 1.1, 20.0, 0.1));
+    grp.addRow(new DoubleDescriptor(EXH_GROWTH, "Erschöpfung: Aufwand je Fortschritt wächst ≥ ×", 3.0, 1.1, 20.0, 0.1));
 
     grp = tab.addGroup("9 Stacked Imbalance gescheitert");
     grp.addRow(new BooleanDescriptor(USE_STACK, "Aktiv", true));
-    grp.addRow(new DoubleDescriptor(STACK_IMB, "Imbalance (diagonal) ≥ ×", 3.0, 1.5, 20.0, 0.5));
-    grp.addRow(new IntegerDescriptor(STACK_N, "Mindestens Preiszeilen hintereinander", 3, 2, 20, 1));
+    grp.addRow(new DoubleDescriptor(STACK_IMB, "Imbalance (diagonal) ≥ ×", 4.0, 1.5, 20.0, 0.5));
+    grp.addRow(new IntegerDescriptor(STACK_N, "Mindestens Preiszeilen hintereinander", 4, 2, 20, 1));
 
     grp = tab.addGroup("10 Delta-Umkehr in der Kerze");
     grp.addRow(new BooleanDescriptor(USE_DREV, "Aktiv", true));
-    grp.addRow(new DoubleDescriptor(DREV_DELTA, "Max. Delta in der Kerze ≥ × normal", 1.0, 0.2, 20.0, 0.1));
-    grp.addRow(new DoubleDescriptor(DREV_KEEP, "Schluss-Delta ≤ Anteil des Max-Deltas", 0.3, -1.0, 1.0, 0.05));
+    grp.addRow(new DoubleDescriptor(DREV_DELTA, "Max. Delta in der Kerze ≥ × normal", 2.0, 0.2, 20.0, 0.1));
+    grp.addRow(new DoubleDescriptor(DREV_KEEP, "Schluss-Delta ≤ Anteil des Max-Deltas", 0.2, -1.0, 1.0, 0.05));
 
     tab = sd.addTab("Ergebnis & Anzeige");
     grp = tab.addGroup("Ergebnis (relativ zur ATR)");
@@ -327,7 +327,7 @@ public class AbsorptionEngine extends Study
   private Hit evaluate(DataSeries s, int i, BarFP fp, boolean live)
   {
     var st = getSettings();
-    int lb = st.getInteger(LOOKBACK, 100), sw = st.getInteger(SWING, 20);
+    int lb = st.getInteger(LOOKBACK, 100), sw = st.getInteger(SWING, 60);
     double o = s.getOpen(i), c = s.getClose(i), hi = s.getHigh(i), lo = s.getLow(i);
     double rng = hi - lo, vol = fp.vol(), delta = fp.delta();
     if (vol <= 0) return null;
@@ -356,7 +356,7 @@ public class AbsorptionEngine extends Study
 
     // 9 Stacked Imbalance gescheitert (diagonal: Kauf auf p gegen Verkauf eine Zeile tiefer)
     if (st.getBoolean(USE_STACK, true) && rng > 0 && fp.rows.size() >= 3) {
-      double imb = st.getDouble(STACK_IMB, 3.0); int need = st.getInteger(STACK_N, 3);
+      double imb = st.getDouble(STACK_IMB, 4.0); int need = st.getInteger(STACK_N, 4);
       int runA = 0, bestA = 0, runB = 0, bestB = 0;
       for (Map.Entry<Float, Row> e : fp.rows.entrySet()) {
         float px = e.getKey(); Row r = e.getValue();
@@ -372,7 +372,7 @@ public class AbsorptionEngine extends Study
     }
     // 10 Delta-Umkehr in der Kerze
     if (st.getBoolean(USE_DREV, true) && rng > 0) {
-      double need = st.getDouble(DREV_DELTA, 1.0) * mDel * frac, keep = st.getDouble(DREV_KEEP, 0.3);
+      double need = st.getDouble(DREV_DELTA, 2.0) * mDel * frac, keep = st.getDouble(DREV_KEEP, 0.2);
       if (fp.maxD >= need && delta <= keep * fp.maxD && c < hi - 0.3 * rng)
         bear[9] = 45 + 55 * Math.min(1, (fp.maxD - delta) / Math.max(1, 2 * mDel));
       if (-fp.minD >= need && -delta <= keep * -fp.minD && c > lo + 0.3 * rng)
@@ -382,7 +382,7 @@ public class AbsorptionEngine extends Study
     // 1 Delta-Flip
     if (st.getBoolean(USE_FLIP, true) && rng > 0) {
       double body = c - o;
-      if (Math.abs(body) >= st.getDouble(FLIP_BODY, 0.3) * rng && rd >= st.getDouble(FLIP_DELTA, 0.8) && Math.signum(body) == -Math.signum(delta)) {
+      if (Math.abs(body) >= st.getDouble(FLIP_BODY, 0.4) * rng && rd >= st.getDouble(FLIP_DELTA, 1.5) && Math.signum(body) == -Math.signum(delta)) {
         double sc = 40 + 30 * Math.min(1, rd / 2.0) + 30 * Math.min(1, Math.abs(body) / rng);
         if (body > 0) bull[0] = sc; else bear[0] = sc;
       }
@@ -390,8 +390,8 @@ public class AbsorptionEngine extends Study
     // 2 Aufwand ohne Ergebnis
     if (st.getBoolean(USE_EFFORT, true)) {
       double ratio = rr / Math.max(1e-9, rv);
-      if (rv >= st.getDouble(EFF_VOL, 1.5) && ratio <= st.getDouble(EFF_RATIO, 0.6)) {
-        double sc = 40 + 30 * Math.min(1, (rv - 1) / 2.0) + 30 * Math.min(1, 1 - ratio / st.getDouble(EFF_RATIO, 0.6) + 0.3);
+      if (rv >= st.getDouble(EFF_VOL, 2.5) && ratio <= st.getDouble(EFF_RATIO, 0.4)) {
+        double sc = 40 + 30 * Math.min(1, (rv - 1) / 2.0) + 30 * Math.min(1, 1 - ratio / st.getDouble(EFF_RATIO, 0.4) + 0.3);
         int d = 0;
         if (rd >= 0.5) d = delta > 0 ? -1 : 1;            // die Aggressoren sind nicht vorangekommen
         else {                                            // Delta ausgeglichen → Lage im Swing entscheidet
@@ -408,7 +408,7 @@ public class AbsorptionEngine extends Study
       double z = st.getDouble(WICK_ZONE, 0.25) * rng;
       double topBuy = 0, topSell = 0, botBuy = 0, botSell = 0;
       double wallTopV = 0, wallBotV = 0, wallTopPx = hi, wallBotPx = lo;
-      double wallMin = st.getDouble(WALL_MULT, 1.5) * mRow * (live ? Math.max(frac, 0.5) : 1.0), wallBal = st.getDouble(WALL_BAL, 0.2);
+      double wallMin = st.getDouble(WALL_MULT, 2.5) * mRow * (live ? Math.max(frac, 0.5) : 1.0), wallBal = st.getDouble(WALL_BAL, 0.15);
       for (Map.Entry<Float, Row> e : fp.rows.entrySet()) {
         double px = e.getKey(); Row r = e.getValue(); double rvlm = r.buy + r.sell;
         boolean top = px >= hi - z, bot = px <= lo + z;
@@ -421,7 +421,7 @@ public class AbsorptionEngine extends Study
         }
       }
       if (st.getBoolean(USE_WICK, true)) {
-        double share = st.getDouble(WICK_SHARE, 0.15), dom = st.getDouble(WICK_DOM, 1.3), wl = st.getDouble(WICK_LEN, 0.35) * rng;
+        double share = st.getDouble(WICK_SHARE, 0.35), dom = st.getDouble(WICK_DOM, 3.0), wl = st.getDouble(WICK_LEN, 0.5) * rng;
         double upW = hi - Math.max(o, c), dnW = Math.min(o, c) - lo;
         if (topBuy / vol >= share && topBuy / Math.max(1, topSell) >= dom && upW >= wl && c < hi - z)
           bear[2] = 40 + 30 * Math.min(1, topBuy / vol / (2 * share)) + 30 * Math.min(1, upW / rng);
@@ -468,7 +468,7 @@ public class AbsorptionEngine extends Study
       if (st.getBoolean(USE_TRAP, true)) {
         BarFP p = bar(s, i - 1);
         double pd = p.delta(), prd = Math.abs(pd) / Math.max(1e-9, mDel);
-        if (prd >= st.getDouble(TRAP_DELTA, 1.5)) {
+        if (prd >= st.getDouble(TRAP_DELTA, 2.0)) {
           boolean newHi = true, newLo = true;
           for (int k = Math.max(0, i - 1 - sw); k < i - 1; k++) { if (s.getHigh(k) >= s.getHigh(i - 1)) newHi = false; if (s.getLow(k) <= s.getLow(i - 1)) newLo = false; }
           if (pd > 0 && newHi && c < s.getOpen(i - 1)) { bear[6] = 50 + 50 * Math.min(1, (prd - 1) / 3); bearPx = Math.max(bearPx, s.getHigh(i - 1)); }
@@ -485,7 +485,7 @@ public class AbsorptionEngine extends Study
           if ((int) Math.signum(body) != dir0 || Math.signum(f.delta()) != dir0) same = false;
           eff[k] = f.vol() / Math.max(Math.abs(body), 1e-9);
         }
-        double g = st.getDouble(EXH_GROWTH, 2.0);
+        double g = st.getDouble(EXH_GROWTH, 3.0);
         if (same && eff[1] > eff[0] && eff[2] > eff[1] && eff[2] >= g * eff[0]) {
           double sc = 45 + 55 * Math.min(1, (eff[2] / eff[0] - g) / (2 * g) + 0.2);
           if (dir0 > 0) bear[7] = sc; else bull[7] = sc;
@@ -495,7 +495,7 @@ public class AbsorptionEngine extends Study
 
     Hit hb = combine(bull, 1, bullPx), ha = combine(bear, -1, bearPx);
     Hit h = hb == null ? ha : ha == null ? hb : (hb.strength >= ha.strength ? hb : ha);
-    if (h == null || h.strength < st.getInteger(MIN_STRENGTH, 40) || h.modes < st.getInteger(MIN_MODES, 1)) return null;
+    if (h == null || h.strength < st.getInteger(MIN_STRENGTH, 0) || h.modes < st.getInteger(MIN_MODES, 1)) return null;
     return h;
   }
 

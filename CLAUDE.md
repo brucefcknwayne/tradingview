@@ -19,4 +19,4 @@
 | `ib-first/` | IB First: Tief der IB zuerst → IB-Hoch wird geholt (und umgekehrt), Linien mit % für Gegenseite, +0,5/+1 IB, Erstseite; Statistik in `data-lab/ib_first_*.py` |
 | `kyle-lambda/` | Kyle-λ-Profil: Preis-Impact je Kontrakt (Δp auf vorzeichenbehaftetes Volumen, BVC oder Tick-Regel), rollierend + je Preiszone, dünne/dicke Zonen (ungetestet) |
 | `gotham-engine/` | Nachrechnung der MotiveWave-Study „Gotham Engine“ (Absorption/Breaking) auf NQ-Trades: Ereignisse, Zufallsvergleich, Kalibrierung |
-| `absorption-engine/` | Absorption Engine (Pine): Footprint je Kerze – Bid-/Ask-Absorption am Tief/Hoch (Aufwand, Dominanz, gehalten), Stärke 0–100, Filter „nur an meinen Levels“, Live-Status + Held/Failed-Statistik (aktuelles Projekt) |
+| `absorption-engine/` | Absorption Engine: `motivewave/` = MotiveWave-Study (Java, Rithmic-Ticks, 10 Modi, „x/10“-Konfluenz, relative Schwellen, `dist/AbsorptionEngine.jar`), `calibrate.py` = Eichung auf NQ-Trades; dazu ältere Pine-Variante (aktuelles Projekt) |
