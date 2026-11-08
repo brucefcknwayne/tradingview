@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "lagercheck",
+  "version": "2.0.0",
+  "name": "Lagercheck",
+  "description": "Merkt sich, was in deinen Truhen liegt. Befehl: /lc (oder /lagercheck). Daten in .minecraft/lagercheck/",
+  "authors": ["Hanu"],
+  "environment": "client",
+  "entrypoints": { "client": ["de.hanu.lagercheck.LagerCheck"] },
+  "mixins": ["lagercheck.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.17.0",
+    "minecraft": "~26.3",
+    "java": ">=21"
+  }
+}
