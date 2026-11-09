@@ -1,37 +1,30 @@
 FEHLENDE ITEMS - Lager Quadrat 359
-Stand: 09.11.2026   (24 Stück)
-================================================
+Stand: 09.11.2026   (21 Stück)
+================================
 
 REDSTONE (10)
-[ ] Hebel                                Preis fehlt
-[ ] Tageslichtsensor                     Preis fehlt
-[ ] Steinknopf                           Preis fehlt
-[ ] Holzknopf                            Preis fehlt
-[ ] Steindruckplatte                     Preis fehlt
-[ ] Holzdruckplatte                      Preis fehlt
-[ ] Wägeplatte leicht (Gold)             Preis fehlt
-[ ] Wägeplatte schwer (Eisen)            Preis fehlt
-[ ] Eisentür                             Preis fehlt
-[ ] Eisenfalltür                         Preis fehlt
+[ ] Hebel
+[ ] Tageslichtsensor
+[ ] Steinknopf
+[ ] Holzknopf
+[ ] Steindruckplatte
+[ ] Holzdruckplatte
+[ ] Wägeplatte leicht (Gold)
+[ ] Wägeplatte schwer (Eisen)
+[ ] Eisentür
+[ ] Eisenfalltür
 
 NATUR (2)
-[ ] Heuballen (Strohballen)               3.800,00 $
-[ ] Kürbislaterne                            71,00 $
+[ ] Heuballen (Strohballen)
+[ ] Kürbislaterne
 
-BLUMEN & PFLANZEN (12)
-[ ] Löwenzahn                            Preis fehlt
-[ ] Sternlauch (Allium)                  Preis fehlt
-[ ] Farn                                 Preis fehlt
-[ ] Toter Busch                          Preis fehlt
-[ ] Gras                                    453,00 $
-[ ] Hohes Gras                           Preis fehlt
-[ ] Großer Farn                          Preis fehlt
-[ ] Brauner Pilz                            267,00 $   <- Pilz-Preise evtl. vertauscht
-[ ] Roter Pilz                              268,00 $   <- Pilz-Preise evtl. vertauscht
-[ ] Kaktus                                  410,00 $
-[ ] Ranken                                  300,00 $
-[ ] Seerosenblatt                         2.460,00 $
-
-------------------------------------------------
-Summe (8 Items mit Preis):           8.029,00 $
-Noch ohne Preis: 16 Items
+BLUMEN & PFLANZEN (9)
+[ ] Löwenzahn
+[ ] Sternlauch (Allium)
+[ ] Farn
+[ ] Toter Busch
+[ ] Gras
+[ ] Hohes Gras
+[ ] Großer Farn
+[ ] Kaktus
+[ ] Seerosenblatt
