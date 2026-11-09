@@ -1,22 +1,16 @@
 FEHLENDE ITEMS - Lager Quadrat 359
-Stand: 09.11.2026   (7 Stück)
+Stand: 09.11.2026   (3 Stück)
 ================================================
 
-A) SELBER CRAFTEN (1)                  Rezept (Minecraft 1.8)
-------------------------------------------------
-[ ] Eisenfalltür                       4 Eisenbarren (2x2 im Werkbank-Feld)
-
-ROHSTOFFE:
-[ ] 4 Eisenbarren
-
-B) NICHT CRAFTBAR - SAMMELN (6)
+NICHT CRAFTBAR - SAMMELN (3)
 ------------------------------------------------
 [ ] Löwenzahn         Knochenmehl auf Grasblock (Ebene), oder finden
 [ ] Sternlauch        nur im Blumenwald-Biom
 [ ] Farn              Taiga / Dschungel, mit SCHERE abbauen
-[ ] Großer Farn       Knochenmehl auf einen Farn, mit Schere abbauen
-[ ] Hohes Gras        Knochenmehl auf Grasblock, mit Schere abbauen
-[ ] Seerosenblatt     Sumpf (oder beim Angeln)
+
+AUS DEM LAGER GESTRICHEN (in 1.8 nicht zu bekommen):
+Hohes Gras, Großer Farn  -> Platz bleibt leer, sonst ändert sich nichts
 
 ERLEDIGT: Hebel, Tageslichtsensor, Steinknopf, Holzknopf, alle 4 Druckplatten,
-Eisentür, Heuballen, Kürbislaterne, Gras, Kaktus, Toter Busch
+Eisentür, Eisenfalltür, Heuballen, Kürbislaterne, Gras, Kaktus, Toter Busch,
+Seerosenblatt
