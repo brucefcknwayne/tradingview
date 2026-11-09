@@ -1,0 +1,55 @@
+FEHLENDE ITEMS - Lager Quadrat 359
+Stand: 09.11.2026   (43 Stück)
+==================================
+
+REDSTONE (18)
+[ ] Redstone-Fackel
+[ ] Redstone-Verstärker (Repeater)
+[ ] Redstone-Komparator
+[ ] Hebel
+[ ] Steinknopf
+[ ] Holzknopf
+[ ] Steindruckplatte
+[ ] Holzdruckplatte
+[ ] Wägeplatte leicht (Gold)
+[ ] Wägeplatte schwer (Eisen)
+[ ] Haken
+[ ] Tageslichtsensor
+[ ] Schiene
+[ ] Antriebsschiene
+[ ] Sensorschiene
+[ ] Aktivierungsschiene
+[ ] Eisentür
+[ ] Eisenfalltür
+
+NATUR (1)
+[ ] Heuballen (Strohballen)
+
+BLUMEN & PFLANZEN (24)
+[ ] Löwenzahn
+[ ] Mohn
+[ ] Blaue Orchidee
+[ ] Sternlauch
+[ ] Porzellansternchen
+[ ] Rote Tulpe
+[ ] Orange Tulpe
+[ ] Weiße Tulpe
+[ ] Rosa Tulpe
+[ ] Margerite
+[ ] Sonnenblume
+[ ] Flieder
+[ ] Rosenstrauch
+[ ] Pfingstrose
+[ ] Gras
+[ ] Farn
+[ ] Hohes Gras
+[ ] Großer Farn
+[ ] Toter Busch
+[ ] Brauner Pilz
+[ ] Roter Pilz
+[ ] Kaktus
+[ ] Ranken
+[ ] Seerosenblatt
+
+ERLEDIGT: Eimer, Pilzsuppe, Brot, Schere, Ziegelstufe, Sandsteinstufe,
+alle Farbstoffe, roher Fisch
