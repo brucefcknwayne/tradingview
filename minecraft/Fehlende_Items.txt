@@ -1,9 +1,10 @@
 FEHLENDE ITEMS - Lager Quadrat 359
-Stand: 09.11.2026   (3 Stück)
+Stand: 09.11.2026   (4 Stück)
 ================================================
 
-NICHT CRAFTBAR - SAMMELN (3)
+NICHT CRAFTBAR - SAMMELN (4)
 ------------------------------------------------
+[ ] Mohn (rote Blume) Knochenmehl auf Grasblock (Ebene), Eisengolems droppen ihn auch
 [ ] Löwenzahn         Knochenmehl auf Grasblock (Ebene), oder finden
 [ ] Sternlauch        nur im Blumenwald-Biom
 [ ] Farn              Taiga / Dschungel, mit SCHERE abbauen
