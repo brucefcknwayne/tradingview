@@ -1,17 +1,45 @@
-FEHLENDE ITEMS - Lager Quadrat 359
-Stand: 09.11.2026   (4 Stück)
+LAGER QUADRAT 359 - TO-DO
+Stand: 09.11.2026
 ================================================
 
-NICHT CRAFTBAR - SAMMELN (4)
+ERLEDIGEN
 ------------------------------------------------
-[ ] Mohn (rote Blume) Knochenmehl auf Grasblock (Ebene), Eisengolems droppen ihn auch
-[ ] Löwenzahn         Knochenmehl auf Grasblock (Ebene), oder finden
-[ ] Sternlauch        nur im Blumenwald-Biom
-[ ] Farn              Taiga / Dschungel, mit SCHERE abbauen
+[ ] Stone Bricks in ihre Kiste legen
 
-AUS DEM LAGER GESTRICHEN (in 1.8 nicht zu bekommen):
-Hohes Gras, Großer Farn  -> Platz bleibt leer, sonst ändert sich nichts
+NOCH BESORGEN
+------------------------------------------------
+[ ] 2x Farbstoff pink / lila / magenta
+       -> im Spiel mit der Maus drüber fahren, dann steht der echte Name da
+       Rosa (Pink):  1 Rosenrot + 1 Knochenmehl       = 2 Rosa
+       Lila:         1 Rosenrot + 1 Lapislazuli        = 2 Lila
+       Magenta:      1 Flieder                        = 2 Magenta
+                     (oder 1 Lila + 1 Rosa            = 2 Magenta)
+[ ] 2x Tageslichtsensor     je 3 Glas + 3 Netherquarz + 3 Holzstufen
+[ ] 1x Erfahrungsfläschchen NICHT craftbar -> kaufen oder beim Priester-Dorfbewohner tauschen
+[ ] 2x Leere Karte          je 8 Papier + 1 Kompass
+                            (Kompass = 4 Eisenbarren + 1 Redstone)
+[ ] 1x Lore                 5 Eisenbarren
+[ ] 1x Güterlore            1 Lore + 1 Truhe
+[ ] 1x Antriebslore         1 Lore + 1 Ofen
+[ ] 1x TNT-Lore             1 Lore + 1 TNT
+[ ] 1x Trichterlore         1 Lore + 1 Trichter (Trichter = 5 Eisenbarren + 1 Truhe)
+[ ] 1x Boot                 5 Holzbretter
+[ ] 1x Farn                 Taiga / Dschungel, mit SCHERE abbauen
 
-ERLEDIGT: Hebel, Tageslichtsensor, Steinknopf, Holzknopf, alle 4 Druckplatten,
-Eisentür, Eisenfalltür, Heuballen, Kürbislaterne, Gras, Kaktus, Toter Busch,
-Seerosenblatt
+ROHSTOFFE FÜR ALLES ZUM CRAFTEN (ohne Farbstoff)
+------------------------------------------------
+[ ] 38 Eisenbarren   (25 für 5 Loren, 5 Trichter, 8 für 2 Kompasse)
+[ ]  6 Holzstämme    (= 24 Bretter: 2 Truhen, Boot, 6 Holzstufen)
+[ ] 10 Sand          (6 zu Glas schmelzen, 4 für TNT)
+[ ]  6 Netherquarz
+[ ] 16 Zuckerrohr    (= 16 Papier)
+[ ]  2 Redstone      (für die Kompasse)
+[ ]  8 Bruchstein    (Ofen)
+[ ]  5 Schwarzpulver (TNT)
+
+NEU IM LAGER: Boot (Item-Frame direkt hinter den Loren)
+
+ERLEDIGT: Mohn, Löwenzahn, Sternlauch, Eisenfalltür, Seerosenblatt, Hebel,
+Tageslichtsensor (1), Knöpfe, Druckplatten, Eisentür, Heuballen,
+Kürbislaterne, Gras, Kaktus, Toter Busch
+GESTRICHEN (gibt es in 1.8 nicht): Hohes Gras, Großer Farn
