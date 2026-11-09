@@ -1,12 +1,11 @@
 FEHLENDE ITEMS - Lager Quadrat 359
-Stand: 09.11.2026   (43 Stück)
+Stand: 09.11.2026   (37 Stück)
 ================================================
 
-REDSTONE (18)
+REDSTONE (16)
 [ ] Redstone-Fackel                          34,00 $
 [ ] Redstone-Verstärker (Repeater)          390,00 $
 [ ] Redstone-Komparator                     425,00 $
-[ ] Hebel                                    25,00 $
 [ ] Steinknopf                           Preis fehlt
 [ ] Holzknopf                            Preis fehlt
 [ ] Steindruckplatte                     Preis fehlt
@@ -14,7 +13,6 @@ REDSTONE (18)
 [ ] Wägeplatte leicht (Gold)             Preis fehlt
 [ ] Wägeplatte schwer (Eisen)            Preis fehlt
 [ ] Haken                                    54,00 $
-[ ] Tageslichtsensor                        480,00 $
 [ ] Schiene                                 350,20 $
 [ ] Antriebsschiene                         350,40 $
 [ ] Sensorschiene                           350,30 $
@@ -25,11 +23,9 @@ REDSTONE (18)
 NATUR (1)
 [ ] Heuballen (Strohballen)              Preis fehlt
 
-BLUMEN & PFLANZEN (24)
-[ ] Löwenzahn                               760,09 $
+BLUMEN & PFLANZEN (20)
 [ ] Mohn                                    760,06 $
 [ ] Blaue Orchidee                          760,04 $
-[ ] Sternlauch (Allium)                     760,06 $
 [ ] Porzellansternchen (Azure)              760,05 $
 [ ] Rote Tulpe                              760,13 $
 [ ] Orange Tulpe                            760,10 $
@@ -41,10 +37,8 @@ BLUMEN & PFLANZEN (24)
 [ ] Rosenstrauch                            760,00 $
 [ ] Pfingstrose                             760,01 $
 [ ] Gras                                 Preis fehlt
-[ ] Farn                                    570,00 $
 [ ] Hohes Gras                           Preis fehlt
 [ ] Großer Farn                          Preis fehlt
-[ ] Toter Busch                           6.010,00 $   <- 6.010? oder 60,10?
 [ ] Brauner Pilz                         Preis fehlt
 [ ] Roter Pilz                           Preis fehlt
 [ ] Kaktus                               Preis fehlt
@@ -52,8 +46,16 @@ BLUMEN & PFLANZEN (24)
 [ ] Seerosenblatt                        Preis fehlt
 
 ------------------------------------------------
-Summe (26 Items mit Preis):          20.029,89 $
+Summe (20 Items mit Preis):          11.424,74 $
 Noch ohne Preis: 17 Items
+
+GIBT ES NICHT IM SHOP (6) - woanders besorgen:
+[ ] Hebel
+[ ] Tageslichtsensor
+[ ] Löwenzahn
+[ ] Sternlauch (Allium)
+[ ] Farn
+[ ] Toter Busch
 
 ERLEDIGT: Eimer, Pilzsuppe, Brot, Schere, Ziegelstufe, Sandsteinstufe,
 alle Farbstoffe, roher Fisch
