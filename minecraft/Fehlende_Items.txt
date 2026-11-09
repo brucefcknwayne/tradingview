@@ -1,30 +1,48 @@
 FEHLENDE ITEMS - Lager Quadrat 359
 Stand: 09.11.2026   (21 Stück)
-================================
+================================================
 
-REDSTONE (10)
-[ ] Hebel
-[ ] Tageslichtsensor
-[ ] Steinknopf
-[ ] Holzknopf
-[ ] Steindruckplatte
-[ ] Holzdruckplatte
-[ ] Wägeplatte leicht (Gold)
-[ ] Wägeplatte schwer (Eisen)
-[ ] Eisentür
-[ ] Eisenfalltür
+A) SELBER CRAFTEN (12)                 Rezept (Minecraft 1.8)
+------------------------------------------------
+[ ] Hebel                              1 Stock + 1 Bruchstein
+[ ] Tageslichtsensor                   3 Glas + 3 Netherquarz + 3 Holzstufen
+[ ] Steinknopf                         1 Stein
+[ ] Holzknopf                          1 Holzbrett
+[ ] Steindruckplatte                   2 Stein
+[ ] Holzdruckplatte                    2 Holzbretter
+[ ] Wägeplatte leicht (Gold)           2 Goldbarren
+[ ] Wägeplatte schwer (Eisen)          2 Eisenbarren
+[ ] Eisentür                           6 Eisenbarren (gibt 3 Türen)
+[ ] Eisenfalltür                       4 Eisenbarren
+[ ] Heuballen                          9 Weizen
+[ ] Kürbislaterne                      1 Kürbis + 1 Fackel
 
-NATUR (2)
-[ ] Heuballen (Strohballen)
-[ ] Kürbislaterne
+ROHSTOFFE FÜR ALLES OBEN (je 1 Stück):
+[ ] 2 Holzstämme      -> 8 Bretter (für Knopf, Druckplatte, 3 Stufen, Stöcke)
+[ ] 4 Bruchstein      -> 1 für Hebel, 3 im Ofen zu Stein schmelzen
+[ ] 3 Sand            -> im Ofen zu 3 Glas schmelzen
+[ ] 3 Netherquarz
+[ ] 2 Goldbarren
+[ ] 12 Eisenbarren
+[ ] 9 Weizen
+[ ] 1 Kürbis
+[ ] 1 Kohle (oder Holzkohle) -> für die Fackel
+    (+ etwas Kohle zum Schmelzen von Stein und Glas)
 
-BLUMEN & PFLANZEN (9)
-[ ] Löwenzahn
-[ ] Sternlauch (Allium)
-[ ] Farn
-[ ] Toter Busch
-[ ] Gras
-[ ] Hohes Gras
-[ ] Großer Farn
-[ ] Kaktus
-[ ] Seerosenblatt
+Zwischenschritte:
+  Bretter: 1 Stamm = 4 Bretter
+  Stöcke:  2 Bretter = 4 Stöcke     (brauchst 2: Hebel + Fackel)
+  Stufen:  3 Bretter = 6 Holzstufen (brauchst 3)
+  Fackel:  1 Kohle + 1 Stock = 4 Fackeln
+
+B) NICHT CRAFTBAR - SAMMELN (9)
+------------------------------------------------
+[ ] Löwenzahn         Knochenmehl auf Gras (Ebene), oder finden
+[ ] Sternlauch        nur im Blumenwald-Biom
+[ ] Farn              Taiga / Dschungel, mit SCHERE abbauen
+[ ] Großer Farn       Knochenmehl auf einen Farn, mit Schere abbauen
+[ ] Gras              Knochenmehl auf Grasblock, mit SCHERE abbauen
+[ ] Hohes Gras        Knochenmehl auf Grasblock, mit Schere abbauen
+[ ] Toter Busch       Wüste / Mesa, mit SCHERE abbauen (sonst nur Stöcke)
+[ ] Kaktus            Wüste
+[ ] Seerosenblatt     Sumpf (oder beim Angeln)
