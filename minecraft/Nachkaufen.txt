@@ -1,0 +1,80 @@
+NACHKAUFEN - XXL Lager Final Ton
+Stand 10.11.2026  (Bestand verglichen mit allen Items im Lager)
+====================================================
+
+FEHLT KOMPLETT - 0 Stück (30)
+[ ] Angel
+[ ] Antriebslore
+[ ] Bogen
+[ ] Boot
+[ ] Eis
+[ ] Farn
+[ ] Feuerzeug
+[ ] Güterlore
+[ ] Hellgrauer Farbstoff
+[ ] Holztreppe (Akazie)
+[ ] Holztreppe (Birke)
+[ ] Holztreppe (Eiche)
+[ ] Holztreppe (Fichte)
+[ ] Holztreppe (Tropenbaum)
+[ ] Lore
+[ ] Pilzsuppe
+[ ] Rahmen (Item-Frame)
+[ ] Redstone (Staub)
+[ ] Sandsteintreppe
+[ ] Schere
+[ ] Schild
+[ ] Setzling (Birke)
+[ ] Setzling (Eiche)
+[ ] Setzling (Fichte)
+[ ] Setzling (Schwarzeiche)
+[ ] Setzling (Tropenbaum)
+[ ] Steinziegeltreppe
+[ ] TNT-Lore
+[ ] Trichterlore
+[ ] Ziegeltreppe
+
+UNTER 8 STÜCK (23)
+[ ] Wägeplatte (schwer, Eisen)         hast: 2
+[ ] Hebel                              hast: 3
+[ ] Steindruckplatte                   hast: 3
+[ ] Zaun (Eiche)                       hast: 3
+[ ] Bruchsteintreppe                   hast: 4
+[ ] Holztreppe (Schwarzeiche)          hast: 4
+[ ] Netherziegeltreppe                 hast: 4
+[ ] Quarztreppe                        hast: 4
+[ ] Rote Sandsteintreppe               hast: 4
+[ ] Sandsteinstufe                     hast: 4
+[ ] Zaun (Akazie)                      hast: 4
+[ ] Zaun (Birke)                       hast: 4
+[ ] Zaun (Fichte)                      hast: 4
+[ ] Zaun (Schwarzeiche)                hast: 4
+[ ] Zaun (Tropenbaum)                  hast: 4
+[ ] Ziegelstufe                        hast: 4
+[ ] Holzknopf                          hast: 5
+[ ] Wägeplatte (leicht, Gold)          hast: 5
+[ ] Eisenfalltür                       hast: 6
+[ ] Holzdruckplatte                    hast: 6
+[ ] Milcheimer                         hast: 6
+[ ] Lavaeimer                          hast: 7
+[ ] Wassereimer                        hast: 7
+
+8 BIS 11 STÜCK (18)
+[ ] Braustand                          hast: 8
+[ ] Quarzstufe                         hast: 8
+[ ] Steinknopf                         hast: 8
+[ ] Bruchsteinmauer                    hast: 10
+[ ] Bruchsteinstufe                    hast: 10
+[ ] Ei                                 hast: 10
+[ ] Enderperle                         hast: 10
+[ ] Holzstufe (Birke)                  hast: 10
+[ ] Holzstufe (Eiche)                  hast: 10
+[ ] Holzstufe (Fichte)                 hast: 10
+[ ] Holzstufe (Tropenbaum)             hast: 10
+[ ] Netherziegelzaun                   hast: 10
+[ ] Rote Sandsteinstufe                hast: 10
+[ ] Schüssel                           hast: 10
+[ ] Steinstufe                         hast: 10
+[ ] Eisentür                           hast: 11
+[ ] Holzstufe (Akazie)                 hast: 11
+[ ] Ofen                               hast: 11   (3 pro Lager!)
