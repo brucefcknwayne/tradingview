@@ -1,73 +1,94 @@
 NACHKAUFEN
 
-[ ] Angel
-[ ] Antriebslore
-[ ] Bogen
-[ ] Boot
-[ ] Braustand
-[ ] Bruchsteinmauer
-[ ] Bruchsteinstufe
-[ ] Bruchsteintreppe
-[ ] Ei
-[ ] Eis
-[ ] Eisenfalltür
-[ ] Eisentür
-[ ] Enderperle
-[ ] Farn
-[ ] Feuerzeug
-[ ] Güterlore
-[ ] Hebel
-[ ] Hellgrauer Farbstoff
-[ ] Holzdruckplatte
-[ ] Holzknopf
-[ ] Holzstufe (Akazie)
-[ ] Holzstufe (Birke)
+== Holz ==
 [ ] Holzstufe (Eiche)
 [ ] Holzstufe (Fichte)
+[ ] Holzstufe (Birke)
 [ ] Holzstufe (Tropenbaum)
-[ ] Holztreppe (Akazie)
-[ ] Holztreppe (Birke)
+[ ] Holzstufe (Akazie)
 [ ] Holztreppe (Eiche)
 [ ] Holztreppe (Fichte)
-[ ] Holztreppe (Schwarzeiche)
+[ ] Holztreppe (Birke)
 [ ] Holztreppe (Tropenbaum)
-[ ] Lavaeimer
-[ ] Lore
-[ ] Milcheimer
-[ ] Netherziegeltreppe
-[ ] Netherziegelzaun
-[ ] Ofen
-[ ] Pilzsuppe
-[ ] Quarzstufe
-[ ] Quarztreppe
-[ ] Rahmen (Item-Frame)
-[ ] Redstone (Staub)
-[ ] Rote Sandsteinstufe
-[ ] Rote Sandsteintreppe
-[ ] Sandsteinstufe
-[ ] Sandsteintreppe
-[ ] Schere
-[ ] Schild
-[ ] Schüssel
-[ ] Setzling (Birke)
-[ ] Setzling (Eiche)
-[ ] Setzling (Fichte)
-[ ] Setzling (Schwarzeiche)
-[ ] Setzling (Tropenbaum)
-[ ] Steindruckplatte
-[ ] Steinknopf
-[ ] Steinstufe
-[ ] Steinziegeltreppe
-[ ] TNT-Lore
-[ ] Trichterlore
-[ ] Wassereimer
-[ ] Wägeplatte (leicht, Gold)
-[ ] Wägeplatte (schwer, Eisen)
-[ ] Zaun (Akazie)
-[ ] Zaun (Birke)
+[ ] Holztreppe (Akazie)
+[ ] Holztreppe (Schwarzeiche)
 [ ] Zaun (Eiche)
 [ ] Zaun (Fichte)
-[ ] Zaun (Schwarzeiche)
+[ ] Zaun (Birke)
 [ ] Zaun (Tropenbaum)
+[ ] Zaun (Akazie)
+[ ] Zaun (Schwarzeiche)
+[ ] Setzling (Eiche)
+[ ] Setzling (Fichte)
+[ ] Setzling (Birke)
+[ ] Setzling (Tropenbaum)
+[ ] Setzling (Schwarzeiche)
+
+== Steine, Treppen und Stufen ==
+[ ] Steinstufe
+[ ] Bruchsteinstufe
+[ ] Bruchsteintreppe
+[ ] Bruchsteinmauer
+[ ] Steinziegeltreppe
 [ ] Ziegelstufe
 [ ] Ziegeltreppe
+[ ] Sandsteinstufe
+[ ] Sandsteintreppe
+[ ] Rote Sandsteinstufe
+[ ] Rote Sandsteintreppe
+[ ] Quarzstufe
+[ ] Quarztreppe
+[ ] Netherziegeltreppe
+[ ] Netherziegelzaun
+
+== Natur und Pflanzen ==
+[ ] Farn
+[ ] Eis
+
+== Redstone ==
+[ ] Hebel
+[ ] Steinknopf
+[ ] Holzknopf
+[ ] Steindruckplatte
+[ ] Holzdruckplatte
+[ ] Wägeplatte (leicht, Gold)
+[ ] Wägeplatte (schwer, Eisen)
+[ ] Eisentür
+[ ] Eisenfalltür
+[ ] Redstone (Staub)
+
+== Loren und Boot ==
+[ ] Lore
+[ ] Güterlore
+[ ] Antriebslore
+[ ] TNT-Lore
+[ ] Trichterlore
+[ ] Boot
+
+== Werkzeuge ==
+[ ] Angel
+[ ] Bogen
+[ ] Feuerzeug
+[ ] Schere
+
+== Eimer ==
+[ ] Wassereimer
+[ ] Lavaeimer
+[ ] Milcheimer
+
+== Funktion und Deko ==
+[ ] Ofen
+[ ] Braustand
+[ ] Rahmen (Item-Frame)
+[ ] Schild
+
+== Mob-Drops ==
+[ ] Ei
+[ ] Enderperle
+
+== Essen ==
+[ ] Pilzsuppe
+[ ] Schüssel
+
+== Farbstoffe ==
+[ ] Hellgrauer Farbstoff
