@@ -1,31 +1,16 @@
 NACHKAUFEN
 
 == Holz ==
-[ ] Holzstufe (Eiche)            - Oak Slab
-[ ] Holzstufe (Fichte)           - Spruce Slab
-[ ] Holzstufe (Birke)            - Birch Slab
-[ ] Holzstufe (Tropenbaum)       - Jungle Slab
-[ ] Holzstufe (Akazie)           - Acacia Slab
 [ ] Holztreppe (Eiche)           - Oak Stairs
 [ ] Holztreppe (Fichte)          - Spruce Stairs
 [ ] Holztreppe (Birke)           - Birch Stairs
 [ ] Holztreppe (Tropenbaum)      - Jungle Stairs
 [ ] Holztreppe (Akazie)          - Acacia Stairs
 [ ] Holztreppe (Schwarzeiche)    - Dark Oak Stairs
-[ ] Zaun (Eiche)                 - Oak Fence
-[ ] Zaun (Fichte)                - Spruce Fence
-[ ] Zaun (Birke)                 - Birch Fence
-[ ] Zaun (Tropenbaum)            - Jungle Fence
-[ ] Zaun (Akazie)                - Acacia Fence
-[ ] Zaun (Schwarzeiche)          - Dark Oak Fence
-[ ] Setzling (Eiche)             - Oak Sapling
-[ ] Setzling (Fichte)            - Spruce Sapling
-[ ] Setzling (Birke)             - Birch Sapling
-[ ] Setzling (Tropenbaum)        - Jungle Sapling
 [ ] Setzling (Schwarzeiche)      - Dark Oak Sapling
+[ ] Setzling (Akazie)            - Acacia Sapling
 
 == Steine, Treppen und Stufen ==
-[ ] Steinstufe                   - Stone Slab
 [ ] Bruchsteinstufe              - Cobblestone Slab
 [ ] Bruchsteintreppe             - Cobblestone Stairs
 [ ] Bruchsteinmauer              - Cobblestone Wall
@@ -41,16 +26,8 @@ NACHKAUFEN
 [ ] Netherziegeltreppe           - Nether Brick Stairs
 [ ] Netherziegelzaun             - Nether Brick Fence
 
-== Natur und Pflanzen ==
-[ ] Farn                         - Fern
-[ ] Eis                          - Ice
-
 == Redstone ==
 [ ] Hebel                        - Lever
-[ ] Steinknopf                   - Stone Button
-[ ] Holzknopf                    - Oak Button
-[ ] Steindruckplatte             - Stone Pressure Plate
-[ ] Holzdruckplatte              - Oak Pressure Plate
 [ ] Wägeplatte (leicht, Gold)    - Light Weighted Pressure Plate
 [ ] Wägeplatte (schwer, Eisen)   - Heavy Weighted Pressure Plate
 [ ] Eisentür                     - Iron Door
@@ -71,24 +48,12 @@ NACHKAUFEN
 [ ] Feuerzeug                    - Flint and Steel
 [ ] Schere                       - Shears
 
-== Eimer ==
-[ ] Wassereimer                  - Water Bucket
-[ ] Lavaeimer                    - Lava Bucket
-[ ] Milcheimer                   - Milk Bucket
-
 == Funktion und Deko ==
-[ ] Ofen                         - Furnace
 [ ] Braustand                    - Brewing Stand
-[ ] Rahmen (Item-Frame)          - Item Frame
-[ ] Schild                       - Sign
 
 == Mob-Drops ==
 [ ] Ei                           - Egg
 [ ] Enderperle                   - Ender Pearl
-
-== Essen ==
-[ ] Pilzsuppe                    - Mushroom Stew
-[ ] Schüssel                     - Bowl
 
 == Farbstoffe ==
 [ ] Hellgrauer Farbstoff         - Light Gray Dye
