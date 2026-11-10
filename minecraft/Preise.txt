@@ -2,43 +2,46 @@ PREISE (Stand 10.11.2026)
 
 == Steine ==
 Netherziegel ............ ?
-Quarz ................... 920,00 $
-Roter Sandstein ......... 980,00 $
-Sandstein ............... 434,01 $
-Bruchstein .............. 330,00 $
-Eisblock ................ 10,10 $
+Quarz ................... ?
+Roter Sandstein ......... 920,00 $
+Sandstein ............... 980,00 $
+Bruchstein .............. 460,00 $
+Eisblock ................ 1.610,00 $
 
 == Erze / Materialien ==
-Eisen ................... 262,00 $
-Gold .................... 100,00 $
-Redstone ................ 70,00 $
+Eisen ................... 330,00 $
+Gold .................... 262,00 $
+Redstone ................ 100,00 $
 
 == Setzlinge ==
-Birkensetzling .......... 190,00 $
-Fichtensetzling ......... 360,00 $
-Akaziensetzling ......... 1.700,00 $
-Tropensetzling .......... 1.000,00 $
-Schwarzeichensetzling ... 1.610,00 $
+Birkensetzling .......... 70,00 $
+Fichtensetzling ......... 190,00 $
+Akaziensetzling ......... 360,00 $
+Tropensetzling .......... 1.700,00 $
+Schwarzeichensetzling ... 1.000,00 $
 
 == Eimer ==
-Wassereimer ............. 40,00 $
-Milcheimer .............. 297,00 $
-Lavaeimer ............... 24,00 $
+Wassereimer ............. 10,10 $
+Milcheimer .............. 40,00 $
+Lavaeimer ............... 297,00 $
 
 == Funktion und Deko ==
-Braustand ............... 456,00 $
-Ofen .................... 570,00 $
-Bilderrahmen ............ 15,00 $
-Schild .................. 55,00 $
+Braustand ............... 24,00 $
+Ofen .................... 14,00 $
+Bilderrahmen ............ 82,00 $
+Schild .................. 15,00 $
 
 == Essen / Mob-Drops ==
-Schüssel ................ 82,00 $
-Pilzsuppe ............... 1.100,00 $   (zweiter Preis genannt: 3.500,01 $)
-Eier .................... 14,00 $
+Schüssel ................ 456,00 $
+Pilzsuppe ............... 1.100,00 $
+Eier .................... 3.500,01 $
+
+== Natur ==
+Farn .................... 570,00 $
 
 == Farbstoffe ==
-Hellgraue Farbe ......... 460,00 $
+Hellgraue Farbe ......... 434,01 $
 
 == Ohne Preis ==
 Netherziegel
-Farn
+Quarz
