@@ -1,94 +1,94 @@
 NACHKAUFEN
 
 == Holz ==
-[ ] Holzstufe (Eiche)
-[ ] Holzstufe (Fichte)
-[ ] Holzstufe (Birke)
-[ ] Holzstufe (Tropenbaum)
-[ ] Holzstufe (Akazie)
-[ ] Holztreppe (Eiche)
-[ ] Holztreppe (Fichte)
-[ ] Holztreppe (Birke)
-[ ] Holztreppe (Tropenbaum)
-[ ] Holztreppe (Akazie)
-[ ] Holztreppe (Schwarzeiche)
-[ ] Zaun (Eiche)
-[ ] Zaun (Fichte)
-[ ] Zaun (Birke)
-[ ] Zaun (Tropenbaum)
-[ ] Zaun (Akazie)
-[ ] Zaun (Schwarzeiche)
-[ ] Setzling (Eiche)
-[ ] Setzling (Fichte)
-[ ] Setzling (Birke)
-[ ] Setzling (Tropenbaum)
-[ ] Setzling (Schwarzeiche)
+[ ] Holzstufe (Eiche)            - Oak Slab
+[ ] Holzstufe (Fichte)           - Spruce Slab
+[ ] Holzstufe (Birke)            - Birch Slab
+[ ] Holzstufe (Tropenbaum)       - Jungle Slab
+[ ] Holzstufe (Akazie)           - Acacia Slab
+[ ] Holztreppe (Eiche)           - Oak Stairs
+[ ] Holztreppe (Fichte)          - Spruce Stairs
+[ ] Holztreppe (Birke)           - Birch Stairs
+[ ] Holztreppe (Tropenbaum)      - Jungle Stairs
+[ ] Holztreppe (Akazie)          - Acacia Stairs
+[ ] Holztreppe (Schwarzeiche)    - Dark Oak Stairs
+[ ] Zaun (Eiche)                 - Oak Fence
+[ ] Zaun (Fichte)                - Spruce Fence
+[ ] Zaun (Birke)                 - Birch Fence
+[ ] Zaun (Tropenbaum)            - Jungle Fence
+[ ] Zaun (Akazie)                - Acacia Fence
+[ ] Zaun (Schwarzeiche)          - Dark Oak Fence
+[ ] Setzling (Eiche)             - Oak Sapling
+[ ] Setzling (Fichte)            - Spruce Sapling
+[ ] Setzling (Birke)             - Birch Sapling
+[ ] Setzling (Tropenbaum)        - Jungle Sapling
+[ ] Setzling (Schwarzeiche)      - Dark Oak Sapling
 
 == Steine, Treppen und Stufen ==
-[ ] Steinstufe
-[ ] Bruchsteinstufe
-[ ] Bruchsteintreppe
-[ ] Bruchsteinmauer
-[ ] Steinziegeltreppe
-[ ] Ziegelstufe
-[ ] Ziegeltreppe
-[ ] Sandsteinstufe
-[ ] Sandsteintreppe
-[ ] Rote Sandsteinstufe
-[ ] Rote Sandsteintreppe
-[ ] Quarzstufe
-[ ] Quarztreppe
-[ ] Netherziegeltreppe
-[ ] Netherziegelzaun
+[ ] Steinstufe                   - Stone Slab
+[ ] Bruchsteinstufe              - Cobblestone Slab
+[ ] Bruchsteintreppe             - Cobblestone Stairs
+[ ] Bruchsteinmauer              - Cobblestone Wall
+[ ] Steinziegeltreppe            - Stone Brick Stairs
+[ ] Ziegelstufe                  - Brick Slab
+[ ] Ziegeltreppe                 - Brick Stairs
+[ ] Sandsteinstufe               - Sandstone Slab
+[ ] Sandsteintreppe              - Sandstone Stairs
+[ ] Rote Sandsteinstufe          - Red Sandstone Slab
+[ ] Rote Sandsteintreppe         - Red Sandstone Stairs
+[ ] Quarzstufe                   - Quartz Slab
+[ ] Quarztreppe                  - Quartz Stairs
+[ ] Netherziegeltreppe           - Nether Brick Stairs
+[ ] Netherziegelzaun             - Nether Brick Fence
 
 == Natur und Pflanzen ==
-[ ] Farn
-[ ] Eis
+[ ] Farn                         - Fern
+[ ] Eis                          - Ice
 
 == Redstone ==
-[ ] Hebel
-[ ] Steinknopf
-[ ] Holzknopf
-[ ] Steindruckplatte
-[ ] Holzdruckplatte
-[ ] Wägeplatte (leicht, Gold)
-[ ] Wägeplatte (schwer, Eisen)
-[ ] Eisentür
-[ ] Eisenfalltür
-[ ] Redstone (Staub)
+[ ] Hebel                        - Lever
+[ ] Steinknopf                   - Stone Button
+[ ] Holzknopf                    - Oak Button
+[ ] Steindruckplatte             - Stone Pressure Plate
+[ ] Holzdruckplatte              - Oak Pressure Plate
+[ ] Wägeplatte (leicht, Gold)    - Light Weighted Pressure Plate
+[ ] Wägeplatte (schwer, Eisen)   - Heavy Weighted Pressure Plate
+[ ] Eisentür                     - Iron Door
+[ ] Eisenfalltür                 - Iron Trapdoor
+[ ] Redstone (Staub)             - Redstone Dust
 
 == Loren und Boot ==
-[ ] Lore
-[ ] Güterlore
-[ ] Antriebslore
-[ ] TNT-Lore
-[ ] Trichterlore
-[ ] Boot
+[ ] Lore                         - Minecart
+[ ] Güterlore                    - Minecart with Chest
+[ ] Antriebslore                 - Minecart with Furnace
+[ ] TNT-Lore                     - Minecart with TNT
+[ ] Trichterlore                 - Minecart with Hopper
+[ ] Boot                         - Boat
 
 == Werkzeuge ==
-[ ] Angel
-[ ] Bogen
-[ ] Feuerzeug
-[ ] Schere
+[ ] Angel                        - Fishing Rod
+[ ] Bogen                        - Bow
+[ ] Feuerzeug                    - Flint and Steel
+[ ] Schere                       - Shears
 
 == Eimer ==
-[ ] Wassereimer
-[ ] Lavaeimer
-[ ] Milcheimer
+[ ] Wassereimer                  - Water Bucket
+[ ] Lavaeimer                    - Lava Bucket
+[ ] Milcheimer                   - Milk Bucket
 
 == Funktion und Deko ==
-[ ] Ofen
-[ ] Braustand
-[ ] Rahmen (Item-Frame)
-[ ] Schild
+[ ] Ofen                         - Furnace
+[ ] Braustand                    - Brewing Stand
+[ ] Rahmen (Item-Frame)          - Item Frame
+[ ] Schild                       - Sign
 
 == Mob-Drops ==
-[ ] Ei
-[ ] Enderperle
+[ ] Ei                           - Egg
+[ ] Enderperle                   - Ender Pearl
 
 == Essen ==
-[ ] Pilzsuppe
-[ ] Schüssel
+[ ] Pilzsuppe                    - Mushroom Stew
+[ ] Schüssel                     - Bowl
 
 == Farbstoffe ==
-[ ] Hellgrauer Farbstoff
+[ ] Hellgrauer Farbstoff         - Light Gray Dye
