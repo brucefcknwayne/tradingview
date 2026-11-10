@@ -1,7 +1,7 @@
 PREISE (Stand 10.11.2026)
 
 == Steine ==
-Netherziegel ............ ?
+Netherziegel ............ 3,40 $
 Quarz ................... ?
 Roter Sandstein ......... 920,00 $
 Sandstein ............... 980,00 $
@@ -43,5 +43,4 @@ Farn .................... 570,00 $
 Hellgraue Farbe ......... 434,01 $
 
 == Ohne Preis ==
-Netherziegel
 Quarz
