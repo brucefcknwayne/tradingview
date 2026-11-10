@@ -1,24 +1,14 @@
 PREISE (Stand 10.11.2026)
 
 == Steine ==
-Netherziegel ............ 3,40 $
+Netherziegel ............ 348,00 $
 Quarz ................... 884,00 $
 Roter Sandstein ......... 920,00 $
-Sandstein ............... 980,00 $
 Bruchstein .............. 460,00 $
 Eisblock ................ 1.610,00 $
 
-== Erze / Materialien ==
-Eisen ................... 330,00 $
-Gold .................... 262,00 $
-Redstone ................ 100,00 $
-
 == Setzlinge ==
-Birkensetzling .......... 70,00 $
-Fichtensetzling ......... 190,00 $
-Akaziensetzling ......... 360,00 $
 Tropensetzling .......... 1.700,00 $
-Schwarzeichensetzling ... 1.000,00 $
 
 == Eimer ==
 Wassereimer ............. 10,10 $
@@ -26,18 +16,16 @@ Milcheimer .............. 40,00 $
 Lavaeimer ............... 297,00 $
 
 == Funktion und Deko ==
-Braustand ............... 24,00 $
 Ofen .................... 14,00 $
 Bilderrahmen ............ 82,00 $
 Schild .................. 15,00 $
 
-== Essen / Mob-Drops ==
+== Essen ==
 Schüssel ................ 456,00 $
 Pilzsuppe ............... 1.100,00 $
-Eier .................... 3.500,01 $
 
 == Natur ==
 Farn .................... 570,00 $
 
-== Farbstoffe ==
-Hellgraue Farbe ......... 434,01 $
+------------------------------------
+SUMME ................... 8.506,10 $
